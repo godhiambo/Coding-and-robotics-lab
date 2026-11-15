@@ -16,7 +16,7 @@ function floorTex(i){
  return tex(W*S,H*S,function(g,w,h){
   var tape=l.floor==="tape",farm=l.floor==="farm";
   if(farm){World.paintSoil(g,0,0,w,h,"field",3);}
-  else{g.fillStyle=tape?"#e8ebee":"#c9ced4";g.fillRect(0,0,w,h);speckle(g,w,h,5000,tape?["#dde1e5","#f1f3f5"]:["#bfc5cc","#d3d8dd","#b6bcc4"],3);
+  else{World.paintFloor(g,w,h,tape);
    g.strokeStyle=tape?"rgba(160,170,180,.35)":"rgba(120,130,140,.4)";g.lineWidth=2;for(var x=0;x<=w;x+=25*S){g.beginPath();g.moveTo(x,0);g.lineTo(x,h);g.stroke();}for(var y=0;y<=h;y+=25*S){g.beginPath();g.moveTo(0,y);g.lineTo(w,y);g.stroke();}}
   st.plots.forEach(function(p){
    var x=p.x*S,y=p.y*S,pw=p.w*S,ph=p.h*S;World.paintSoil(g,x,y,pw,ph,p.dry?"dry":"wet",11+Math.round(p.x));
@@ -221,9 +221,9 @@ function buildLevel(){
  while(levelGroup.children.length)levelGroup.remove(levelGroup.children[0]);plantMeshes=[];World.resetPlants();
  if(floor.material.map)floor.material.map.dispose();
  floor.material.map=floorTex(st.lvl);floor.material.needsUpdate=true;
- ground.material.map=l.floor==="farm"?grass:concrete;ground.material.needsUpdate=true;
- scene.fog.color.set(l.floor==="farm"?0xcfe3ee:0xd5dde4);setNight(!!l.night);
- var bm=function(w,h){var t=brick.clone();t.needsUpdate=true;t.repeat.set(Math.max(1,w/22),Math.max(1,h/22));return new THREE.MeshStandardMaterial({map:t,roughness:0.9});};
+ ground.material.map=l.floor==="farm"?grass:World.murramTex();ground.material.needsUpdate=true;
+ scene.fog.color.set(0xcfe3ee);setNight(!!l.night);
+ var bm=function(w,h){if(l.id==="escarp")return World.rockMat(w,h);var t=brick.clone();t.needsUpdate=true;t.repeat.set(Math.max(1,w/22),Math.max(1,h/22));return new THREE.MeshStandardMaterial({map:t,roughness:0.9});};
  var wH=l.wallH||16;l.walls.forEach(function(r){var w=r[2],d=r[3];B(w,wH,d,bm(Math.max(w,d),wH),r[0]+w/2,wH/2,r[1]+d/2,levelGroup);B(w+0.6,1,d+0.6,M(0x8a8f96,0.8),r[0]+w/2,wH+0.4,r[1]+d/2,levelGroup);});
  var bw=l.floor==="farm"?M(0x8b6a43,0.9):M(0x7b838c,0.8),th=3;
  B(W+2*th,6,th,bw,W/2,3,-th/2,levelGroup);B(W+2*th,6,th,bw,W/2,3,H+th/2,levelGroup);B(th,6,H,bw,-th/2,3,H/2,levelGroup);B(th,6,H,bw,W+th/2,3,H/2,levelGroup);
@@ -233,11 +233,9 @@ function buildLevel(){
   plantMeshes[i]=World.buildPlot(levelGroup,p,i,p.dry&&!p.watered);
   lastWetBuilt=1;
  });
- (l.zonesDef||[]).forEach(function(z){var gm=new THREE.MeshStandardMaterial({color:0xbfe3ff,transparent:true,opacity:0.14,roughness:0.1,depthWrite:false});B(z[2],24,z[3],gm,z[0]+z[2]/2,12,z[1]+z[3]/2,levelGroup,false);
-  var e=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(z[2],24,z[3])),new THREE.LineBasicMaterial({color:0x8fb8d8}));e.position.set(z[0]+z[2]/2,12,z[1]+z[3]/2);levelGroup.add(e);
-  for(var k=0;k<5;k++)for(var m=0;m<3;m++)Cy(1.8,3.5,M(0x3f8f3a,0.8),z[0]+10+k*(z[2]-20)/4,1.7,z[1]+14+m*(z[3]-28)/2,levelGroup);});
+ (l.zonesDef||[]).forEach(function(z){if(l.id==="solar")World.solarRow(levelGroup,z);else World.greenhouse(levelGroup,z);});
  if(l.floor==="farm"){tree(-30,40,1,0);tree(-50,170,1.1,1);tree(330,30,1.2,0);tree(350,150,1,1);tree(120,-60,1.2,0);tree(240,-80,1,1);tree(60,270,1.1,1);tree(250,270,1,0);tree(-110,100,1.25,0);tree(430,90,1.15,1);World.tufts(levelGroup,W,H,qHigh()?900:0);}
- else{B(60,24,4,M(0xcbd5e1,0.6),W/2-40,12,-28,levelGroup);B(40,22,4,M(0x94a3b8,0.6),W/2+60,11,-30,levelGroup);}
+ else{World.shed(levelGroup,W/2-70,-46,76,30,17,1,"176,84,52");World.shed(levelGroup,W/2+62,-50,50,26,14,2,"58,108,148");tree(-60,60,1.1,0);tree(W+70,40,1.2,1);tree(W+60,175,1,0);tree(150,-110,1.25,0);tree(-75,175,1,1);World.tufts(levelGroup,W,H,qHigh()?600:0);}
  lastWet=st.plots.map(function(p){return p.watered;});
  if(l.arm)buildArmLevel(l);
  if(l.drone)buildDroneLevel(l);
