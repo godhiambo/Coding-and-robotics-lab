@@ -24,13 +24,14 @@ The app is one HTML file assembled from `src/`:
 | `src/echo.js` | echo sonar signal processing |
 | `src/extras.js` | scores, Club, teacher tools, export, vibe coding, device features |
 | `src/template.html` | page layout and styles |
+| `android-app/` | Android wrapper project (Capacitor) |
 
 ## Deploy
 - **GitHub Pages:** push to `main`. In *Settings > Pages* set *Source* to **GitHub Actions**. The included workflow builds and publishes `site/`.
 - **Netlify / any static host:** upload the `site/` folder.
 
 ## Android app
-See the separate Android project (Capacitor) that wraps `site/`. Copy `site/` into its `www/` folder, run `npx cap sync android`, then build in Android Studio.
+`android-app/` wraps `site/` as a native Android app (Capacitor). See [android-app/README.md](android-app/README.md): build the web app, run `npm install` and `npm run sync` there, then build the APK in Android Studio.
 
 ## Notes
 - "Ask Mila to code it" uses Claude only inside claude.ai. Elsewhere it falls back to a simple keyword writer.
