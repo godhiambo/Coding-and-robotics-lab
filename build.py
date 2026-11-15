@@ -16,7 +16,6 @@ t = t.replace('__ECHO__', r('echo.js').replace('if(typeof module!=="undefined")m
 t = t.replace('__EXTRAS__', r('extras.js').replace('__PYGLUE__', json.dumps(r('pyglue.py')).replace('</', '<\\/')))
 # use the bundled 3D engine instead of the CDN so the site works offline
 t = re.sub(r'https://cdnjs\.cloudflare\.com/[^"\']*three[^"\']*\.js', 'three.min.js', t)
-t = t.replace('<meta name="theme-color"', '<link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="theme-color"', 1)
 os.makedirs(SITE, exist_ok=True)
 open(os.path.join(SITE, 'index.html'), 'w', encoding='utf-8').write(t)
 print('built site/index.html', len(t), 'bytes')

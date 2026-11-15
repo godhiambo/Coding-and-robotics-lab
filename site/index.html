@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="theme-color" content="#0b1322"><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="theme-color" content="#0b1322"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Milestone Minds Robotics Lab (3D)</title>
 <style>
 *{box-sizing:border-box}
@@ -200,18 +200,19 @@ button{min-height:44px}.iconbtn{min-height:34px}
 #welcome .wst b{display:block}#welcome .wst span{color:#94a3b8;font-size:13.5px;line-height:1.4}
 #welcome .row2{margin-top:6px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+img.logo{width:38px;height:38px;border-radius:10px;background:#fff;object-fit:cover;flex:0 0 auto;box-shadow:0 0 0 2px rgba(255,255,255,.12)}
 </style>
 </head>
 <body>
 <div id="welcome" role="dialog" aria-modal="true" aria-labelledby="wTitle"><div class="box">
- <h2 id="wTitle">Welcome to the Robotics Lab 🤖</h2><div class="sub">No kit needed. Build, program and test robots on your phone.</div>
+ <div style="background:#fff;border-radius:14px;padding:6px;margin:-6px -6px 10px"><img src="logo.webp" alt="Milestone Minds Robotics Lab. Imagine. Build. Programme. Simulate." style="display:block;width:100%;height:auto;border-radius:10px"></div><h2 id="wTitle">Welcome to the Robotics Lab</h2><div class="sub">No kit needed. Build, program and test robots on your phone.</div>
  <div class="wst"><div class="n">1</div><div><b>Pick a mission</b><span>Start with “1 Drive”. Each mission is a small engineering challenge, from easy to hard.</span></div></div>
  <div class="wst"><div class="n">2</div><div><b>Make a program</b><span>Tap blocks, write Python, or just tell Mila what you want in your own words.</span></div></div>
  <div class="wst"><div class="n">3</div><div><b>Press Run and watch</b><span>If it fails, tap Hint or Explain. Mila gives clues, not answers. Earn up to 3 stars per mission.</span></div></div>
  <div class="wst"><div class="n">★</div><div><b>Go further</b><span>Build your own robot in <b style="display:inline">Build</b>, wire circuits in <b style="display:inline">Circuits</b>, and compete in <b style="display:inline">Club</b>.</span></div></div>
  <div class="row2"><button id="wGo" class="p">Start Mission 1</button></div>
 </div></div>
-<header><div class="logo">🤖</div><div><h1>Robotics Lab</h1><small>by Milestone Minds</small></div><button id="helpBtn" class="iconbtn" aria-label="How to use this app" title="How to use">?</button><div class="prog-pill"><b id="progtxt">0 / 0</b>missions done<div class="prog-bar"><i id="progbar"></i></div></div></header>
+<header><img class="logo" src="icon-192.png" alt="Milestone Minds Robotics Lab mascot" width="38" height="38"><div><h1>Robotics Lab</h1><small>by Milestone Minds</small></div><button id="helpBtn" class="iconbtn" aria-label="How to use this app" title="How to use">?</button><div class="prog-pill"><b id="progtxt">0 / 0</b>missions done<div class="prog-bar"><i id="progbar"></i></div></div></header>
 <nav id="tabs">
  <button data-tab="play" class="on"><span>🎮</span>Missions</button>
  <button data-tab="build"><span>🔧</span>Build</button>
