@@ -190,7 +190,7 @@ var SKYF="varying vec3 vD;uniform vec3 sunDir;uniform float t;uniform float cl;u
 "float s=max(dot(d,normalize(sunDir)),0.);col+=vec3(1.,.82,.55)*(pow(s,700.)*2.2+pow(s,10.)*.16);"+
 "if(cl>.5){vec2 uv=d.xz/(d.y+.14)*1.1+vec2(t*.004,0.);float c=smoothstep(.46,.78,fbm(uv*1.4));c*=smoothstep(0.,.16,d.y);"+
 "vec3 cc=mix(vec3(1.),vec3(.66,.72,.82),smoothstep(.45,.95,fbm(uv*2.8+4.)));col=mix(col,cc,c*.88);}"+
-"if(d.y<0.)col=hor;gl_FragColor=vec4(col,1.);}";
+"if(d.y<0.)col=mix(hor,vec3(.3,.25,.2),smoothstep(0.,-.35,d.y));gl_FragColor=vec4(col,1.);}";
 function initSky(){
  skyU={sunDir:{value:sunDir.clone()},t:{value:0},cl:{value:detail?1:0},hor:{value:new T.Color(0xcfe3ee)}};
  dome=new T.Mesh(new T.SphereGeometry(1400,24,16),new T.ShaderMaterial({uniforms:skyU,vertexShader:SKYV,fragmentShader:SKYF,side:T.BackSide,depthWrite:false,fog:false}));
@@ -304,5 +304,8 @@ function update(camera,t){
  for(var i=0;i<plants.length;i++){var o=plants[i];if(!o.g.parent){continue;}var w=Math.sin(s*1.3+o.ph)*o.amp+Math.sin(s*.45+o.g.position.x*.05)*.008;o.m.rotation.z=o.wilt?w*.4:w;o.m.rotation.x=o.wilt?0:w*.6;}
 }
 function resetPlants(){plants.length=0;}
-return {init:init,setDetail:setDetail,setNight:setNight,update:update,buildPlot:buildPlot,murramTex:murramTex,paintFloor:paintFloor,shed:shed,rockMat:rockMat,greenhouse:greenhouse,solarRow:solarRow,setPlotState:setPlotState,tree:tree,tufts:tufts,grassTex:grassTex,paintSoil:paintSoil,resetPlants:resetPlants,soilTile:soilTile};
+function envTex(renderer){try{if(!T.PMREMGenerator||!sunDir)return null;var sc=new T.Scene(),u={sunDir:{value:sunDir.clone()},t:{value:0},cl:{value:1},hor:{value:new T.Color(0xcfe3ee)}};
+ sc.add(new T.Mesh(new T.SphereGeometry(50,32,16),new T.ShaderMaterial({uniforms:u,vertexShader:SKYV,fragmentShader:SKYF,side:T.BackSide,depthWrite:false})));
+ var pm=new T.PMREMGenerator(renderer),rt=pm.fromScene(sc,0.03);pm.dispose();return rt.texture;}catch(e){try{console.log('ENVERR '+e.message+' '+(e.stack||'').slice(0,300));}catch(_){}return null;}}
+return {envTex:envTex,init:init,setDetail:setDetail,setNight:setNight,update:update,buildPlot:buildPlot,murramTex:murramTex,paintFloor:paintFloor,shed:shed,rockMat:rockMat,greenhouse:greenhouse,solarRow:solarRow,setPlotState:setPlotState,tree:tree,tufts:tufts,grassTex:grassTex,paintSoil:paintSoil,resetPlants:resetPlants,soilTile:soilTile};
 })();
