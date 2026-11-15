@@ -28,6 +28,7 @@ The app is one HTML file assembled from `src/`:
 
 ## Deploy
 - **GitHub Pages:** push to `main`. In *Settings > Pages* set *Source* to **GitHub Actions**. The included workflow builds and publishes `site/`.
+- **Cloudflare Pages:** Workers & Pages > Create > Pages > Connect to Git, pick this repo. Framework preset **None**, build command empty (or `python3 build.py`), build output directory **`site`**. `site/_headers` sets caching and permission headers. You can also use *Upload assets* and drag the `site/` folder.
 - **Netlify / any static host:** upload the `site/` folder.
 
 ## Android app
