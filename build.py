@@ -1,0 +1,22 @@
+#!/usr/bin/env python3
+"""Build the single-file web app: python3 build.py  ->  site/index.html (deploy the site/ folder)."""
+import json, os, re
+SRC = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'src')
+SITE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'site')
+def r(n): return open(os.path.join(SRC, n), encoding='utf-8').read()
+t = r('template.html')
+t = t.replace('__CORE__', r('core.js').replace('if(typeof module', '//if(typeof module'))
+t = t.replace('__MILA__', r('mila.js').replace('if(typeof module', '//if(typeof module'))
+t = t.replace('__APP__', r('app.js'))
+t = t.replace('__CIRCUIT__', r('circuit.js').replace('if(typeof module', '//if(typeof module'))
+t = t.replace('__BB__', r('bb.js'))
+t = t.replace('__BB3D__', r('bb3d.js'))
+t = t.replace('__PYX__', r('pyx.js').replace('if(typeof module!=="undefined")module.exports=PyX;', ''))
+t = t.replace('__ECHO__', r('echo.js').replace('if(typeof module!=="undefined")module.exports=Echo;', ''))
+t = t.replace('__EXTRAS__', r('extras.js').replace('__PYGLUE__', json.dumps(r('pyglue.py')).replace('</', '<\\/')))
+# use the bundled 3D engine instead of the CDN so the site works offline
+t = re.sub(r'https://cdnjs\.cloudflare\.com/[^"\']*three[^"\']*\.js', 'three.min.js', t)
+t = t.replace('<meta name="theme-color"', '<link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="theme-color"', 1)
+os.makedirs(SITE, exist_ok=True)
+open(os.path.join(SITE, 'index.html'), 'w', encoding='utf-8').write(t)
+print('built site/index.html', len(t), 'bytes')

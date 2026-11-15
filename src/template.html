@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#0b1322"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Milestone Minds Robotics Lab (3D)</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#070d19;color:#e2e8f0;-webkit-tap-highlight-color:transparent}
+header{padding:10px 14px;background:#141f33}
+header h1{font-size:15px;margin:0}
+header small{color:#94a3b8;font-size:11px}
+main{max-width:780px;margin:0 auto;padding:10px}
+.card{background:#141f33;border-radius:12px;padding:10px;margin-bottom:10px}
+#cv{width:100%;aspect-ratio:3/2;border-radius:8px;overflow:hidden;background:#9db9cf;touch-action:pan-y}
+#cv{position:relative}#cv canvas{width:100%!important;height:auto!important;display:block}
+#fsbar{position:absolute;right:8px;top:8px;display:flex;gap:6px;z-index:5}#fsbar button{min-width:40px;min-height:40px;padding:6px 10px;font-size:15px;background:#0b1322cc;color:#fff;border:1px solid #ffffff44;border-radius:10px;backdrop-filter:blur(4px)}
+#fsmsg{position:absolute;left:8px;right:8px;bottom:10px;z-index:5;background:#0b1322cc;color:#e2e8f0;border-radius:10px;padding:8px 10px;font-size:13px;pointer-events:none}
+body:not(.fs) .fsonly{display:none!important}
+body.fs{overflow:hidden}body.fs #cv{position:fixed;inset:0;z-index:100;width:100vw;height:100vh;height:100dvh;aspect-ratio:auto;border-radius:0;border:0;touch-action:none}body.fs #cv canvas{height:100%!important;width:100%!important}body.fs nav#tabs{display:none}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button,select,input{font:inherit}
+button{border:0;border-radius:8px;padding:9px 13px;background:#334155;color:#e2e8f0;cursor:pointer;min-height:40px}
+button.p{background:#16a34a;color:#fff;font-weight:600}
+button.s{background:#dc2626;color:#fff}
+button:active{opacity:.8}
+.lv button{flex:1 1 30%;min-width:0;padding:8px 4px;font-size:13px}
+.lv button.on{background:#2563eb;color:#fff}
+#mission{font-size:14px;line-height:1.4}
+#mission b{color:#fbbf24}
+#hint{color:#94a3b8;font-size:12px;margin-top:4px}
+#sense{font-variant-numeric:tabular-nums;font-size:12.5px;color:#7dd3fc;display:flex;gap:6px 14px;flex-wrap:wrap;margin-top:8px}
+#msg{margin-top:8px;font-size:14px;min-height:20px;font-weight:600}
+.ok{color:#4ade80}.bad{color:#f87171}
+.pal{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.pal button{font-size:13px;padding:7px 10px;min-height:36px}
+.blk{border-radius:8px;padding:6px 8px;margin:5px 0;display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:14px}
+.blk input{width:56px;padding:4px;border-radius:6px;border:0;background:#0b1322;color:#fff;text-align:center}
+.blk select{background:#0b1322;color:#fff;border:0;border-radius:6px;padding:5px;max-width:190px}
+.blk .x{margin-left:auto;background:rgba(0,0,0,.25);padding:2px 9px;min-height:28px}
+.mv{background:#2563eb}.tn{background:#7c3aed}.lp{background:#d97706}.ifb{background:#0d9488}.st{background:#be123c}.wt{background:#0369a1}
+.wrap{margin:5px 0 2px 0}
+.slot{margin:4px 0 4px 12px;padding:4px 6px;border-left:3px solid rgba(255,255,255,.35);border-radius:6px;min-height:30px;background:rgba(0,0,0,.18)}
+.slot.sel{outline:2px solid #fbbf24}
+.slot .lab{font-size:11px;color:#cbd5e1}
+#prog{background:#0b1322;border-radius:10px;padding:6px;min-height:80px}
+#prog.sel{outline:2px solid #fbbf24}
+.note{font-size:12px;color:#94a3b8;margin-top:6px}
+.sm{background:#0b1322;color:#fff;border:0;border-radius:6px;padding:6px}
+label{font-size:12px;color:#94a3b8}
+
+.pg{width:100%;font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin-top:4px}
+.pal button.dim{opacity:.55}
+.blk .warn{font-size:11px;color:#fde68a;background:rgba(0,0,0,.3);border-radius:6px;padding:2px 6px}
+#ptabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px}
+#ptabs button{flex:0 0 auto;font-size:13px;padding:7px 11px;min-height:36px}
+#ptabs button.on{background:#2563eb;color:#fff}
+#catalog{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px}
+.tile{display:flex;align-items:center;gap:8px;background:#0b1322;border-radius:10px;padding:8px;cursor:grab;user-select:none}
+.tile .tn{flex:1;min-width:0;background:none}.tile b{display:block;font-size:13px}.tile small{display:block;color:#94a3b8;font-size:11px;line-height:1.25}
+.tile .add{background:#16a34a;color:#fff;min-height:34px;width:34px;padding:0;font-size:18px;flex:0 0 auto}
+.dot{width:12px;height:12px;border-radius:50%;flex:0 0 auto;display:inline-block}
+#installed{background:#0b1322;border:2px dashed #334155;border-radius:10px;padding:6px;min-height:60px;margin-top:6px}
+#installed.over{border-color:#38bdf8;background:#10223a}
+.inst{display:flex;align-items:center;gap:8px;padding:5px 4px;border-bottom:1px solid #141f33;font-size:13px}
+.inst .nm{flex:1}.inst select{background:#141f33;color:#fff;border:0;border-radius:6px;padding:4px}
+.inst .x{min-height:28px;padding:2px 9px;background:#7f1d1d}
+#valid{margin-top:8px;font-size:12.5px;line-height:1.35}
+.vok{color:#4ade80;font-weight:600}.verr{color:#fca5a5;margin:3px 0}.vwarn{color:#fde68a;margin:3px 0}
+.pbar{height:8px;background:#0b1322;border-radius:4px;overflow:hidden;margin-top:6px}.pbar div{height:100%}
+details{margin-top:8px;background:#0b1322;border-radius:10px;padding:8px}
+summary{cursor:pointer;font-weight:600;font-size:14px}
+pre#code{margin:8px 0 0;font-size:11.5px;line-height:1.4;white-space:pre;overflow-x:auto;color:#c7d2fe;max-height:340px}
+
+.mnt{color:#94a3b8;font-size:11px}.mnt.bad{color:#fca5a5}
+#bench{background:#0b1220;border-radius:10px;padding:8px;margin-bottom:8px}
+#checklist{font-size:12.5px;line-height:1.55;color:#94a3b8;margin-bottom:6px}#checklist .cd{color:#4ade80}
+.chip{display:inline-flex;align-items:center;gap:6px;background:#141f33;border-radius:16px;padding:6px 10px;margin:3px;font-size:12.5px;cursor:pointer}.chip.on{outline:2px solid #fbbf24}
+#tray{min-height:34px;margin:6px 0}
+#benchmsg{font-size:13px;min-height:18px;margin:4px 0}
+.wrow{background:#0b1322;border-radius:8px;padding:6px 8px;margin:5px 0;font-size:12.5px}.wrow .wn{font-weight:600;margin-bottom:3px}.wrow label{display:inline-block;margin:2px 10px 2px 0;color:#cbd5e1;font-size:12px}
+textarea{width:100%;background:#0b1322;color:#e2e8f0;border:1px solid #334155;border-radius:8px;padding:6px;font-size:11px;min-height:54px}
+input[type=text].tx{background:#0b1322;color:#fff;border:1px solid #334155;border-radius:8px;padding:8px;flex:1;min-width:120px}
+
+#benchViews button{flex:1;min-height:36px;font-size:12.5px;padding:6px;border-radius:10px;background:#0b1322;border:1px solid var(--line)}#benchViews button.on{background:#1d4ed8;border-color:#3b82f6;color:#fff}
+#bbViews button{flex:1;min-height:36px;font-size:12.5px;padding:6px;border-radius:10px;background:#0b1322;border:1px solid var(--line)}#bbViews button.on{background:#1d4ed8;border-color:#3b82f6;color:#fff}
+#bbTray{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:6px}
+#bbTray .trow{margin:0;background:#0b1322;border:1px solid var(--line);border-radius:10px;padding:6px 8px}
+#bbPrompt{position:sticky;top:50px;z-index:5;background:#3a2f0b;border:1px solid #8a6d12;border-radius:10px;padding:8px 10px;margin:8px 0;color:#fde68a;font-weight:600}
+#bbPrompt:empty{display:none}
+#bbBoard{overflow-x:auto;background:#0b1322;border-radius:10px;padding:4px}
+.trow{display:flex;align-items:center;gap:8px;margin:5px 0;font-size:13px}.trow span{flex:1}
+#bbSel{background:#0b1322;border-radius:10px;padding:8px;margin-top:8px;font-size:13px}
+.rl{font-size:12.5px;margin:3px 0;line-height:1.35}.rl.mm{color:#c4b5fd}
+#bbPrompt{font-size:13px;color:#fbbf24;min-height:18px;margin:6px 0}
+#milaface{font-size:26px;background:#0b1322;border-radius:50%;width:42px;height:42px;display:flex;align-items:center;justify-content:center}
+#milaOut{margin-top:8px;font-size:13.5px;line-height:1.45}
+#milaOut .bub{background:#0b1322;border-radius:10px;padding:9px 11px;border-left:3px solid #38bdf8}
+#milaOut .bub.win{border-color:#4ade80}#milaOut .bub.fix{border-color:#f87171}#milaOut .bub.tip{border-color:#fbbf24}
+#milaOut ul{margin:6px 0 0;padding-left:18px}#milaOut pre{margin:6px 0 0;white-space:pre-wrap;font-size:12.5px;color:#cbd5e1}
+#bbHint{font-size:12.5px;color:#cbd5e1;margin-top:6px;background:#0b1322;border-radius:8px;padding:8px}
+#calc{background:#0b1322;border-radius:10px;padding:8px;margin-top:10px;font-size:13px}
+#calc input{width:62px;background:#141f33;color:#fff;border:0;border-radius:6px;padding:5px}
+
+.am{background:#c2410c}.dr{background:#0e7490}
+.jr{display:flex;align-items:center;gap:10px;margin:6px 0}.jr label{width:74px;color:#cbd5e1;font-size:13px}.jr input{flex:1;accent-color:#f97316;height:28px}.jr b{width:46px;text-align:right;font-variant-numeric:tabular-nums;font-size:13px}
+/* ===== v2 layout & polish ===== */
+:root{--acc:#38bdf8;--ok:#34d399;--bad:#f87171;--mut:#8fa3bf;--line:#22314b}
+body{padding-bottom:78px;line-height:1.4}
+header{display:flex;align-items:center;gap:12px;padding:10px 14px;background:linear-gradient(135deg,#10203a,#0b1322);border-bottom:1px solid var(--line)}
+.logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#38bdf8,#6366f1);display:flex;align-items:center;justify-content:center;font-size:20px;flex:0 0 auto}
+header h1{font-size:16px;font-weight:700;letter-spacing:.01em}
+header small{display:block;color:var(--mut);font-size:11.5px}
+.prog-pill{margin-left:auto;text-align:right;font-size:11px;color:var(--mut);white-space:nowrap}
+.prog-pill b{display:block;font-size:15px;color:#fff}
+.prog-bar{height:4px;background:#0b1322;border-radius:2px;margin-top:4px;overflow:hidden;width:90px;margin-left:auto}.prog-bar i{display:block;height:100%;background:linear-gradient(90deg,#34d399,#38bdf8);width:0}
+nav#tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;background:#0b1322ee;backdrop-filter:blur(8px);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
+nav#tabs button{flex:1;background:none;border-radius:12px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11.5px;color:var(--mut);padding:6px 2px;min-height:52px}
+nav#tabs button span{font-size:20px;line-height:1}
+nav#tabs button.on{color:#fff;background:#16263f}
+nav#tabs button.on span{filter:drop-shadow(0 0 6px #38bdf8)}
+main{max-width:1180px;padding:12px}
+.card{border:1px solid var(--line);border-radius:14px;padding:12px;box-shadow:0 2px 10px rgba(0,0,0,.25)}
+.card h2,.ttl{font-size:15px;font-weight:700;margin:0 0 4px;display:flex;align-items:center;gap:8px}
+.sub{font-size:12.5px;color:var(--mut);margin:0 0 10px}
+#build,#circuits,#codetab{max-width:900px;margin:0 auto}
+#scoreline{margin-top:6px;padding:8px 10px;background:#0b1322;border:1px solid #1e3a5f;border-radius:10px;font-size:13px;color:#cbd5e1}#scoreline b{color:#facc15;letter-spacing:2px}#scoreline .nb{color:#86efac}
+.crow{display:flex;align-items:center;gap:8px;padding:7px 4px;border-bottom:1px solid #1e293b;font-size:13px}.crow.me{background:#0b2238;border-radius:8px}.crow .rk{width:20px;color:#94a3b8}.crow .cn{flex:1}.crow .cs{color:#facc15;font-weight:700;white-space:nowrap}.crow .cm{color:#94a3b8;font-size:12px;white-space:nowrap}
+#clubTotal.big{font-size:20px;font-weight:800;margin:8px 0}.row2{display:flex;gap:8px;margin:8px 0;flex-wrap:wrap}.row2 button{flex:1;min-width:110px}
+#club input,#codetab textarea,#club textarea{width:100%;box-sizing:border-box;background:#0b1322;color:#e2e8f0;border:1px solid #1e3a5f;border-radius:10px;padding:9px;margin:6px 0;font-size:13px}
+#tTable table{border-collapse:collapse;font-size:12px;width:max-content;min-width:100%}#tTable th,#tTable td{border:1px solid #1e293b;padding:5px 6px;text-align:center;white-space:nowrap}#tTable th{background:#0b1322;color:#94a3b8;position:sticky;top:0}#tTable td.nm{text-align:left;position:sticky;left:0;background:#141f33;font-weight:600}#tTable td.c3{color:#facc15}#tTable td.c0{color:#475569}#tTable button.sm{padding:2px 6px;min-height:0}
+#modeBar{display:flex;gap:6px;margin:0 0 8px}#modeBar button{flex:1;min-height:40px;border-radius:10px;background:#0b1322;border:1px solid #1e3a5f;color:#cbd5e1;font-size:14px}#modeBar button.on{background:#16263f;color:#fff;border-color:#38bdf8}
+#pyIn{width:100%;box-sizing:border-box;background:#06101e;color:#d6e4f5;border:1px solid #1e3a5f;border-radius:10px;padding:10px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px;line-height:1.45;tab-size:4;white-space:pre;overflow:auto}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}.chips button{min-height:34px;padding:4px 9px;font-size:12px;font-family:ui-monospace,Menlo,Consolas,monospace;background:#0b1322;border:1px solid #1e3a5f;border-radius:8px;color:#a5d8ff}
+#pyMsg.err{color:#fca5a5}#pyMsg.ok{color:#86efac}
+.view{display:none}.view.on{display:block}
+#play.on{display:grid;grid-template-columns:minmax(0,1fr);gap:0 14px}
+#picker,#bbChal,#ptabs{scrollbar-width:none}#picker::-webkit-scrollbar,#bbChal::-webkit-scrollbar,#ptabs::-webkit-scrollbar{display:none}
+#ptabs button{border-radius:18px;background:#0b1322;border:1px solid var(--line)}#ptabs button.on{background:#1d4ed8;border-color:#3b82f6}
+.tile{border:1px solid var(--line)}.tile:hover{border-color:#36507a}
+.tile small{color:var(--mut)}
+#picker{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 8px;scroll-snap-type:x proximity;-webkit-mask-image:linear-gradient(90deg,#000 92%,transparent);mask-image:linear-gradient(90deg,#000 92%,transparent)}
+#picker button,#bbChal button{flex:0 0 auto;scroll-snap-align:start;min-height:36px;padding:7px 12px;font-size:13px;border-radius:18px;background:#0b1322;border:1px solid var(--line);color:#c6d3e6;white-space:nowrap}
+#picker button.on,#bbChal button.on{background:#1d4ed8;border-color:#3b82f6;color:#fff}
+#picker button.won{border-color:#1f8f66}
+#bbChal{flex-wrap:nowrap!important;overflow-x:auto;padding-bottom:6px}
+.mhead{display:flex;align-items:center;gap:8px;font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--acc);font-weight:700}
+#mission{font-size:15px;line-height:1.45;margin-top:4px}
+#hint{background:#0b1322;border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-top:8px;color:#b4c3d9;font-size:12.5px}
+#hint:empty{display:none}
+#hint::before{content:"💡 ";}
+#sense{gap:6px;margin-top:10px}
+#sense span{background:#0b1322;border:1px solid var(--line);border-radius:14px;padding:3px 10px;color:#7dd3fc;font-size:12px}
+#msg{padding:0;min-height:0;margin-top:10px}
+#msg:not(:empty){padding:9px 12px;border-radius:10px;background:#0b1322;border:1px solid var(--line)}
+#msg.ok{border-color:#1f8f66;color:#6ee7b7}#msg.bad{border-color:#9b3a3a;color:#fca5a5}
+.actions{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+.actions #run{flex:1 1 140px;min-height:48px;font-size:16px;border-radius:12px;box-shadow:0 4px 14px rgba(22,163,74,.35)}
+.actions #run.s{box-shadow:0 4px 14px rgba(220,38,38,.35)}
+.actions #reset{min-height:48px;border-radius:12px}
+.opts{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px}
+button{transition:background .15s,opacity .15s}
+button:hover{filter:brightness(1.12)}
+button.p{background:linear-gradient(180deg,#22c55e,#16a34a)}
+#views{margin-top:8px;display:flex;gap:6px}
+#views button{flex:1;min-height:34px;font-size:12.5px;padding:6px;border-radius:10px;background:#0b1322;border:1px solid var(--line)}
+#views button.on{background:#1d4ed8;border-color:#3b82f6;color:#fff}
+#cv{border-radius:12px;border:1px solid var(--line)}
+details{border:1px solid var(--line)}
+.pal{gap:6px}
+.pal button{border-radius:10px;font-weight:600}
+.empty{color:var(--mut);font-size:13px;text-align:center;padding:18px 8px}
+.sectionbar{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.sectionbar .ico{width:34px;height:34px;border-radius:10px;background:#16263f;display:flex;align-items:center;justify-content:center;font-size:18px}
+#milacard summary{list-style:none}
+@media(min-width:900px){
+ body{padding-bottom:0}
+ nav#tabs{position:sticky;top:0;bottom:auto;border-top:0;border-bottom:1px solid var(--line);padding:6px 14px;justify-content:center;gap:6px}
+ nav#tabs button{flex:0 0 auto;flex-direction:row;gap:8px;padding:8px 18px;font-size:14px;min-height:42px}
+ nav#tabs button span{font-size:17px}
+ #play.on{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);align-items:start}
+ #play .colL,#play .colR{min-width:0}
+ #play .colR{position:sticky;top:62px}
+ #prog{max-height:48vh;overflow-y:auto}
+}
+
+header h1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:15px}
+header>div:nth-child(2){min-width:0;flex:1}
+.iconbtn{width:34px;height:34px;min-height:34px;padding:0;border-radius:50%;background:#1e3a5f;color:#7dd3fc;font-weight:700;flex:0 0 auto}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid #38bdf8;outline-offset:2px}
+button{min-height:44px}.iconbtn{min-height:34px}
+.fold{padding:0}.fold>summary{list-style:none;cursor:pointer;padding:14px;font-size:16px;font-weight:700;display:flex;justify-content:space-between;align-items:center}
+.fold>summary::-webkit-details-marker{display:none}.fold>summary::after{content:"▾";color:#94a3b8;transition:transform .2s}
+.fold[open]>summary::after{transform:rotate(180deg)}.fold>*:not(summary){margin-left:14px;margin-right:14px}.fold>*:last-child{margin-bottom:14px}
+#welcome{position:fixed;inset:0;z-index:99;background:rgba(5,10,20,.82);display:none;align-items:center;justify-content:center;padding:16px}
+#welcome.on{display:flex}
+#welcome .box{max-width:420px;width:100%;max-height:92vh;overflow:auto;background:#101c30;border:1px solid #27385a;border-radius:18px;padding:20px}
+#welcome h2{margin:0 0 4px;font-size:20px}#welcome .wst{display:flex;gap:12px;margin:14px 0;align-items:flex-start}
+#welcome .n{flex:0 0 30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#38bdf8,#6366f1);display:flex;align-items:center;justify-content:center;font-weight:700}
+#welcome .wst b{display:block}#welcome .wst span{color:#94a3b8;font-size:13.5px;line-height:1.4}
+#welcome .row2{margin-top:6px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<div id="welcome" role="dialog" aria-modal="true" aria-labelledby="wTitle"><div class="box">
+ <h2 id="wTitle">Welcome to the Robotics Lab 🤖</h2><div class="sub">No kit needed. Build, program and test robots on your phone.</div>
+ <div class="wst"><div class="n">1</div><div><b>Pick a mission</b><span>Start with “1 Drive”. Each mission is a small engineering challenge, from easy to hard.</span></div></div>
+ <div class="wst"><div class="n">2</div><div><b>Make a program</b><span>Tap blocks, write Python, or just tell Mila what you want in your own words.</span></div></div>
+ <div class="wst"><div class="n">3</div><div><b>Press Run and watch</b><span>If it fails, tap Hint or Explain. Mila gives clues, not answers. Earn up to 3 stars per mission.</span></div></div>
+ <div class="wst"><div class="n">★</div><div><b>Go further</b><span>Build your own robot in <b style="display:inline">Build</b>, wire circuits in <b style="display:inline">Circuits</b>, and compete in <b style="display:inline">Club</b>.</span></div></div>
+ <div class="row2"><button id="wGo" class="p">Start Mission 1</button></div>
+</div></div>
+<header><div class="logo">🤖</div><div><h1>Robotics Lab</h1><small>by Milestone Minds</small></div><button id="helpBtn" class="iconbtn" aria-label="How to use this app" title="How to use">?</button><div class="prog-pill"><b id="progtxt">0 / 0</b>missions done<div class="prog-bar"><i id="progbar"></i></div></div></header>
+<nav id="tabs">
+ <button data-tab="play" class="on"><span>🎮</span>Missions</button>
+ <button data-tab="build"><span>🔧</span>Build</button>
+ <button data-tab="circuits"><span>⚡</span>Circuits</button>
+ <button data-tab="codetab"><span>💻</span>Code</button>
+ <button data-tab="club"><span>🏆</span>Club</button>
+</nav>
+<main>
+<section id="play" class="view on">
+ <div class="colL">
+  <div class="card">
+   <div class="mhead"><span id="mnum">Mission</span></div>
+   <div id="picker" class="lvbar"><span id="levels" style="display:contents"></span></div>
+   <div id="mission"></div>
+   <div id="hint"></div>
+  </div>
+  <div class="card">
+   <div id="cv"><div id="fsbar"><button id="fsRun" class="fsonly">▶ Run</button><button id="fsReset" class="fsonly">↺</button><button id="fsView" class="fsonly">🎥</button><button id="fsBtn" title="Full screen" aria-label="Toggle full screen">⛶</button></div><div id="fsmsg" class="fsonly"></div></div>
+   <div class="row" id="views"><button data-v="angle" class="on">3D view</button><button data-v="chase">Robot cam</button><button data-v="top">Top view</button></div>
+   <div id="sense">
+    <span>Front: <b id="sd">--</b> cm</span><span>Left: <b id="sl">--</b></span><span>Right: <b id="sr">--</b></span>
+    <span>Line L/R: <b id="sir">□ □</b></span><span>Soil: <b id="ss">--</b>%</span><span>Bumps: <b id="sb">0</b></span>
+   </div>
+   <div id="msg"></div><div id="scoreline" style="display:none"></div>
+   <div class="actions"><button class="p" id="run">▶ Run</button><button id="reset">↺ Reset</button></div>
+   <button id="nextM" class="p" style="display:none;width:100%;margin-top:8px">⭐ Next mission ▶</button>
+   <div class="opts"><label>Speed <select id="spd" class="sm"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select></label>
+   <label>Graphics <select id="quality" class="sm"><option value="high">High</option><option value="light">Light (slow phones)</option></select></label></div>
+  </div>
+ </div>
+ <div class="colR">
+  <div class="card" id="pendant" style="display:none">
+   <h2>🦾 Teach pendant</h2>
+   <p class="sub">Move the joints by hand to find the angles, then add the pose to your program.</p>
+   <div class="jr"><label>Base turn</label><input type="range" id="jb" min="0" max="180" value="90"><b id="jbv">90°</b></div>
+   <div class="jr"><label>Shoulder</label><input type="range" id="js" min="0" max="160" value="90"><b id="jsv">90°</b></div>
+   <div class="jr"><label>Elbow</label><input type="range" id="je" min="-40" max="150" value="0"><b id="jev">0°</b></div>
+   <div id="tipinfo" class="sub" style="margin:6px 0"></div>
+   <div class="row"><button id="pgrip">✋ Gripper: open</button><button class="p" id="padd">＋ Add this pose to program</button></div>
+  </div>
+  <div class="card" id="vibeCard" style="display:none">
+   <h2>✨ Ask Mila to code it</h2>
+   <p class="sub">Describe what the robot should do in your own words. Mila writes the program as <b>blocks</b> and <b>Python</b> and explains it.</p>
+   <textarea id="vibeIn" rows="3" placeholder="e.g. Drive forward until you are close to the wall, then turn right and beep" spellcheck="true"></textarea>
+   <div class="row2"><button id="vibeGo" class="p">✨ Write my program</button><button id="vibeMic" style="display:none">🎤 Speak</button></div>
+   <div id="vibeMsg" class="sub"></div>
+   <div id="vibeRes" style="display:none">
+    <div id="vibeExp" class="sub" style="margin:6px 0"></div>
+    <pre id="vibeCode" style="max-height:170px;overflow:auto;background:#0b1220;border-radius:8px;padding:8px;margin:6px 0;white-space:pre;font-size:12px"></pre>
+    <div class="row"><button id="vibeBlocks">🧩 See blocks</button><button id="vibePy">🐍 See Python</button><button id="vibeRun" class="p">▶ Run</button></div>
+   </div>
+  </div>
+  <div class="row" id="modeBar"><button id="modeBlocks" class="on">🧩 Blocks</button><button id="modePy">🐍 Python</button><button id="modeAsk">✨ Ask Mila</button></div>
+  <div class="card" id="pyCard" style="display:none">
+   <h2>🐍 Program in Python</h2>
+   <p class="sub">Write Python to control the robot. It runs on the simulator and turns into blocks when you press Run. Tap a command to add it.</p>
+   <div id="pyChips" class="chips"></div>
+   <textarea id="pyIn" rows="11" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off"></textarea>
+   <label class="sub" style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="pyFull"> <span><b>Full Python (beta)</b>: real Python with variables, functions, classes, lists, <code>import math</code>. Downloads about 10 MB once.</span></label>
+   <pre id="pyOut" class="sub" style="display:none;max-height:140px;overflow:auto;background:#0b1220;border-radius:8px;padding:8px;margin:6px 0;white-space:pre-wrap"></pre>
+   <div id="pyMsg" class="sub"></div>
+   <div class="row2"><button id="pyRun" class="p">▶ Run Python</button><button id="pyFromBlocks">🧩 Blocks → Python</button></div>
+  </div>
+  <div class="card" id="blocksCard">
+   <h2>🧩 Program your robot</h2>
+   <p class="sub">Tap a block to add it. Tap a Repeat / Forever / If box to put blocks inside it.</p>
+   <div class="pal" id="pal"></div>
+   <div id="prog"></div>
+  </div>
+  <div class="card" id="milacard">
+   <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><div id="milaface">🤖</div><div><div class="ttl" style="margin:0">Mila, your robotics mentor</div><div class="sub" style="margin:0">I give hints, not answers.</div></div></div>
+   <div class="row"><button id="mCheck">🔍 Check</button><button id="mHint">💡 Hint</button><button id="mExplain">📖 Explain</button></div>
+   <div id="milaOut"></div>
+  </div>
+ </div>
+<details class="card fold" id="manCard"><summary>🎮 Drive by hand</summary>
+ <p class="sub">Steer the robot yourself with the stick, the arrow keys / WASD, by tilting your phone, or with a game controller. Reach the green zone to win. Space starts/stops a run.</p>
+ <div class="row2"><button id="manGo" class="p">▶ Start driving</button><button id="manTilt">📱 Tilt: off</button></div>
+ <div id="joy" role="application" aria-label="Drive stick" style="touch-action:none;width:150px;height:150px;border-radius:50%;margin:10px auto;background:#0b1220;border:2px solid #27385a;position:relative"><div id="joyK" style="position:absolute;left:55px;top:55px;width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#38bdf8,#6366f1)"></div></div>
+ <div id="manMsg" class="sub"></div>
+</details>
+</section>
+
+<section id="build" class="view">
+<div class="card" id="lab">
+  <h2>🔧 Parts Lab: build your robot</h2>
+  <p class="sub">Pick a kit, or turn on Hands-on build to assemble it yourself. Parts follow real rules: mounting, pins, voltage and power.</p>
+  <div class="row" style="margin-bottom:8px"><button id="handsBtn">🛠 Hands-on build: OFF</button><label>Chassis <select id="chassis" class="sm"></select></label></div>
+  <div class="note" id="chdesc" style="margin:0 0 8px"></div>
+  <div id="bench" style="display:none">
+   <div style="font-weight:600;font-size:14px;margin-bottom:4px">🛠 Assembly Bench</div>
+   <div id="checklist"></div>
+   <div class="note" style="margin:0 0 4px">1) Add parts from the catalog below (drag a part straight onto a mount point, or tap +). 2) Tap a loose part, then tap a <span style="color:#4ade80">green</span> mount point. Tap a mounted part to take it off. 3) Wire each pin.</div>
+   <div class="row" id="benchViews" style="margin:6px 0"><button data-m="3d" class="on">🧊 3D robot</button><button data-m="bp">📐 Blueprint</button></div>
+   <div id="bench3d" style="display:block"></div>
+   <div id="blueprint"></div>
+   <div id="benchmsg"></div>
+   <div style="font-size:12px;color:#94a3b8">Loose parts (not mounted yet)</div><div id="tray"></div>
+   <div style="font-weight:600;font-size:14px;margin-top:10px">Wiring: connect every pin yourself</div>
+   <div id="wirepanel"></div>
+   <div class="row" style="margin-top:6px"><button id="autowire">Auto-wire (let Claude do it)</button></div>
+   <div style="font-weight:600;font-size:14px;margin-top:12px">💾 Save your prototype</div>
+   <div class="row" style="margin-top:6px"><input type="text" class="tx" id="pname" placeholder="Name your robot" maxlength="30"><button class="p" id="savebtn">Save</button></div>
+   <div id="saved" style="margin-top:6px"></div>
+   <div class="row" style="margin-top:6px"><button id="exportbtn">Get design code</button><button id="importbtn">Load from code</button></div>
+   <textarea id="dcode" placeholder="Design code appears here. Share it with a classmate, or paste one and tap Load."></textarea>
+  </div>
+  <div id="ptabs"></div>
+  <div id="catalog"></div>
+  <div style="font-weight:600;margin-top:12px;font-size:14px">Installed on your robot</div>
+  <div id="installed"></div>
+  <div class="row" style="margin-top:8px"><button id="kit">Recommended kit for this mission</button><button id="clearparts">Clear all</button></div>
+  <div id="valid"></div>
+  <details><summary>Wiring diagram</summary><div id="wiring" style="margin-top:8px"></div></details>
+ </div>
+</section>
+
+<section id="circuits" class="view">
+ <div class="card" id="bblab">
+  <h2>⚡ Breadboard Lab</h2>
+  <p class="sub">A real-style breadboard: the five holes in each short column are connected, the two halves are separate, and the + and − rails run the whole length. Pick a challenge, build it, then check it.</p>
+  <div class="row" id="bbChal"></div>
+   <div id="bbGoal" style="margin-top:10px;font-size:14px;line-height:1.4"></div>
+   <div class="row" style="margin-top:6px"><button id="bbHintBtn" style="min-height:32px;padding:4px 10px;font-size:12px">Show hint</button><button id="bbMilaBtn" style="min-height:32px;padding:4px 10px;font-size:12px">🤖 Ask Mila</button></div>
+   <div id="bbHint" style="display:none"></div><div id="bbMila" style="display:none"></div>
+         <div class="row" id="bbViews" style="margin:8px 0 6px"><button data-m="place" class="on">📍 Place (top-down)</button><button data-m="look">🧊 Look around (3D)</button><button data-m="flat">📐 Flat diagram</button></div>
+   <div id="bb3d"></div>
+   <div class="note" id="bb3dHelp" style="margin:4px 0 0">Top-down: drag to move, pinch or scroll to zoom, tap a hole to place. 3D: drag to rotate.</div>
+   <div id="bbBoard" style="margin-top:6px;display:none"></div>
+   <div id="bbPrompt"></div><button id="bbCancel" style="display:none;min-height:30px;padding:3px 10px;font-size:12px">Cancel</button>
+   <div style="font-weight:600;font-size:14px;margin:12px 0 6px">Parts <span style="font-weight:400;color:#8fa3bf;font-size:12px">(tap + Add, then tap the holes on the board)</span></div>
+   <div id="bbTray"></div>
+
+   <div id="bbSel" style="display:none"></div>
+   <div id="bbRead" style="margin-top:8px"></div>
+   <div class="row" style="margin-top:8px"><button class="p" id="bbCheck">Check my circuit</button><button id="bbRevive">Replace burnt parts</button><button id="bbClear">Clear board</button></div>
+   <div id="bbMsg" style="margin-top:8px;font-size:14px;font-weight:600"></div>
+   <div id="calc"><b>Resistor calculator (Ohm's law)</b><br>
+    Battery <select id="calcV" class="sm"><option value="5">5V</option><option value="3">3V</option><option value="9">9V</option></select>
+    LED <select id="calcL" class="sm"><option>red</option><option>green</option><option>yellow</option><option>blue</option></select>
+    Current <input id="calcI" type="number" value="15" inputmode="decimal"> mA
+    <div id="calcOut" style="margin-top:6px"></div></div>
+ </div>
+<div class="card" id="echoCard"><h2>🔊 Echo sonar</h2>
+ <p class="sub">Use your phone like a bat. The speaker sends a short chirp, the microphone hears the echo, and the delay tells you the distance: <b>distance = speed of sound × time ÷ 2</b>. Hold the phone 15 cm to 2 m from a flat object like a wall or a book. Quiet room works best.</p>
+ <div class="row2"><button id="echoGo" class="p">🔊 Start sonar</button><select id="echoBand" aria-label="Chirp pitch"><option value="a">Audible chirp (2–9 kHz)</option><option value="q">Quiet chirp (15–20 kHz)</option></select></div>
+ <div style="display:flex;align-items:baseline;gap:10px;margin:8px 0"><div id="echoCm" style="font-size:34px;font-weight:800">-- cm</div><div id="echoQ" class="sub"></div></div>
+ <canvas id="echoPlot" width="300" height="70" style="width:100%;height:70px;background:#0b1220;border-radius:8px"></canvas>
+ <div class="sub" style="display:flex;gap:8px;align-items:center;margin-top:6px">Air temperature <input type="range" id="echoT" min="0" max="45" value="25" style="flex:1"><b id="echoTv">25°C</b></div>
+ <div id="echoC" class="sub"></div>
+ <label class="sub" style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="echoUse"> <span>Use as my robot's <b>front distance sensor</b> (mission programs read the real distance in front of your phone)</span></label>
+ <div id="echoMsg" class="sub"></div></div>
+<div class="card" id="camCard"><h2>📷 Camera light sensor</h2>
+ <p class="sub">Use your phone camera as a real light sensor. The brightness it sees controls the light sensor (LDR) in your circuit. Nothing is recorded or uploaded.</p>
+ <div class="row2"><button id="camGo" class="p">📷 Start camera</button><button id="camStop" style="display:none">■ Stop</button></div>
+ <div id="camRead" class="sub"></div><div style="height:10px;border-radius:5px;background:#0b1220;overflow:hidden;display:none" id="camBarW"><div id="camBar" style="height:100%;width:0;background:linear-gradient(90deg,#334155,#fde047)"></div></div>
+ <div id="camMsg" class="sub"></div></div>
+</section>
+
+<section id="codetab" class="view">
+ <div class="card">
+  <h2>💻 Your program as real code</h2><div class="sub" style="margin:-4px 0 6px">Language: <b id="codelang"></b></div>
+  <p class="sub">This is what your blocks turn into on a real robot. Copy it into the Arduino IDE or Thonny.</p>
+  <pre id="code"></pre><button id="copycode" style="margin-top:8px">Copy code</button>
+ </div>
+ <div class="card">
+  <h2>🔌 Build it for real</h2>
+  <p class="sub">Run your program on a real Arduino robot. Download the sketch, the helper library and a parts &amp; wiring guide.</p>
+  <div class="row2"><button id="dlSketch">⬇ Sketch</button><button id="dlHeader">⬇ Helper file</button><button id="dlGuide">⬇ Parts guide</button></div>
+  <div id="hwMsg" class="sub"></div>
+ </div>
+ <div class="card">
+  <h2>🔗 Share your program</h2>
+  <p class="sub">Copy a share code and send it to a friend or teacher. They paste it here and press Load.</p>
+  <textarea id="shareBox" rows="3" placeholder="Paste a share code here, or press Copy to make yours"></textarea>
+  <div class="row2"><button id="shareCopy">📋 Copy my code</button><button id="shareLoad">📥 Load code</button></div>
+  <div id="shareMsg" class="sub"></div>
+ </div>
+<div class="card" id="serCard"><h2>🔌 Live link to a real robot</h2>
+ <p class="sub">Mirror your simulated robot onto a real Arduino robot over USB. Needs Chrome or Edge on a laptop, and a robot running the Live sketch. (iPhones cannot do this.)</p>
+ <div class="row2"><button id="serSketch">⬇ Live sketch (.ino)</button><button id="serBtn" class="p">🔌 Connect robot</button></div>
+ <label class="sub" style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="serMirror" checked> <span>Mirror the simulator to the real motors while it runs or while I drive by hand</span></label>
+ <pre id="serMon" class="sub" style="display:none;max-height:120px;overflow:auto;background:#0b1220;border-radius:8px;padding:8px;margin:6px 0;white-space:pre-wrap"></pre>
+ <div id="serMsg" class="sub"></div></div>
+</section>
+<section id="club" class="view">
+ <div class="card">
+  <h2>🏆 Robotics Club</h2>
+  <p class="sub">Earn up to 3 stars per mission: finish it with few blocks. Compare scores with friends by swapping codes.</p>
+  <input id="playerName" placeholder="Your name" maxlength="24">
+  <div id="clubTotal" class="big"></div>
+  <div id="clubBoard"></div>
+  <div class="row2"><button id="clubCopy">📋 Copy my score code</button></div>
+  <textarea id="clubMine" rows="2" readonly placeholder="Your code appears here"></textarea>
+  <input id="clubIn" placeholder="Paste a friend's score code (MM1:...)">
+  <div class="row2"><button id="clubAdd">➕ Add friend</button></div>
+  <div id="clubMsg" class="sub"></div>
+ </div>
+ <details class="card fold"><summary>⭐ My missions</summary><div id="clubMissions"></div></details>
+ <details class="card fold"><summary>🏫 My class</summary><p class="sub">Enter the class code your teacher gave you, then send your progress report to your teacher (WhatsApp, SMS or email).</p>
+  <input id="classCode" placeholder="Class code (e.g. GRADE8A)" maxlength="16">
+  <div class="row2"><button id="repCopy">📤 Copy my progress report</button></div>
+  <textarea id="repBox" rows="2" readonly placeholder="Your report appears here"></textarea><div id="repMsg" class="sub"></div></details>
+<details class="card fold"><summary>👩🏾‍🏫 Teacher tools</summary><p class="sub">Paste each learner's progress report to build your class table. Everything stays on this device.</p>
+  <input id="tClass" placeholder="Your class code (learners must use the same one)" maxlength="16">
+  <textarea id="tIn" rows="2" placeholder="Paste a learner report here (MM2:...)"></textarea>
+  <div class="row2"><button id="tAdd">➕ Add learner</button><button id="tCsv">⬇ Class CSV</button><button id="tClear">🗑 Clear class</button></div>
+  <div id="tMsg" class="sub"></div><div id="tStats" class="sub"></div>
+  <div id="tTable" style="overflow-x:auto"></div></details>
+ <div class="card"><h2>📄 Portfolio</h2><p class="sub">Download a page with your certificate, scores and code. Open it and print to save as PDF.</p><button id="portBtn">⬇ Download my portfolio</button><div id="portMsg" class="sub"></div></div>
+</section>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+__CORE__
+</script>
+<script>
+__MILA__
+__APP__
+</script>
+<script>
+__CIRCUIT__
+</script>
+<script>
+__BB__
+</script>
+<script>
+__BB3D__
+</script>
+<script>
+__PYX__
+__ECHO__
+</script>
+<script>
+__EXTRAS__
+</script>
+<script>try{if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(function(){});}catch(e){}</script>
+</body>
+</html>

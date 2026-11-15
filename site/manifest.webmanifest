@@ -1,0 +1,24 @@
+{
+ "name": "Milestone Minds Robotics Lab",
+ "short_name": "Robotics Lab",
+ "start_url": ".",
+ "display": "standalone",
+ "background_color": "#0b1322",
+ "theme_color": "#0b1322",
+ "icons": [
+  {
+   "src": "icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png",
+   "purpose": "any"
+  },
+  {
+   "src": "icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "any"
+  }
+ ],
+ "orientation": "any",
+ "description": "Build, program and simulate robots without hardware."
+}
