@@ -201,6 +201,55 @@ button{min-height:44px}.iconbtn{min-height:34px}
 #welcome .row2{margin-top:6px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 img.logo{width:38px;height:38px;border-radius:10px;background:#fff;object-fit:cover;flex:0 0 auto;box-shadow:0 0 0 2px rgba(255,255,255,.12)}
+
+/* ===== Scratch / Blockly style code blocks ===== */
+.k-motion{--c:#4C97FF;--cd:#3373CC}.k-control{--c:#FFAB19;--cd:#CF8B17}.k-stop{--c:#FF5C5C;--cd:#D63D3D}
+.k-looks{--c:#9966FF;--cd:#774DCB}.k-sound{--c:#CF63CF;--cd:#B043B0}.k-act{--c:#0FBD8C;--cd:#0B8E69}
+.k-arm{--c:#FF6680;--cd:#E0475F}.k-drone{--c:#59C059;--cd:#389438}
+.sr{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+#prog{--ws:#f3f6fb;background-color:var(--ws);background-image:radial-gradient(#d2d9e6 1px,transparent 1.3px);background-size:18px 18px;border:1px solid #d6deeb;border-radius:12px;padding:14px 12px 22px;min-height:120px;overflow-x:auto}
+#prog.sel{outline:3px solid #fbbf24;outline-offset:2px}
+#prog .note{color:#64748b;margin-top:16px;font-size:13px}
+#prog .wrap{position:relative;margin:0;width:max-content;max-width:100%;min-width:190px}
+#prog .blk{position:relative;margin:0;background:var(--c);color:#fff;border-radius:7px;padding:9px 12px 12px 10px;min-height:48px;gap:8px;font-weight:700;font-size:14px;text-shadow:0 1px 1px rgba(0,0,0,.28);box-shadow:inset 0 -3px 0 var(--cd);flex-wrap:wrap}
+/* notch on top of every block */
+#prog .blk::before{content:"";position:absolute;top:0;left:18px;width:30px;height:7px;background:var(--ws);clip-path:polygon(0 0,100% 0,76% 100%,24% 100%);z-index:1}
+/* bump under every block (except cap blocks) */
+#prog .wrap:not(.cap)::after,#prog .hat::after{content:"";position:absolute;bottom:-7px;left:18px;width:30px;height:7px;background:var(--cd);clip-path:polygon(0 0,100% 0,76% 100%,24% 100%);z-index:2}
+#prog .wrap.cap>.blk{border-bottom-left-radius:12px;border-bottom-right-radius:12px}
+/* C-shaped blocks: repeat, forever, if/else */
+#prog .cwrap{background:var(--c);border-radius:7px;padding-bottom:18px;box-shadow:inset 0 -3px 0 var(--cd)}
+#prog .cwrap.cap{border-bottom-left-radius:12px;border-bottom-right-radius:12px}
+#prog .cwrap>.blk{box-shadow:none;border-radius:7px 7px 0 0}
+#prog .cwrap>.blk::after,#prog .carm::after{content:"";position:absolute;bottom:-7px;left:38px;width:30px;height:7px;background:var(--c);clip-path:polygon(0 0,100% 0,76% 100%,24% 100%);z-index:2}
+#prog .slot{position:relative;margin:0 0 0 20px;padding:0 0 4px;border:0;border-radius:6px 0 0 6px;background:var(--ws);min-height:34px;outline-offset:-3px}
+#prog .slot.empty::after{content:"tap here, then add blocks";display:block;color:#94a3b8;font-size:12px;font-weight:600;padding:12px 12px 6px;text-shadow:none}
+#prog .slot.sel{outline:3px dashed #f59e0b;background:#fff8e6}
+#prog .slot.sel.empty::after{content:"✓ new blocks go here";color:#b45309}
+#prog .carm{position:relative;background:var(--c);color:#fff;font-weight:700;font-size:13px;padding:7px 14px 10px;text-shadow:0 1px 1px rgba(0,0,0,.28)}
+/* hat block */
+#prog .hat{position:relative;display:flex;align-items:center;gap:8px;width:max-content;max-width:100%;min-width:190px;background:#FFBF00;--cd:#CC9900;color:#fff;font-weight:600;font-size:14px;padding:20px 14px 13px 10px;border-radius:34px 34px 7px 7px/22px 22px 7px 7px;box-shadow:inset 0 -3px 0 #CC9900;text-shadow:0 1px 1px rgba(0,0,0,.3)}
+/* block contents */
+#prog .ic,.pal .pb .ic{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.25);font-size:15px;flex:0 0 auto;text-shadow:none}
+#prog .bl{white-space:nowrap}
+#prog .blk input,#prog .blk select{background:#fff;color:#1e293b;border:0;border-radius:999px;padding:5px 12px;min-height:30px;font-weight:700;font-size:13.5px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.14);text-shadow:none;text-align:center}
+#prog .blk input{width:64px}
+#prog .blk input[type=text]{width:120px;text-align:left}
+#prog .blk select.cond{-webkit-appearance:none;appearance:none;background:#5CB1D6 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='white'/%3E%3C/svg%3E") no-repeat right 16px center;color:#fff;border-radius:0;box-shadow:none;padding:7px 32px 7px 18px;max-width:230px;text-align:left;clip-path:polygon(13px 0,calc(100% - 13px) 0,100% 50%,calc(100% - 13px) 100%,13px 100%,0 50%);text-shadow:0 1px 1px rgba(0,0,0,.25)}
+#prog .blk option{background:#fff;color:#111}
+#prog .blk .x{margin-left:auto;width:28px;height:28px;min-height:28px;padding:0;border-radius:50%;background:rgba(0,0,0,.18);color:#fff;font-size:13px}
+#prog .blk .x:hover{background:rgba(0,0,0,.32)}
+#prog .blk .warn{color:#7c2d12;background:#fef3c7;text-shadow:none;font-weight:600}
+/* palette: each button is a mini block */
+.pal .pg{display:flex;align-items:center;gap:7px;color:#cbd5e1;font-weight:700;margin-top:8px}
+.pal .pg i{width:13px;height:13px;border-radius:50%;background:var(--c);box-shadow:0 0 0 2px var(--cd)}
+.pal button.pb{position:relative;display:inline-flex;align-items:center;gap:7px;background:var(--c);color:#fff;border:0;border-radius:7px;padding:6px 13px 9px 7px;min-height:42px;margin:0 0 8px;font-size:13.5px;font-weight:700;text-shadow:0 1px 1px rgba(0,0,0,.28);box-shadow:inset 0 -3px 0 var(--cd);transition:transform .08s,filter .12s}
+.pal button.pb:not(.cap)::after{content:"";position:absolute;bottom:-6px;left:14px;width:24px;height:6px;background:var(--cd);clip-path:polygon(0 0,100% 0,76% 100%,24% 100%)}
+.pal button.pb.cap{border-radius:7px 7px 12px 12px}
+.pal button.pb:hover{filter:brightness(1.08)}
+.pal button.pb:active{transform:translateY(1px) scale(.98)}
+.pal button.pb .ic{width:24px;height:24px;font-size:13px}
+.pal button.pb.dim{opacity:.5;filter:grayscale(.5)}
 </style>
 </head>
 <body>
