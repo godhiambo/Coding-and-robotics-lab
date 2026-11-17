@@ -7,6 +7,13 @@
     "binding": "ASSETS",
     "run_worker_first": ["/api/*"]
   },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "milestone-robotics",
+      "database_id": "983c8f91-e8b2-421e-b927-ed9947217ac2"
+    }
+  ],
   "vars": {
     "GEMINI_MODEL": "gemini-3.5-flash-lite"
   }
