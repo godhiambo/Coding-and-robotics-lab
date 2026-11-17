@@ -149,6 +149,10 @@ function paintSoil(g,x,y,w,h,mode,seed){soilCanvas(0,0,x,y,w,h,mode,seed||1,g);}
 function blob(rx,ry,rz,seed,det){var geo=new T.IcosahedronGeometry(1,det),ps=geo.attributes.position,r=rng(seed);var cache2={};
  for(var i=0;i<ps.count;i++){var x=ps.getX(i),y=ps.getY(i),z=ps.getZ(i),key=x.toFixed(3)+y.toFixed(3)+z.toFixed(3);if(!(key in cache2))cache2[key]=.82+r()*.34;var f=cache2[key];ps.setXYZ(i,x*rx*f,y*ry*f,z*rz*f);}
  geo.computeVertexNormals();return geo;}
+function clusterTex(){if(cache.cluster)return cache.cluster;var c=cv(128,128),g=c.getContext("2d");for(var i=0;i<46;i++){var x=14+Math.random()*100,y=14+Math.random()*100,a=Math.random()*6.28,l=10+Math.random()*8;g.save();g.translate(x,y);g.rotate(a);var gr=g.createLinearGradient(0,-l,0,l);gr.addColorStop(0,i%3?"#5f9a2e":"#7fb53a");gr.addColorStop(1,"#2f6a1f");g.fillStyle=gr;g.beginPath();g.ellipse(0,0,l*0.38,l,0,0,7);g.fill();g.strokeStyle="rgba(20,50,10,.5)";g.beginPath();g.moveTo(0,-l);g.lineTo(0,l);g.stroke();g.restore();}var t=new T.CanvasTexture(c);t.encoding=T.sRGBEncoding;t.anisotropy=4;cache.cluster=t;return t;}
+function leafCards(g,blobs,seed){if(!detail)return;var n=blobs.length*34,m=new T.MeshStandardMaterial({map:clusterTex(),transparent:true,alphaTest:0.35,side:T.DoubleSide,roughness:0.85}),im=new T.InstancedMesh(new T.PlaneGeometry(10,10),m,n),d=new T.Object3D(),r=rng(seed+11),k=0,col=new T.Color();
+ blobs.forEach(function(c){for(var i=0;i<34;i++){var u=r()*6.283,v=Math.acos(2*r()-1),sx=c[3]*0.95,sy=c[4]*0.95,sz=c[5]*0.95;d.position.set(c[0]+Math.sin(v)*Math.cos(u)*sx,c[1]+Math.cos(v)*sy,c[2]+Math.sin(v)*Math.sin(u)*sz);d.rotation.set(r()*6.28,r()*6.28,r()*6.28);var s=0.8+r()*0.9;d.scale.set(s,s,s);d.updateMatrix();im.setMatrixAt(k,d.matrix);col.setHSL(0.26+r()*0.05,0.5,0.28+r()*0.12);im.setColorAt(k,col);k++;}});
+ im.castShadow=false;g.add(im);}
 function tree(parent,x,z,s,variant){
  var g=new T.Group();g.position.set(x,0,z);g.scale.setScalar(s);g.rotation.y=Math.random()*6.28;parent.add(g);
  var b=new Bld(),bark=[.28,.2,.13],bark2=[.36,.27,.18],r=rng(Math.floor(x*7+z*3)+1);
@@ -158,12 +162,12 @@ function tree(parent,x,z,s,variant){
   for(var k=0;k<3;k++){var an=k*2.1+r(),sx=lean,sy=22;b.tube([[sx,sy,1],[sx+Math.cos(an)*9,sy+7,Math.sin(an)*9],[sx+Math.cos(an)*19,sy+11,Math.sin(an)*19]],[1.5,1,.6],6,bark2,bark2);}
   var tm=new T.Mesh(b.geo(),new T.MeshStandardMaterial({vertexColors:true,roughness:1}));tm.castShadow=true;g.add(tm);
   var cx=[[lean,38,0,28,6.5,26],[lean+16,36,14,20,5,18],[lean-14,35,-12,22,5,18],[lean+4,36,-18,17,4.5,15],[lean-10,34,16,18,4.5,15]];
-  cx.forEach(function(c,i){var m=new T.Mesh(blob(c[3],c[4],c[5],i+Math.floor(x),detail?2:1),leafy);m.position.set(c[0],c[1],c[2]);m.castShadow=true;m.receiveShadow=true;g.add(m);});
+  cx.forEach(function(c,i){var m=new T.Mesh(blob(c[3],c[4],c[5],i+Math.floor(x),detail?2:1),leafy);m.position.set(c[0],c[1],c[2]);m.castShadow=true;m.receiveShadow=true;g.add(m);});leafCards(g,cx,Math.floor(x));
  }else{ // round shade tree
   b.tube([[0,0,0],[1,10,0],[0,20,1]],[3.4,2.6,2.2],8,bark,bark2);
   for(var q=0;q<3;q++){var a2=q*2.1+r();b.tube([[0,17,0],[Math.cos(a2)*7,25,Math.sin(a2)*7],[Math.cos(a2)*12,31,Math.sin(a2)*12]],[1.4,1,.7],6,bark2,bark2);}
   var tm2=new T.Mesh(b.geo(),new T.MeshStandardMaterial({vertexColors:true,roughness:1}));tm2.castShadow=true;g.add(tm2);
-  [[0,36,0,17,14,17],[11,33,8,12,10,12],[-11,32,-7,13,10,13],[3,30,-13,11,9,11],[-6,31,12,12,9,12]].forEach(function(c,i){var m=new T.Mesh(blob(c[3],c[4],c[5],i+5+Math.floor(z),detail?2:1),leafy);m.position.set(c[0],c[1],c[2]);m.castShadow=true;m.receiveShadow=true;g.add(m);});
+  [[0,36,0,17,14,17],[11,33,8,12,10,12],[-11,32,-7,13,10,13],[3,30,-13,11,9,11],[-6,31,12,12,9,12]].forEach(function(c,i){var m=new T.Mesh(blob(c[3],c[4],c[5],i+5+Math.floor(z),detail?2:1),leafy);m.position.set(c[0],c[1],c[2]);m.castShadow=true;m.receiveShadow=true;g.add(m);});leafCards(g,[[0,36,0,17,14,17],[11,33,8,12,10,12],[-11,32,-7,13,10,13],[3,30,-13,11,9,11],[-6,31,12,12,9,12]],Math.floor(z));
  }
  return g;
 }

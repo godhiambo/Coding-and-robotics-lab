@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="theme-color" content="#0b1322"><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#0b1322"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Milestone Minds Robotics Lab (3D)</title>
 <style>
 *{box-sizing:border-box}
@@ -201,68 +201,18 @@ button{min-height:44px}.iconbtn{min-height:34px}
 #welcome .wst b{display:block}#welcome .wst span{color:#94a3b8;font-size:13.5px;line-height:1.4}
 #welcome .row2{margin-top:6px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
-img.logo{width:38px;height:38px;border-radius:10px;background:#fff;object-fit:cover;flex:0 0 auto;box-shadow:0 0 0 2px rgba(255,255,255,.12)}
-
-/* ===== Scratch / Blockly style code blocks ===== */
-.k-motion{--c:#4C97FF;--cd:#3373CC}.k-control{--c:#FFAB19;--cd:#CF8B17}.k-stop{--c:#FF5C5C;--cd:#D63D3D}
-.k-looks{--c:#9966FF;--cd:#774DCB}.k-sound{--c:#CF63CF;--cd:#B043B0}.k-act{--c:#0FBD8C;--cd:#0B8E69}
-.k-arm{--c:#FF6680;--cd:#E0475F}.k-drone{--c:#59C059;--cd:#389438}
-.sr{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-#prog{--ws:#f3f6fb;background-color:var(--ws);background-image:radial-gradient(#d2d9e6 1px,transparent 1.3px);background-size:18px 18px;border:1px solid #d6deeb;border-radius:12px;padding:14px 12px 22px;min-height:120px;overflow-x:auto}
-#prog.sel{outline:3px solid #fbbf24;outline-offset:2px}
-#prog .note{color:#64748b;margin-top:16px;font-size:13px}
-#prog .wrap{position:relative;margin:0;width:max-content;max-width:100%;min-width:190px}
-#prog .blk{position:relative;margin:0;background:var(--c);color:#fff;border-radius:7px;padding:9px 12px 12px 10px;min-height:48px;gap:8px;font-weight:700;font-size:14px;text-shadow:0 1px 1px rgba(0,0,0,.28);box-shadow:inset 0 -3px 0 var(--cd);flex-wrap:wrap}
-/* notch on top of every block */
-#prog .blk::before{content:"";position:absolute;top:0;left:18px;width:30px;height:7px;background:var(--ws);clip-path:polygon(0 0,100% 0,76% 100%,24% 100%);z-index:1}
-/* bump under every block (except cap blocks) */
-#prog .wrap:not(.cap)::after,#prog .hat::after{content:"";position:absolute;bottom:-7px;left:18px;width:30px;height:7px;background:var(--cd);clip-path:polygon(0 0,100% 0,76% 100%,24% 100%);z-index:2}
-#prog .wrap.cap>.blk{border-bottom-left-radius:12px;border-bottom-right-radius:12px}
-/* C-shaped blocks: repeat, forever, if/else */
-#prog .cwrap{background:var(--c);border-radius:7px;padding-bottom:18px;box-shadow:inset 0 -3px 0 var(--cd)}
-#prog .cwrap.cap{border-bottom-left-radius:12px;border-bottom-right-radius:12px}
-#prog .cwrap>.blk{box-shadow:none;border-radius:7px 7px 0 0}
-#prog .cwrap>.blk::after,#prog .carm::after{content:"";position:absolute;bottom:-7px;left:38px;width:30px;height:7px;background:var(--c);clip-path:polygon(0 0,100% 0,76% 100%,24% 100%);z-index:2}
-#prog .slot{position:relative;margin:0 0 0 20px;padding:0 0 4px;border:0;border-radius:6px 0 0 6px;background:var(--ws);min-height:34px;outline-offset:-3px}
-#prog .slot.empty::after{content:"tap here, then add blocks";display:block;color:#94a3b8;font-size:12px;font-weight:600;padding:12px 12px 6px;text-shadow:none}
-#prog .slot.sel{outline:3px dashed #f59e0b;background:#fff8e6}
-#prog .slot.sel.empty::after{content:"✓ new blocks go here";color:#b45309}
-#prog .carm{position:relative;background:var(--c);color:#fff;font-weight:700;font-size:13px;padding:7px 14px 10px;text-shadow:0 1px 1px rgba(0,0,0,.28)}
-/* hat block */
-#prog .hat{position:relative;display:flex;align-items:center;gap:8px;width:max-content;max-width:100%;min-width:190px;background:#FFBF00;--cd:#CC9900;color:#fff;font-weight:600;font-size:14px;padding:20px 14px 13px 10px;border-radius:34px 34px 7px 7px/22px 22px 7px 7px;box-shadow:inset 0 -3px 0 #CC9900;text-shadow:0 1px 1px rgba(0,0,0,.3)}
-/* block contents */
-#prog .ic,.pal .pb .ic{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.25);font-size:15px;flex:0 0 auto;text-shadow:none}
-#prog .bl{white-space:nowrap}
-#prog .blk input,#prog .blk select{background:#fff;color:#1e293b;border:0;border-radius:999px;padding:5px 12px;min-height:30px;font-weight:700;font-size:13.5px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.14);text-shadow:none;text-align:center}
-#prog .blk input{width:64px}
-#prog .blk input[type=text]{width:120px;text-align:left}
-#prog .blk select.cond{-webkit-appearance:none;appearance:none;background:#5CB1D6 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='white'/%3E%3C/svg%3E") no-repeat right 16px center;color:#fff;border-radius:0;box-shadow:none;padding:7px 32px 7px 18px;max-width:230px;text-align:left;clip-path:polygon(13px 0,calc(100% - 13px) 0,100% 50%,calc(100% - 13px) 100%,13px 100%,0 50%);text-shadow:0 1px 1px rgba(0,0,0,.25)}
-#prog .blk option{background:#fff;color:#111}
-#prog .blk .x{margin-left:auto;width:28px;height:28px;min-height:28px;padding:0;border-radius:50%;background:rgba(0,0,0,.18);color:#fff;font-size:13px}
-#prog .blk .x:hover{background:rgba(0,0,0,.32)}
-#prog .blk .warn{color:#7c2d12;background:#fef3c7;text-shadow:none;font-weight:600}
-/* palette: each button is a mini block */
-.pal .pg{display:flex;align-items:center;gap:7px;color:#cbd5e1;font-weight:700;margin-top:8px}
-.pal .pg i{width:13px;height:13px;border-radius:50%;background:var(--c);box-shadow:0 0 0 2px var(--cd)}
-.pal button.pb{position:relative;display:inline-flex;align-items:center;gap:7px;background:var(--c);color:#fff;border:0;border-radius:7px;padding:6px 13px 9px 7px;min-height:42px;margin:0 0 8px;font-size:13.5px;font-weight:700;text-shadow:0 1px 1px rgba(0,0,0,.28);box-shadow:inset 0 -3px 0 var(--cd);transition:transform .08s,filter .12s}
-.pal button.pb:not(.cap)::after{content:"";position:absolute;bottom:-6px;left:14px;width:24px;height:6px;background:var(--cd);clip-path:polygon(0 0,100% 0,76% 100%,24% 100%)}
-.pal button.pb.cap{border-radius:7px 7px 12px 12px}
-.pal button.pb:hover{filter:brightness(1.08)}
-.pal button.pb:active{transform:translateY(1px) scale(.98)}
-.pal button.pb .ic{width:24px;height:24px;font-size:13px}
-.pal button.pb.dim{opacity:.5;filter:grayscale(.5)}
 </style>
 </head>
 <body>
 <div id="welcome" role="dialog" aria-modal="true" aria-labelledby="wTitle"><div class="box">
- <div style="background:#fff;border-radius:14px;padding:6px;margin:-6px -6px 10px"><img src="logo.webp" alt="Milestone Minds Robotics Lab. Imagine. Build. Programme. Simulate." style="display:block;width:100%;height:auto;border-radius:10px"></div><h2 id="wTitle">Welcome to the Robotics Lab</h2><div class="sub">No kit needed. Build, program and test robots on your phone.</div>
+ <h2 id="wTitle">Welcome to the Robotics Lab 🤖</h2><div class="sub">No kit needed. Build, program and test robots on your phone.</div>
  <div class="wst"><div class="n">1</div><div><b>Pick a mission</b><span>Start with “1 Drive”. Each mission is a small engineering challenge, from easy to hard.</span></div></div>
  <div class="wst"><div class="n">2</div><div><b>Make a program</b><span>Tap blocks, write Python, or just tell Mila what you want in your own words.</span></div></div>
  <div class="wst"><div class="n">3</div><div><b>Press Run and watch</b><span>If it fails, tap Hint or Explain. Mila gives clues, not answers. Earn up to 3 stars per mission.</span></div></div>
  <div class="wst"><div class="n">★</div><div><b>Go further</b><span>Build your own robot in <b style="display:inline">Build</b>, wire circuits in <b style="display:inline">Circuits</b>, and compete in <b style="display:inline">Club</b>.</span></div></div>
  <div class="row2"><button id="wGo" class="p">Start Mission 1</button></div>
 </div></div>
-<header><img class="logo" src="icon-192.png" alt="Milestone Minds Robotics Lab mascot" width="38" height="38"><div><h1>Robotics Lab</h1><small>by Milestone Minds</small></div><button id="helpBtn" class="iconbtn" aria-label="How to use this app" title="How to use">?</button><div class="prog-pill"><b id="progtxt">0 / 0</b>missions done<div class="prog-bar"><i id="progbar"></i></div></div></header>
+<header><div class="logo">🤖</div><div><h1>Robotics Lab</h1><small>by Milestone Minds</small></div><button id="helpBtn" class="iconbtn" aria-label="How to use this app" title="How to use">?</button><div class="prog-pill"><b id="progtxt">0 / 0</b>missions done<div class="prog-bar"><i id="progbar"></i></div></div></header>
 <nav id="tabs">
  <button data-tab="play" class="on"><span>🎮</span>Missions</button>
  <button data-tab="build"><span>🔧</span>Build</button>
@@ -281,7 +231,7 @@ img.logo{width:38px;height:38px;border-radius:10px;background:#fff;object-fit:co
   </div>
   <div class="card">
    <div id="cv"><div id="fsbar"><button id="fsRun" class="fsonly">▶ Run</button><button id="fsReset" class="fsonly">↺</button><button id="fsView" class="fsonly">🎥</button><button id="fsBtn" title="Full screen" aria-label="Toggle full screen">⛶</button></div><div id="fsmsg" class="fsonly"></div></div>
-   <div class="row" id="views"><button data-v="angle" class="on">3D view</button><button data-v="chase">Robot cam</button><button data-v="top">Top view</button></div>
+   <div class="row" id="views"><button data-v="angle" class="on">3D view</button><button data-v="close">Close-up</button><button data-v="chase">Robot cam</button><button data-v="top">Top view</button></div>
    <div id="sense">
     <span>Front: <b id="sd">--</b> cm</span><span>Left: <b id="sl">--</b></span><span>Right: <b id="sr">--</b></span>
     <span>Line L/R: <b id="sir">□ □</b></span><span>Soil: <b id="ss">--</b>%</span><span>Bumps: <b id="sb">0</b></span>
@@ -1763,6 +1713,10 @@ function paintSoil(g,x,y,w,h,mode,seed){soilCanvas(0,0,x,y,w,h,mode,seed||1,g);}
 function blob(rx,ry,rz,seed,det){var geo=new T.IcosahedronGeometry(1,det),ps=geo.attributes.position,r=rng(seed);var cache2={};
  for(var i=0;i<ps.count;i++){var x=ps.getX(i),y=ps.getY(i),z=ps.getZ(i),key=x.toFixed(3)+y.toFixed(3)+z.toFixed(3);if(!(key in cache2))cache2[key]=.82+r()*.34;var f=cache2[key];ps.setXYZ(i,x*rx*f,y*ry*f,z*rz*f);}
  geo.computeVertexNormals();return geo;}
+function clusterTex(){if(cache.cluster)return cache.cluster;var c=cv(128,128),g=c.getContext("2d");for(var i=0;i<46;i++){var x=14+Math.random()*100,y=14+Math.random()*100,a=Math.random()*6.28,l=10+Math.random()*8;g.save();g.translate(x,y);g.rotate(a);var gr=g.createLinearGradient(0,-l,0,l);gr.addColorStop(0,i%3?"#5f9a2e":"#7fb53a");gr.addColorStop(1,"#2f6a1f");g.fillStyle=gr;g.beginPath();g.ellipse(0,0,l*0.38,l,0,0,7);g.fill();g.strokeStyle="rgba(20,50,10,.5)";g.beginPath();g.moveTo(0,-l);g.lineTo(0,l);g.stroke();g.restore();}var t=new T.CanvasTexture(c);t.encoding=T.sRGBEncoding;t.anisotropy=4;cache.cluster=t;return t;}
+function leafCards(g,blobs,seed){if(!detail)return;var n=blobs.length*34,m=new T.MeshStandardMaterial({map:clusterTex(),transparent:true,alphaTest:0.35,side:T.DoubleSide,roughness:0.85}),im=new T.InstancedMesh(new T.PlaneGeometry(10,10),m,n),d=new T.Object3D(),r=rng(seed+11),k=0,col=new T.Color();
+ blobs.forEach(function(c){for(var i=0;i<34;i++){var u=r()*6.283,v=Math.acos(2*r()-1),sx=c[3]*0.95,sy=c[4]*0.95,sz=c[5]*0.95;d.position.set(c[0]+Math.sin(v)*Math.cos(u)*sx,c[1]+Math.cos(v)*sy,c[2]+Math.sin(v)*Math.sin(u)*sz);d.rotation.set(r()*6.28,r()*6.28,r()*6.28);var s=0.8+r()*0.9;d.scale.set(s,s,s);d.updateMatrix();im.setMatrixAt(k,d.matrix);col.setHSL(0.26+r()*0.05,0.5,0.28+r()*0.12);im.setColorAt(k,col);k++;}});
+ im.castShadow=false;g.add(im);}
 function tree(parent,x,z,s,variant){
  var g=new T.Group();g.position.set(x,0,z);g.scale.setScalar(s);g.rotation.y=Math.random()*6.28;parent.add(g);
  var b=new Bld(),bark=[.28,.2,.13],bark2=[.36,.27,.18],r=rng(Math.floor(x*7+z*3)+1);
@@ -1772,12 +1726,12 @@ function tree(parent,x,z,s,variant){
   for(var k=0;k<3;k++){var an=k*2.1+r(),sx=lean,sy=22;b.tube([[sx,sy,1],[sx+Math.cos(an)*9,sy+7,Math.sin(an)*9],[sx+Math.cos(an)*19,sy+11,Math.sin(an)*19]],[1.5,1,.6],6,bark2,bark2);}
   var tm=new T.Mesh(b.geo(),new T.MeshStandardMaterial({vertexColors:true,roughness:1}));tm.castShadow=true;g.add(tm);
   var cx=[[lean,38,0,28,6.5,26],[lean+16,36,14,20,5,18],[lean-14,35,-12,22,5,18],[lean+4,36,-18,17,4.5,15],[lean-10,34,16,18,4.5,15]];
-  cx.forEach(function(c,i){var m=new T.Mesh(blob(c[3],c[4],c[5],i+Math.floor(x),detail?2:1),leafy);m.position.set(c[0],c[1],c[2]);m.castShadow=true;m.receiveShadow=true;g.add(m);});
+  cx.forEach(function(c,i){var m=new T.Mesh(blob(c[3],c[4],c[5],i+Math.floor(x),detail?2:1),leafy);m.position.set(c[0],c[1],c[2]);m.castShadow=true;m.receiveShadow=true;g.add(m);});leafCards(g,cx,Math.floor(x));
  }else{ // round shade tree
   b.tube([[0,0,0],[1,10,0],[0,20,1]],[3.4,2.6,2.2],8,bark,bark2);
   for(var q=0;q<3;q++){var a2=q*2.1+r();b.tube([[0,17,0],[Math.cos(a2)*7,25,Math.sin(a2)*7],[Math.cos(a2)*12,31,Math.sin(a2)*12]],[1.4,1,.7],6,bark2,bark2);}
   var tm2=new T.Mesh(b.geo(),new T.MeshStandardMaterial({vertexColors:true,roughness:1}));tm2.castShadow=true;g.add(tm2);
-  [[0,36,0,17,14,17],[11,33,8,12,10,12],[-11,32,-7,13,10,13],[3,30,-13,11,9,11],[-6,31,12,12,9,12]].forEach(function(c,i){var m=new T.Mesh(blob(c[3],c[4],c[5],i+5+Math.floor(z),detail?2:1),leafy);m.position.set(c[0],c[1],c[2]);m.castShadow=true;m.receiveShadow=true;g.add(m);});
+  [[0,36,0,17,14,17],[11,33,8,12,10,12],[-11,32,-7,13,10,13],[3,30,-13,11,9,11],[-6,31,12,12,9,12]].forEach(function(c,i){var m=new T.Mesh(blob(c[3],c[4],c[5],i+5+Math.floor(z),detail?2:1),leafy);m.position.set(c[0],c[1],c[2]);m.castShadow=true;m.receiveShadow=true;g.add(m);});leafCards(g,[[0,36,0,17,14,17],[11,33,8,12,10,12],[-11,32,-7,13,10,13],[3,30,-13,11,9,11],[-6,31,12,12,9,12]],Math.floor(z));
  }
  return g;
 }
@@ -2772,6 +2726,7 @@ function placeCamera(){
  else if(LEVELS[st.lvl].drone){var ph3=0.5,r3=radius*1.2;camera.position.set(150+r3*Math.cos(ph3)*Math.cos(theta),r3*Math.sin(ph3)+20,100+r3*Math.cos(ph3)*Math.sin(theta));camera.lookAt(150,28,100);}
  else if(LEVELS[st.lvl].arm&&view==="chase"){camera.position.set(AR.x,78,AR.y+62);camera.lookAt(AR.x,16,AR.y-55);}
  else if(LEVELS[st.lvl].arm){var ph2=LEVELS[st.lvl].belt?0.62:0.5,r2=radius*(LEVELS[st.lvl].belt?0.86:0.62);camera.position.set(150+r2*Math.cos(ph2)*Math.cos(theta),r2*Math.sin(ph2),125+r2*Math.cos(ph2)*Math.sin(theta));camera.lookAt(150,22,125);}
+ else if(view==="close"){var rc=Math.max(40,Math.min(90,radius*0.2)),phc=0.42;camera.position.set(x+rc*Math.cos(phc)*Math.cos(theta),rc*Math.sin(phc)+4,y+rc*Math.cos(phc)*Math.sin(theta));camera.lookAt(x,5,y);}
  else if(view==="chase"){camera.position.set(x-Math.cos(a)*34,22,y-Math.sin(a)*34);camera.lookAt(x+Math.cos(a)*34,5,y+Math.sin(a)*34);}
  else{var cx=W/2,cz=H/2-5,ph=0.62;camera.position.set(cx+radius*Math.cos(ph)*Math.cos(theta),radius*Math.sin(ph),cz+radius*Math.cos(ph)*Math.sin(theta));camera.lookAt(cx,0,cz);}
 }
@@ -2836,10 +2791,8 @@ function msg(t,c){$("msg").textContent=t;$("msg").className=c||"";}
 // ================= PROGRAM EDITOR =================
 var prog=[],selected=null;
 var LABEL={fwd:"Forward",back:"Back",left:"Turn left",right:"Turn right",wait:"Wait",repeat:"Repeat",forever:"Forever",if:"If",stop:"Stop",water:"Water plant",fanon:"Fan on",fanoff:"Fan off",gripc:"Grip close",gripo:"Grip open",led:"LED",beep:"Beep",print:"Show on LCD",armb:"Arm: base to",beltgo:"Belt: run until box",beltoff:"Belt: stop",arms:"Arm: shoulder to",arme:"Arm: elbow to",takeoff:"Take off",land:"Land",up:"Fly up",down:"Fly down"};
-var CLS={fwd:"k-motion",back:"k-motion",left:"k-motion",right:"k-motion",wait:"k-control",repeat:"k-control",forever:"k-control",if:"k-control",stop:"k-stop",water:"k-act",fanon:"k-act",fanoff:"k-act",gripc:"k-act",gripo:"k-act",led:"k-looks",beep:"k-sound",print:"k-looks",armb:"k-arm",beltgo:"k-arm",beltoff:"k-arm",arms:"k-arm",arme:"k-arm",takeoff:"k-drone",land:"k-drone",up:"k-drone",down:"k-drone"};
-var ICON={fwd:"⬆️",back:"⬇️",left:"↪️",right:"↩️",wait:"⏱️",repeat:"🔁",forever:"♾️",if:"🤔",stop:"🛑",water:"💧",fanon:"🌀",fanoff:"🌀",gripc:"✊",gripo:"🖐️",led:"💡",beep:"🔊",print:"🖥️",armb:"🦾",beltgo:"⚙️",beltoff:"⚙️",arms:"🦾",arme:"🦾",takeoff:"🛫",land:"🛬",up:"⏫",down:"⏬","do":"⭐"};
-var CATNAME={Move:"k-motion",Fly:"k-drone",Control:"k-control",Actions:"k-act",Arm:"k-arm",Conveyor:"k-arm",Mission:"k-act"};
-LABEL["do"]="Action";CLS["do"]="k-act";
+var CLS={fwd:"mv",back:"mv",left:"tn",right:"tn",wait:"mv",repeat:"lp",forever:"lp",if:"ifb",stop:"st",water:"wt",fanon:"wt",fanoff:"wt",gripc:"wt",gripo:"wt",led:"wt",beep:"wt",print:"wt",armb:"am",beltgo:"am",beltoff:"am",arms:"am",arme:"am",takeoff:"dr",land:"dr",up:"dr",down:"dr"};
+LABEL["do"]="Action";CLS["do"]="wt";
 var DEF={up:50,down:50,armb:90,arms:90,arme:0,fwd:30,back:30,left:90,right:90,repeat:3,wait:1};
 var UNIT={up:"cm",down:"cm",armb:"°",arms:"°",arme:"°",fwd:"cm",back:"cm",left:"°",right:"°",repeat:"×",wait:"s"};
 var NEEDPART={water:"pump",fanon:"fan",fanoff:"fan",gripc:"servo",gripo:"servo",led:"led",beep:"buzzer",print:"lcd",armb:"armkit",beltgo:"armkit",beltoff:"armkit",arms:"armkit",arme:"armkit",takeoff:"dronekit",land:"dronekit",up:"dronekit",down:"dronekit"};
@@ -2857,17 +2810,16 @@ function condOk(k){var sg=sigSensor(k);if(sg)return anyHas(sg.need);switch(k){ca
 function add(t,q){var b={t:t};if(t==="do"){b.q=q;var ad=actDef(q);if(ad&&ad.p)b.v=ad.p.def;}if(DEF[t]!==undefined)b.v=DEF[t];if(t==="repeat"||t==="forever"||t==="if")b.c=[];if(t==="if"){b.e=[];b.k="front";b.v=20;var cl=condsList();if(cl.length&&cl[0][0].indexOf("sig:")===0&&(smeta().station||true)&&smeta().station){b.k=cl[0][0];}var sg0=sigSensor(b.k);if(sg0){b.v=sg0.type==="num"?30:0;if(sg0.type==="enum")b.q=sg0.opts[0];b.op=sg0.gt?">":"<";}}if(t==="led")b.q="red";if(t==="print")b.q="Hello";(selected||prog).push(b);renderProg();}
 function exists(list,target){if(list===target)return true;for(var i=0;i<list.length;i++){var b=list[i];if(b.c&&exists(b.c,target))return true;if(b.e&&exists(b.e,target))return true;}return false;}
 function removeFrom(list,b){var i=list.indexOf(b);if(i>=0)list.splice(i,1);}
-function slot(list,label){var d=document.createElement("div");d.className="slot"+(selected===list?" sel":"")+(list.length?"":" empty");var l=document.createElement("div");l.className="lab sr";l.textContent=label;d.appendChild(l);
+function slot(list,label){var d=document.createElement("div");d.className="slot"+(selected===list?" sel":"");var l=document.createElement("div");l.className="lab";l.textContent=label;d.appendChild(l);
  d.onclick=function(e){e.stopPropagation();selected=list;renderProg();};list.forEach(function(b){d.appendChild(block(b,list));});return d;}
 function numInput(b,key,d){var i=document.createElement("input");i.type="number";i.inputMode="decimal";i.value=b[key];i.onclick=function(e){e.stopPropagation();};i.oninput=function(){b[key]=+i.value||0;updateCode();};d.appendChild(i);}
 function block(b,parent){
- var isC=!!b.c,cap=(b.t==="forever"||b.t==="stop");var w=document.createElement("div");w.className="wrap "+CLS[b.t]+(isC?" cwrap":"")+(cap?" cap":"");var d=document.createElement("div");d.className="blk "+CLS[b.t];
- var ic=document.createElement("span");ic.className="ic";ic.setAttribute("aria-hidden","true");ic.textContent=ICON[b.t]||"•";d.appendChild(ic);
- var s=document.createElement("span");s.className="bl";var adx=b.t==="do"?actDef(b.q):null;s.textContent=adx?adx.label:LABEL[b.t];d.appendChild(s);
+ var w=document.createElement("div");w.className="wrap";var d=document.createElement("div");d.className="blk "+CLS[b.t];
+ var s=document.createElement("span");var adx=b.t==="do"?actDef(b.q):null;s.textContent=adx?adx.label:LABEL[b.t];d.appendChild(s);
  if(b.t==="do"){var ad0=actDef(b.q);if(ad0&&!anyHas(ad0.need)){var wn0=document.createElement("span");wn0.className="warn";wn0.textContent="⚠ add "+needName(ad0.need);d.appendChild(wn0);}else if(ad0&&ad0.needAlso&&!anyHas(ad0.needAlso)){var wn1=document.createElement("span");wn1.className="warn";wn1.textContent="⚠ add "+needName(ad0.needAlso);d.appendChild(wn1);}}
  if(b.t!=="do"&&needPart(b.t)&&!C.has(needPart(b.t))){var wn=document.createElement("span");wn.className="warn";wn.textContent="⚠ add "+PARTS[needPart(b.t)].name;d.appendChild(wn);}
  if(b.t==="if"){
-  var sel=document.createElement("select");sel.className="cond";condsList().forEach(function(c){var o=document.createElement("option");o.value=c[0];o.textContent=c[1]+(condOk(c[0])?"":" ⚠");if(c[0]===b.k)o.selected=true;sel.appendChild(o);});
+  var sel=document.createElement("select");condsList().forEach(function(c){var o=document.createElement("option");o.value=c[0];o.textContent=c[1]+(condOk(c[0])?"":" ⚠");if(c[0]===b.k)o.selected=true;sel.appendChild(o);});
   sel.onclick=function(e){e.stopPropagation();};sel.onchange=function(){b.k=sel.value;var sg1=sigSensor(b.k);if(sg1){b.op=sg1.gt?">":"<";if(sg1.type==="enum")b.q=sg1.opts[0];else if(sg1.type==="num"&&(b.v==null||b.v===0))b.v=30;}renderProg();};d.appendChild(sel);
   var cd=condsList().filter(function(c){return c[0]===b.k;})[0]||CONDS[0];
   var sgm=sigSensor(b.k);
@@ -2881,12 +2833,12 @@ function block(b,parent){
  else if(b.v!==undefined){numInput(b,"v",d);var u2=document.createElement("span");u2.textContent=b.t==="do"?(((actDef(b.q)||{}).p||{}).unit||""):UNIT[b.t];d.appendChild(u2);}
  var x=document.createElement("button");x.className="x";x.textContent="✕";x.onclick=function(e){e.stopPropagation();removeFrom(parent,b);if(selected&&selected!==prog&&!exists(prog,selected))selected=null;renderProg();};d.appendChild(x);
  w.appendChild(d);
- if(b.t==="if"){w.appendChild(slot(b.c,"then"));var ea=document.createElement("div");ea.className="carm";ea.textContent="else";w.appendChild(ea);w.appendChild(slot(b.e,"else"));}else if(b.c)w.appendChild(slot(b.c,"do"));
+ if(b.t==="if"){w.appendChild(slot(b.c,"then"));w.appendChild(slot(b.e,"else"));}else if(b.c)w.appendChild(slot(b.c,"do"));
  return w;
 }
 function renderProg(){
  if(selected&&selected!==prog&&!exists(prog,selected))selected=null;
- var p=$("prog");p.innerHTML="";p.className=selected===null?"sel":"";var hat=document.createElement("div");hat.className="hat";hat.innerHTML="<span class='ic' aria-hidden='true'>🚩</span><span>when <b>▶ Run</b> is pressed</span>";p.appendChild(hat);prog.forEach(function(b){p.appendChild(block(b,prog));});
+ var p=$("prog");p.innerHTML="";p.className=selected===null?"sel":"";prog.forEach(function(b){p.appendChild(block(b,prog));});
  if(!prog.length){var e=document.createElement("div");e.className="note";e.textContent="Your program is empty. Tap a block above to start, for example “+ Forward”.";p.appendChild(e);}
  updateCode();
 }
@@ -2909,10 +2861,10 @@ function renderPalette(){
  var pal=$("pal");pal.innerHTML="";
  paletteGroups().forEach(function(grp){
   if(!grp[1].length)return;
-  var gc=CATNAME[grp[0]]||"k-control";var lab=document.createElement("div");lab.className="pg "+gc;lab.innerHTML="<i></i>"+grp[0];pal.appendChild(lab);
+  var lab=document.createElement("div");lab.className="pg";lab.textContent=grp[0];pal.appendChild(lab);
   grp[1].forEach(function(t){var isDo=t.indexOf("do:")===0,q=isDo?t.slice(3):null,ad=isDo?actDef(q):null;if(isDo&&!ad)return;
    var nd=isDo?ad.need:needPart(t),lock=isDo?!anyHas(nd):(needPart(t)&&!C.has(needPart(t))),nm=isDo?ad.label:LABEL[t];
-   var b=document.createElement("button");var kc=isDo?"k-act":(CLS[t]||gc);b.className="pb "+kc+(t==="forever"||t==="stop"?" cap":"");b.innerHTML="<span class='ic' aria-hidden='true'>"+(lock?"🔒":(isDo?"⭐":(ICON[t]||"+")))+"</span>";b.appendChild(document.createTextNode(nm));if(isDo&&ad.tip)b.title=ad.tip;if(lock){b.className+=" dim";b.title="Needs: "+needName(nd);}
+   var b=document.createElement("button");b.textContent=(lock?"🔒 ":"+ ")+nm;if(isDo&&ad.tip)b.title=ad.tip;if(lock){b.className="dim";b.title="Needs: "+needName(nd);}
    b.onclick=function(){add(isDo?"do":t,q);if(lock)msg("🔒 “"+nm+"” needs a "+needName(nd)+". Add it in the Build tab, then it will work.","bad");};pal.appendChild(b);});
  });
 }
