@@ -141,7 +141,7 @@ function texture(pid,THREE){if(texCache[pid])return texCache[pid];var d=part(pid
 
 // ---------------- Fritzing-style wiring diagram ----------------
 var WC=["#2e9b4a","#f2c200","#ff8a1f","#3a86ff","#9b59d6","#e8e8e8","#ff5ca8","#18c7c7"];
-function bez(a,b,col,k,dash){var dy=Math.max(14,Math.abs(b[1]-a[1])*0.45);var sgn=b[1]>=a[1]?1:-1;return "<path d='M"+a[0]+" "+a[1]+" C"+a[0]+" "+(a[1]+sgn*dy)+" "+b[0]+" "+(b[1]-sgn*dy)+" "+b[0]+" "+b[1]+"' fill='none' stroke='"+col+"' stroke-width='1.9' stroke-linecap='round' opacity='.95'"+(dash?" stroke-dasharray='4 3'":"")+"/><circle cx='"+a[0]+"' cy='"+a[1]+"' r='1.9' fill='"+col+"'/><circle cx='"+b[0]+"' cy='"+b[1]+"' r='1.9' fill='"+col+"'/>";}
+var LANE=0;function bez(a,b,col,k,dash){var dy=Math.max(14,Math.abs(b[1]-a[1])*0.45)+((LANE++)%7)*4;var sgn=b[1]>=a[1]?1:-1;return "<path d='M"+a[0]+" "+a[1]+" C"+a[0]+" "+(a[1]+sgn*dy)+" "+b[0]+" "+(b[1]-sgn*dy)+" "+b[0]+" "+b[1]+"' fill='none' stroke='"+col+"' stroke-width='1.9' stroke-linecap='round' opacity='.95'"+(dash?" stroke-dasharray='4 3'":"")+"/><circle cx='"+a[0]+"' cy='"+a[1]+"' r='1.9' fill='"+col+"'/><circle cx='"+b[0]+"' cy='"+b[1]+"' r='1.9' fill='"+col+"'/>";}
 function pick(pins,name,side){var l=pins[name];if(!l||!l.length)return null;if(l.length===1)return l[0];var best=l[0];l.forEach(function(p){if(side==="top"?p[1]<best[1]:p[1]>best[1])best=p;});return best;}
 var I2C={uno:["A4","A5"],nano:["A4","A5"],esp32:["GPIO21","GPIO22"],pi4:["GPIO2","GPIO3"],pico:["GP4","GP5"]};
 function diagram(v,ctlId,ctlName,opts){opts=opts||{};var W=380,rows=v.wiring||[];if(!ctlId)return "";
@@ -151,7 +151,9 @@ function diagram(v,ctlId,ctlName,opts){opts=opts||{};var W=380,rows=v.wiring||[]
  var drv=items.filter(function(it){return Core.PARTS[it.pid]&&Core.PARTS[it.pid].single==="driver";})[0];
  var pwr=null,mot=null;if(opts.power){pwr=opts.power;}if(opts.motors)mot=true;
  function layout(list,side){var x=8,y=0,rowH=0,gap=44,res=[],rowsH=[];list.forEach(function(it){var d=part(it.pid,side==="below"),s=Math.min(1.05,(W-16)/d.w*0.5);if(d.w*s>150)s=150/d.w;var pw=d.w*s,ph=d.h*s;if(x+pw>W-4){x=8;y+=rowH+gap;rowH=0;}it.d=d;it.s=s;it.x=x;it.ry=y;it.w=pw;it.h=ph;x+=pw+10;rowH=Math.max(rowH,ph);res.push(it);});return {items:res,h:list.length?y+rowH:0};}
- var up=items.filter(function(i){return !i.below;}),dn=items.filter(function(i){return i.below;});
+ function keyX(it){var xs=[];it.r.pins.forEach(function(q){var n=q.kind==="i"?(I2C[ctlId]||[])[0]:q.pin;var l=C.pins[n]||C.pins[String(n).replace(/^GPIO/,"")];if(l&&l.length)xs.push(l[0][0]);});return xs.length?xs.reduce(function(a,b){return a+b;},0)/xs.length:C.w/2;}
+ items.forEach(function(it){it.kx=keyX(it);});LANE=0;
+ var up=items.filter(function(i){return !i.below;}).sort(function(a,b){return a.kx-b.kx;}),dn=items.filter(function(i){return i.below;}).sort(function(a,b){return a.kx-b.kx;});
  // battery & motors strip above the driver
  var strip=[];if(drv&&(pwr||mot)){if(pwr)strip.push({pid:pwr,kind:"pwr"});strip.push({pid:"gear",kind:"mot",n:2});}
  var LU=layout(up,"above"),LD=layout(dn,"below"),LS=layout(strip.map(function(s){return {pid:s.pid,kind:s.kind,r:{pins:[]},col:"#ddd"};}),"above");
