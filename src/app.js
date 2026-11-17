@@ -141,7 +141,7 @@ var DECK=[[-6,-3.4],[-6,3.4],[-3,-4],[-3,4],[0,-4.2],[0,4.2],[3.5,-4.2],[3.5,4.2
 function buildRobotParts(){
  while(partsGroup.children.length)partsGroup.remove(partsGroup.children[0]);fx={fingers:[],leds:[]};
  var g=partsGroup,silver=M(0xc7ccd1,0.25,0.9),black=M(0x0b0f14,0.5),deckUsed=0;
- function pcb(w,h,d,col,x,y,z,p){return B(w,h,d,M(col,0.45,0.1),x,y,z,p||g);}
+ function pcb(w,h,d,col,x,y,z,p,pid){if(pid&&typeof PIC!=="undefined"&&PIC.has(pid)){var sd=M(col,0.5,0.1),tp=new THREE.MeshStandardMaterial({map:PIC.texture(pid,THREE),roughness:0.55,metalness:0.05});return mk(new THREE.BoxGeometry(w,h,d),[sd,sd,tp,sd,sd,sd],x,y,z,p||g);}return B(w,h,d,M(col,0.45,0.1),x,y,z,p||g);}
  function slotPos(){var n=parseInt(String(curInst&&curInst.mount||"").replace("deck",""))||1;return DECK[(Math.max(1,n)-1)%DECK.length];}
  var hasDeck=st.parts.some(function(i){return PARTS[i.pid].ctl&&i.mount;});
  if(hasDeck){for(var px=-6;px<=6;px+=12)for(var pz=-4;pz<=4;pz+=8)Cy(0.4,3.4,silver,px,5.6,pz,g);B(15,0.5,10.5,M(0x263238,0.5,0.2),0,7.4,0,g);}
@@ -151,10 +151,7 @@ function buildRobotParts(){
   var p=PARTS[i.pid],id=i.pid,col=p.col,s;
   if(p.ctl){
    var dims={uno:[6.8,1,5.3],nano:[4.3,0.8,1.8],esp32:[5,0.8,2.8],pi4:[8.4,1.5,5.6],pico:[4.4,0.6,2],microbit:[4.2,0.8,3.5]}[id];
-   var b=pcb(dims[0],dims[1],dims[2],col,0,8.1+dims[1]/2,0);
-   if(id==="uno"){B(1.8,1.4,2.2,M(0x9e9e9e,0.3,0.8),-2.8,8.2+0.7,-1.2,g);B(1.5,1.0,1.8,black,2.4,9.2,0.6,g);}
-   if(id==="pi4"){B(2.4,1.8,2.2,M(0xcfd8dc,0.3,0.8),3.2,9.4,-1.5,g);B(2.4,1.8,2.2,M(0xcfd8dc,0.3,0.8),3.2,9.4,1.5,g);B(2,0.4,2,M(0xb0bec5,0.3,0.9),-1,9.6,0,g);}
-   if(id==="esp32"||id==="pico"||id==="nano")B(1.4,0.5,1.4,black,0.4,8.1+dims[1]+0.2,0,g);
+   var b=pcb(dims[0],dims[1],dims[2],col,0,8.1+dims[1]/2,0,g,id);
    if(id==="microbit"){var gl=EM(0xff3030,1.1);for(var r=0;r<3;r++)for(var c=0;c<3;c++)mk(new THREE.BoxGeometry(0.4,0.2,0.4),gl,-0.8+c*0.8,9.0,-0.8+r*0.8,g,false);}
    return;
   }
@@ -177,13 +174,14 @@ function buildRobotParts(){
   if(id==="servo"){B(2.6,2.4,3,M(col,0.5),8.2,4.3,0,g);[-1,1].forEach(function(sd){var f=B(5.4,0.9,0.6,M(0xeeeeee,0.5),11.2,4.3,sd*3,g);f.userData.sd=sd;fx.fingers.push(f);});return;}
   if(id==="led"){var pp=slotPos();var m=mk(new THREE.SphereGeometry(0.95,10,8),EM(0x333333,0.1),pp[0],8.5,pp[1],g,false);fx.led=m;return;}
   if(id==="fan"){var pf=slotPos(),fg=new THREE.Group();fg.position.set(pf[0],9.2,pf[1]);g.add(fg);Cy(2.6,0.3,M(0x37474f,0.5),0,-0.2,0,fg);for(var k=0;k<4;k++){var bl=B(2.4,0.15,0.9,M(0xe0e0e0,0.4),0,0,0,fg);bl.rotation.y=k*Math.PI/2;bl.position.set(Math.cos(k*Math.PI/2)*1.2,0,Math.sin(k*Math.PI/2)*1.2);bl.rotation.y=-k*Math.PI/2;}fx.fan=fg;return;}
-  if(id==="lcd"){var pl=slotPos();pcb(4.6,0.3,2,0x1b5e20,pl[0],8.4,pl[1]);fx.lcd=B(3.6,0.2,1.2,M(0x0d2b2b,0.2),pl[0],8.65,pl[1],g,false);return;}
+  if(id==="lcd"){var pl=slotPos();pcb(4.6,0.3,2,0x1b5e20,pl[0],8.4,pl[1],g,"lcd");fx.lcd=B(3.6,0.2,1.2,M(0x0d2b2b,0.2),pl[0],8.65,pl[1],g,false);return;}
   if(id==="buzzer"){var pb=slotPos();Cy(1.2,1.2,black,pb[0],8.7,pb[1],g);return;}
   if(id==="pump"){var pq=slotPos();B(2.4,1.8,2.4,M(col,0.5),pq[0],8.7,pq[1],g);var tank=Cy(1.8,3,new THREE.MeshStandardMaterial({color:0x4aa8ff,transparent:true,opacity:0.55,roughness:0.2}),pq[0],10.6,pq[1],g);return;}
   if(id==="dht"){var pd=slotPos();B(2,2.4,1.4,M(0x1e88e5,0.5),pd[0],9.2,pd[1],g);B(1.4,0.3,0.2,black,pd[0],9.4,pd[1]+0.75,g,false);return;}
   if(id==="dht2")return;
   if(id==="ldr"||id==="imu"||id==="compass"||id==="relay"||id==="shifter"||id==="adc"||id==="buck"){var po=slotPos();var sz=id==="relay"?[2.8,1.6,2]:id==="buck"?[2.4,1.2,1.6]:id==="adc"?[2.8,0.6,1.6]:[1.8,0.5,1.8];
-   var o=pcb(sz[0],sz[1],sz[2],col,po[0],8.4+sz[1]/2,po[1]);if(id==="ldr")Cy(0.7,0.4,M(0xd84315,0.4),po[0],8.9,po[1],g);return;}
+   var o=pcb(Math.max(sz[0],2.6),sz[1],Math.max(sz[2],2),col,po[0],8.4+sz[1]/2,po[1],g,id);return;}
+  if(typeof PIC!=="undefined"&&PIC.has(id)&&id!=="armkit"&&id!=="dronekit"&&!p.single){var pf2=slotPos(),zz=PIC.SZ[id]||[60,40],ww=Math.min(5,Math.max(2.2,zz[0]*0.034)),dd=Math.min(4,Math.max(1.6,zz[1]*0.034));pcb(ww,0.5,dd,col,pf2[0],8.5,pf2[1],g,id);}
  });
  tagPrev();
 }
@@ -371,7 +369,7 @@ function renderPalette(){
  });
 }
 // ================= PARTS LAB =================
-function icon(p){return "<span class='dot' style='background:#"+("000000"+p.col.toString(16)).slice(-6)+"'></span>";}
+function icon(p){if(typeof PIC!=="undefined"&&PIC.has(p.id))return PIC.thumb(p.id);return "<span class='dot' style='background:#"+("000000"+p.col.toString(16)).slice(-6)+"'></span>";}
 function renderTabs(){
  var t=$("ptabs");t.innerHTML="";
  C.CATS.forEach(function(c){var b=document.createElement("button");b.textContent=c;b.className=c===tab?"on":"";b.onclick=function(){tab=c;renderTabs();renderCatalog();};t.appendChild(b);});
@@ -419,6 +417,7 @@ function renderValidation(){
 }
 function renderWiring(){
  var v=C.validate(),ci=C.ctlInst(),rows=v.wiring,hgt=Math.max(80,rows.length*40+20);
+ if(ci&&typeof PIC!=="undefined"&&PIC.has(ci.pid)){try{var pw=st.parts.filter(function(i){return PARTS[i.pid].single==="power";})[0],hasM=st.parts.some(function(i){return i.pid==="gear";});$("wiring").innerHTML=PIC.diagram(v,ci.pid,PARTS[ci.pid].name,{power:pw?pw.pid:null,motors:hasM})+"<div class='note'>Wires: <b style='color:#e53935'>red</b> = power, <b>black</b> = ground, coloured = signals. Pins are assigned automatically in the order you install parts.</div>";return;}catch(e){try{console.error(e);}catch(_){}}}
  var s="<svg viewBox='0 0 340 "+hgt+"' width='100%' xmlns='http://www.w3.org/2000/svg' font-family='sans-serif'>";
  s+="<rect x='6' y='6' width='96' height='"+(hgt-12)+"' rx='8' fill='#14532d' stroke='#4ade80'/><text x='54' y='"+(hgt/2)+"' fill='#fff' font-size='11' text-anchor='middle' font-weight='bold'>"+(ci?PARTS[ci.pid].name.replace(" "," "):"No controller")+"</text>";
  rows.forEach(function(r,k){var y=14+k*40,p=PARTS[r.pid];
