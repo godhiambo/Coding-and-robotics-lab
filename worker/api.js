@@ -16,13 +16,16 @@ const SCHEMA = [
   `CREATE INDEX IF NOT EXISTS ix_ev_comp ON events(comp_id)`,
 ];
 let ready = false;
-async function init(db) { if (ready) return; await db.batch(SCHEMA.map((s) => db.prepare(s))); ready = true; }
+async function init(db) { if (ready) return; await db.batch(SCHEMA.map((s) => db.prepare(s))); try { await db.prepare("ALTER TABLE attempts ADD COLUMN level TEXT").run(); } catch (e) {} ready = true; }
 
 const hex = (b) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
 const sha = async (s) => hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(s))));
 const rnd = (n) => hex(crypto.getRandomValues(new Uint8Array(n)));
 const uid = () => rnd(8);
-function classCode() { const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let s = ""; for (const x of crypto.getRandomValues(new Uint8Array(6))) s += A[x % A.length]; return "MM-" + s.slice(0, 3) + "-" + s.slice(3); }
+const AL = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+function short(n) { let s = ""; for (const x of crypto.getRandomValues(new Uint8Array(n))) s += AL[x % AL.length]; return s; }
+const classCode = () => short(5);
+const normCode = (v) => String(v == null ? "" : v).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const str = (v, n) => String(v == null ? "" : v).trim().slice(0, n);
 
@@ -61,7 +64,7 @@ const better = (a, b) => (b.score - a.score) || (b.win - a.win) || (a.collisions
 
 // ---------- helpers ----------
 async function teacher(db, body) {
-  const code = str(body.code, 20).toUpperCase(), key = str(body.key, 80);
+  const code = normCode(body.code), key = normCode(body.key);
   if (!code || !key) return null;
   const c = await db.prepare("SELECT * FROM classes WHERE code=?").bind(code).first();
   if (!c || c.key_hash !== (await sha(key))) return null;
@@ -72,7 +75,7 @@ async function learner(db, body) {
   return await db.prepare("SELECT * FROM learners WHERE tok_hash=? AND removed=0").bind(await sha(lt)).first();
 }
 const ev = (db, comp, lid, type, data) => db.prepare("INSERT INTO events(comp_id,learner_id,type,data,at) VALUES(?,?,?,?,?)").bind(comp || null, lid || null, type, data ? JSON.stringify(data).slice(0, 400) : null, Date.now()).run();
-function compView(c) { return { id: c.id, title: c.title, level: c.level, status: c.status, startAt: c.start_at, deadline: c.deadline, pausedAt: c.paused_at, published: !!c.published, rules: JSON.parse(c.rules || "{}") }; }
+function compView(c) { return { id: c.id, title: c.title, level: c.level, levels: String(c.level || "").split(",").filter(Boolean), status: c.status, startAt: c.start_at, deadline: c.deadline, pausedAt: c.paused_at, published: !!c.published, rules: JSON.parse(c.rules || "{}") }; }
 function effDeadline(c, l) { return (c.deadline || 0) + ((l && l.extra_s) || 0) * 1000; }
 
 async function leaderboard(db, compId, withNames) {
@@ -82,10 +85,11 @@ async function leaderboard(db, compId, withNames) {
   const out = Object.values(byL).map((L) => {
     const done = L.list.filter((a) => a.status === "submitted" && !a.disq).sort(better);
     const open = L.list.filter((a) => a.status === "open").pop();
-    const best = done[0];
-    return { id: L.id, name: L.name, score: best ? best.score : 0, win: best ? best.win : 0, collisions: best ? best.collisions : 0, time: best ? best.time_s : 0,
+    const per = {}; done.forEach((a) => { const k = a.level || ""; if (!per[k]) per[k] = a; });
+    const bests = Object.values(per), best = bests[0], sum = (f) => bests.reduce((t, a) => t + (+a[f] || 0), 0);
+    return { id: L.id, name: L.name, score: sum("score"), win: sum("win"), collisions: sum("collisions"), time: sum("time_s"), missions: bests.length,
       progress: best ? best.progress : (open ? open.progress : 0), status: open ? "Running" : (best ? "Submitted" : (L.list.some((a) => a.disq) ? "Disqualified" : "Waiting")), attempts: L.list.length,
-      detail: withNames ? L.list.map((a) => ({ id: a.id, n: a.n, status: a.status, score: a.score, win: a.win, collisions: a.collisions, time: a.time_s, blocks: a.blocks, progress: a.progress, disq: a.disq })) : undefined };
+      detail: withNames ? L.list.map((a) => ({ id: a.id, n: a.n, level: a.level, status: a.status, score: a.score, win: a.win, collisions: a.collisions, time: a.time_s, blocks: a.blocks, progress: a.progress, disq: a.disq })) : undefined };
   });
   out.sort((a, b) => (b.score - a.score) || (b.win - a.win) || (a.collisions - b.collisions) || (a.time - b.time));
   let rank = 0;
@@ -98,7 +102,7 @@ const R = {};
 
 R["class/create"] = async (db, b) => {
   const name = str(b.name, 60); if (!name) return bad("Give the class a name.");
-  const key = rnd(12), id = uid();
+  const key = short(6), id = uid();
   let code = classCode();
   for (let i = 0; i < 5; i++) { const x = await db.prepare("SELECT 1 FROM classes WHERE code=?").bind(code).first(); if (!x) break; code = classCode(); }
   await db.prepare("INSERT INTO classes(id,code,name,grade,subject,key_hash,created) VALUES(?,?,?,?,?,?,?)").bind(id, code, name, str(b.grade, 30), str(b.subject, 60), await sha(key), Date.now()).run();
@@ -123,7 +127,7 @@ R["class/learner"] = async (db, b) => {
 
 R["comp/create"] = async (db, b) => {
   const c = await teacher(db, b); if (!c) return bad("Not allowed.", 401);
-  const title = str(b.title, 80), level = str(b.level, 40); if (!title || !level) return bad("Pick a mission and give the competition a title.");
+  const title = str(b.title, 80), level = (Array.isArray(b.levels) ? b.levels : String(b.level || "").split(",")).map((x) => str(x, 40).replace(/[^\w-]/g, "")).filter(Boolean).slice(0, 30).join(","); if (!title || !level) return bad("Pick at least one mission and give the competition a title.");
   const id = uid();
   await db.prepare("INSERT INTO comps(id,class_id,title,level,rules,status,published,created) VALUES(?,?,?,?,?,?,0,?)").bind(id, c.id, title, level, JSON.stringify(cleanRules(b.rules)), "draft", Date.now()).run();
   await ev(db, id, null, "comp_created", { title, level });
@@ -176,7 +180,7 @@ R["comp/board"] = async (db, b) => {
 };
 
 R["join"] = async (db, b) => {
-  const code = str(b.code, 20).toUpperCase(), name = str(b.name, 40);
+  const code = normCode(b.code), name = str(b.name, 40);
   if (!code || !name) return bad("Enter the class code and your name.");
   const c = await db.prepare("SELECT * FROM classes WHERE code=?").bind(code).first(); if (!c) return bad("That class code was not found.", 404);
   const lt = rnd(16), id = uid();
@@ -192,7 +196,7 @@ R["me"] = async (db, b) => {
   const out = { now: Date.now(), name: l.name, cls: { name: c.name, grade: c.grade, code: c.code }, comp: null };
   if (comp) {
     const v = compView(comp); v.deadline = effDeadline(comp, l);
-    const mine = (await db.prepare("SELECT id,n,status,score,win,collisions,time_s AS time,progress,breakdown,disq FROM attempts WHERE comp_id=? AND learner_id=? ORDER BY n").bind(comp.id, l.id).all()).results || [];
+    const mine = (await db.prepare("SELECT id,n,level,status,score,win,collisions,time_s AS time,progress,breakdown,disq FROM attempts WHERE comp_id=? AND learner_id=? ORDER BY n").bind(comp.id, l.id).all()).results || [];
     // late close: an open attempt past the deadline is locked by the server
     if (comp.status === "ended" || (comp.status === "live" && Date.now() > v.deadline + 15000)) {
       await db.prepare("UPDATE attempts SET status='locked' WHERE comp_id=? AND learner_id=? AND status='open'").bind(comp.id, l.id).run();
@@ -213,14 +217,15 @@ R["attempt/start"] = async (db, b) => {
   if (comp.status !== "live") return bad(comp.status === "paused" ? "The competition is paused." : comp.status === "draft" ? "It has not started yet." : "The competition has ended.");
   if (now < comp.start_at - 500) return bad("Wait for the countdown.");
   if (now > dl) return bad("Time is up.");
+  const lvls = String(comp.level || "").split(",").filter(Boolean), lvl = lvls.includes(str(b.level, 40)) ? str(b.level, 40) : lvls[0];
   const open = await db.prepare("SELECT * FROM attempts WHERE comp_id=? AND learner_id=? AND status='open'").bind(comp.id, l.id).first();
-  if (open) return J({ attemptId: open.id, startedAt: open.started, deadline: dl, now, rules: JSON.parse(open.rules), prog: open.prog ? JSON.parse(open.prog) : null, resumed: true });
-  const used = (await db.prepare("SELECT COUNT(*) AS n FROM attempts WHERE comp_id=? AND learner_id=?").bind(comp.id, l.id).first()).n;
+  if (open) return J({ level: open.level || lvls[0], attemptId: open.id, startedAt: open.started, deadline: dl, now, rules: JSON.parse(open.rules), prog: open.prog ? JSON.parse(open.prog) : null, resumed: true });
+  const used = (await db.prepare("SELECT COUNT(*) AS n FROM attempts WHERE comp_id=? AND learner_id=? AND COALESCE(level,?)=?").bind(comp.id, l.id, lvls[0], lvl).first()).n;
   if (rules.attempts > 0 && used >= rules.attempts) return bad("You have used all your attempts.");
   const id = uid();
-  await db.prepare("INSERT INTO attempts(id,comp_id,learner_id,n,rules,started,status) VALUES(?,?,?,?,?,?,'open')").bind(id, comp.id, l.id, used + 1, comp.rules, now).run();
+  await db.prepare("INSERT INTO attempts(id,comp_id,learner_id,n,rules,started,status,level) VALUES(?,?,?,?,?,?,'open',?)").bind(id, comp.id, l.id, used + 1, comp.rules, now, lvl).run();
   await ev(db, comp.id, l.id, "attempt_start", { n: used + 1 });
-  return J({ attemptId: id, startedAt: now, deadline: dl, now, rules, prog: null });
+  return J({ level: lvl, attemptId: id, startedAt: now, deadline: dl, now, rules, prog: null });
 };
 
 async function openAttempt(db, l, b) {
