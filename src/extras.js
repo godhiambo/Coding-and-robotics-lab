@@ -223,7 +223,7 @@ renderClub();
   function localFallback(why){var py=offline(req);
    if(py){var r=PyX.compile(py);if(!r.errors.length){show(py,"I could not reach my AI brain ("+why+"), so I wrote this from simple keywords. Try short steps like 'forward 50, turn right 90'.",r);return done();}}
    $("vibeRes").style.display="none";say("Mila's AI is not available here ("+why+"). Try short steps like “forward 50, turn right 90, beep”.","err");done();}
-  function proxySample(){return {json:function(p){return fetch("/api/mila",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({prompt:p})}).then(function(r){return r.json().catch(function(){return {};}).then(function(j){if(!r.ok||j.error){var er=new Error(j.error||("Mila server error "+r.status));er.code=r.status===429?"rate_limited":"proxy";throw er;}return j;});});}};}
+  function proxySample(){return {json:function(p){return fetch("/api/mila",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({prompt:p,lt:(window.MM_lt?window.MM_lt():"")})}).then(function(r){return r.json().catch(function(){return {};}).then(function(j){if(!r.ok||j.error){var er=new Error(j.error||("Mila server error "+r.status));er.code=r.status===429?"rate_limited":"proxy";throw er;}return j;});});}};}
   function getSample(){return USE("sample").then(function(s){if(s)return s;return /^https?:$/.test(location.protocol)?proxySample():null;});}
   getSample().then(function(sample){
    if(!sample)return localFallback("AI is not enabled in this view");
@@ -252,7 +252,7 @@ renderClub();
 (function(){var o=$("welcome");if(!o)return;
  function show(){o.classList.add("on");try{$("wGo").focus();}catch(e){}}
  function hide(){o.classList.remove("on");try{localStorage.setItem("mm_seen","1");}catch(e){}}
- $("wGo").onclick=function(){hide();try{window.MM.showTab("play");window.MM.setLevel(0);}catch(e){}};
+ $("wGo").onclick=function(){hide();if(document.body.classList.contains("comp"))return;try{window.MM.showTab("play");window.MM.setLevel(0);}catch(e){}};
  o.addEventListener("click",function(e){if(e.target===o)hide();});
  document.addEventListener("keydown",function(e){if(e.key==="Escape"&&o.classList.contains("on"))hide();});
  $("helpBtn").onclick=show;

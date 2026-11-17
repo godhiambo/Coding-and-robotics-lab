@@ -41,3 +41,21 @@ The app is one HTML file assembled from `src/`:
 - Third-party: Three.js (MIT), Pyodide (MPL-2.0) loaded from CDN.
 
 No licence file is included yet. Add one before inviting contributions.
+
+## Classroom & competition mode (Class tab)
+
+Teachers create a class (class code + secret teacher key), learners join with the code (no account), and the teacher runs
+timed, scored competitions with live leaderboards. All rules, timing and scoring are decided on the server (`worker/api.js`).
+
+**Setup (once):** the API needs a Cloudflare D1 database bound as `DB`.
+1. Cloudflare dashboard → Storage & databases → D1 → Create database `milestone-robotics`.
+2. Put its Database ID in `wrangler.jsonc`:
+   ```jsonc
+   "d1_databases": [{ "binding": "DB", "database_name": "milestone-robotics", "database_id": "<ID>" }]
+   ```
+3. Push. Tables are created automatically on first use. Until then the Class tab says the database is not connected.
+
+What the server enforces: server-side countdown/deadline/pause/extension, attempt limits, per-learner extra time, Mila blocked on the server
+while an attempt with Mila OFF is open, score calculation, ranking and the integrity log. Hints and Code suggestions are offline
+features, so they are switched off in the learner's app for the attempt (rules are snapshotted per attempt on the server).
+Known limit: results (collisions, time, route) are reported by the learner's browser; the program is stored for review.

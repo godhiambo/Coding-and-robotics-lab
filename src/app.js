@@ -284,7 +284,7 @@ function frame(t){
  if(st.status==="run"){C.tick(el*sp);if(st.status!=="run")announce();}
  C.armIdle(el);draw();World.update(camera,t);benchRender(t);requestAnimationFrame(frame);
 }
-function announce(){if(st.status==="win"&&!st.man){ranOk=true;markWon(st.lvl);try{if(window.MM_onWin)window.MM_onWin(st.lvl,prog,st.simt);}catch(e){}}msg(st.msg,st.status==="win"?"ok":"bad");renderBench();$("run").textContent="▶ Run";$("run").className="p";var nb=$("nextM");if(nb){var more=st.status==="win"&&LEVELS[st.lvl+1]&&LEVELS[st.lvl+1].id!=="sandbox";nb.style.display=more?"":"none";}}
+function announce(){try{if(window.MM_onEnd&&!st.man&&(st.status==="win"||st.status==="lose"))window.MM_onEnd(st);}catch(e){}if(st.status==="win"&&!st.man){ranOk=true;markWon(st.lvl);try{if(window.MM_onWin)window.MM_onWin(st.lvl,prog,st.simt);}catch(e){}}msg(st.msg,st.status==="win"?"ok":"bad");renderBench();$("run").textContent="▶ Run";$("run").className="p";var nb=$("nextM");if(nb){var more=st.status==="win"&&LEVELS[st.lvl+1]&&LEVELS[st.lvl+1].id!=="sandbox";nb.style.display=more?"":"none";}}
 function msg(t,c){$("msg").textContent=t;$("msg").className=c||"";}
 // ================= PROGRAM EDITOR =================
 var prog=[],selected=null;
