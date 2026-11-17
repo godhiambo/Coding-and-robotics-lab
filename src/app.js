@@ -629,6 +629,38 @@ function syncPendant(){var ar=st.arm,AMl=!!LEVELS[st.lvl].arm;$("pendant").style
 JK.forEach(function(j){$(j[0]).oninput=function(){if(st.status==="run"){syncPendant();return;}var o={};C.armSet(j[1]==="b"?+this.value:undefined,j[1]==="s"?+this.value:undefined,j[1]==="e"?+this.value:undefined);syncPendant();};});
 $("pgrip").onclick=function(){if(st.status==="run")return;C.armGrip(!st.arm.g);syncPendant();};
 $("padd").onclick=function(){var ar=st.arm;[["armb",ar.b],["arms",ar.s],["arme",ar.e]].forEach(function(p){var b={t:p[0],v:Math.round(p[1])};(selected||prog).push(b);});renderProg();};
+
+// ---- Joystick / keyboard / gamepad control of the arm (with Record) ----
+(function(){
+ var SPD={b:70,s:55,e:75},axL=[0,0],axR=[0,0],keys={},rec=false,lastRec=null,idle=0,moved=false,gpBtn=false,tPrev=0;
+ function stick(el,out){var knob=el.firstElementChild,R=34,pid=null;
+  function set(e){var r=el.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,dx=e.clientX-cx,dy=e.clientY-cy,d=Math.hypot(dx,dy);if(d>R){dx*=R/d;dy*=R/d;}knob.style.transform="translate("+dx+"px,"+dy+"px)";out[0]=dx/R;out[1]=dy/R;}
+  el.addEventListener("pointerdown",function(e){pid=e.pointerId;try{el.setPointerCapture(pid);}catch(_){}set(e);e.preventDefault();});
+  el.addEventListener("pointermove",function(e){if(pid===e.pointerId)set(e);});
+  function up(e){if(pid!==e.pointerId)return;pid=null;knob.style.transform="";out[0]=out[1]=0;}
+  el.addEventListener("pointerup",up);el.addEventListener("pointercancel",up);}
+ stick($("stickL"),axL);stick($("stickR"),axR);
+ function typing(){var a=document.activeElement;return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&a.type!=="range"&&a.type!=="button";}
+ window.addEventListener("keydown",function(e){if(!LEVELS[st.lvl].arm||typing())return;var k=e.key.toLowerCase();if("arrowleft arrowright arrowup arrowdown w s a d".indexOf(k)>=0&&k.length>0){keys[k]=1;e.preventDefault();}if(k===" "||k==="g"){e.preventDefault();toggleGrip();}});
+ window.addEventListener("keyup",function(e){delete keys[e.key.toLowerCase()];});
+ function toggleGrip(){if(st.status==="run")return;C.armGrip(!st.arm.g);syncPendant();if(rec){(selected||prog).push({t:st.arm.g?"gripc":"gripo",v:0});renderProg();}}
+ $("jgrip").onclick=toggleGrip;
+ $("jrec").onclick=function(){rec=!rec;this.classList.toggle("on",rec);this.textContent=rec?"⏹ Stop":"⏺ Record";lastRec={b:Math.round(st.arm.b),s:Math.round(st.arm.s),e:Math.round(st.arm.e)};$("jhint").textContent=rec?"Recording: each time you stop moving, the pose is added to your program.":"Use the sticks, arrow keys / WASD, or a gamepad.";};
+ $("jclr").onclick=function(){if(st.status==="run")return;prog.length=0;selected=null;renderProg();};
+ function pushPose(){var cur={b:Math.round(st.arm.b),s:Math.round(st.arm.s),e:Math.round(st.arm.e)},any=false;[["armb","b"],["arms","s"],["arme","e"]].forEach(function(p){if(!lastRec||Math.abs(cur[p[1]]-lastRec[p[1]])>=2){(selected||prog).push({t:p[0],v:cur[p[1]]});any=true;}});lastRec=cur;if(any)renderProg();}
+ function loop(ts){requestAnimationFrame(loop);var dt=Math.min(0.05,(ts-tPrev)/1000||0.016);tPrev=ts;
+  if(!LEVELS[st.lvl].arm||$("pendant").style.display==="none")return;
+  var x=axL[0],y=axL[1],ey=axR[1];
+  if(keys.arrowleft||keys.a)x-=1;if(keys.arrowright||keys.d)x+=1;if(keys.arrowup)y-=1;if(keys.arrowdown)y+=1;if(keys.w)ey-=1;if(keys.s)ey+=1;
+  var gp=null;try{var gps=navigator.getGamepads?navigator.getGamepads():[];for(var i=0;i<gps.length;i++)if(gps[i]){gp=gps[i];break;}}catch(_){}
+  if(gp){var dz=function(v){return Math.abs(v)<0.15?0:v;};x+=dz(gp.axes[0]||0);y+=dz(gp.axes[1]||0);ey+=dz(gp.axes[3]||0);var pr=gp.buttons[0]&&gp.buttons[0].pressed;if(pr&&!gpBtn)toggleGrip();gpBtn=!!pr;}
+  x=Math.max(-1,Math.min(1,x));y=Math.max(-1,Math.min(1,y));ey=Math.max(-1,Math.min(1,ey));
+  if(st.status==="run"){return;}
+  if(x||y||ey){C.armSet(st.arm.b-x*SPD.b*dt,st.arm.s-y*SPD.s*dt,st.arm.e+ey*SPD.e*dt);syncPendant();moved=true;idle=0;}
+  else if(moved){idle+=dt;if(idle>0.35){moved=false;if(rec)pushPose();}}
+ }
+ requestAnimationFrame(loop);
+})();
 function setLevel(i){try{$("nextM").style.display="none";}catch(e){}
  C.setLevel(i);theta=LEVELS[i].drone?2.75:Math.PI/2;paintLevels();
  syncPendant();mfeed.innerHTML="";$("mission").innerHTML=LEVELS[i].mission;$("hint").innerHTML=LEVELS[i].hint;
