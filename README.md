@@ -1,4 +1,4 @@
-# Milestone Minds Robotics Lab
+# Milestone Minds Robotics Lab 
 
 A virtual robotics lab that runs in the browser (and as an Android app). Learners build, program and test robots
 without owning hardware: wheeled robot, robot arm, drone, a 3D breadboard, Kenya-themed missions, a mentor called Mila,
