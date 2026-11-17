@@ -106,11 +106,13 @@ renderTeacher();
 (function(){
  var inp=$("pyIn");if(!inp||typeof PyX==="undefined")return;
  function lv(){return C.LEVELS[C.st.lvl];}
- function kind(){var l=lv();return l.drone?"drone":l.arm?"arm":"wheeled";}
- var COND={wheeled:'bot.distance("front") < 30',arm:'arm.cube_colour() == "red"',drone:'drone.altitude() < 100'};
+ function kind(){var l=lv();return l.station?"station":l.drone?"drone":l.arm?"arm":"wheeled";}
+ var COND={wheeled:'bot.distance("front") < 30',arm:'arm.cube_colour() == "red"',drone:'drone.altitude() < 100',station:'mission.sense("x")'};
+ function scnCmds(){var m=C.scnMeta&&C.scnMeta();if(!m)return [];var o=[];m.actions.forEach(function(a){o.push('mission.do("'+a.id+'"'+(a.p?", "+a.p.def:"")+")");});m.sensors.forEach(function(s){o.push(s.type==="bool"?'mission.sense("'+s.id+'")':s.type==="enum"?'mission.sense("'+s.id+'") == "'+s.opts[0]+'"':'mission.sense("'+s.id+'") '+(s.gt?">":"<")+" 30");});return o;}
+ function condFor(){var m=C.scnMeta&&C.scnMeta();if(m&&m.station&&m.sensors.length){var s=m.sensors[0];return s.type==="bool"?'mission.sense("'+s.id+'")':s.type==="enum"?'mission.sense("'+s.id+'") == "'+s.opts[0]+'"':'mission.sense("'+s.id+'") '+(s.gt?">":"<")+" 30";}return COND[kind()];}
  function key(){return "mm_py_"+lv().id;}
  var curLvl=-1;
- function chips(){var box=$("pyChips");box.innerHTML="";PyX.CMDS[kind()].forEach(function(c){var txt=c,label=c;if(c==="if"){txt="if "+COND[kind()]+":\n    ";label="if …:";}else if(c==="else:"){txt="else:\n    ";}else if(/^(for|while) /.test(c)){txt=c+"\n    ";}else if(/ < | > | == |^bot\.line|^belt\.box/.test(c)){txt="if "+c+":\n    ";label=c;}
+ function chips(){var box=$("pyChips");box.innerHTML="";PyX.CMDS[kind()].concat(scnCmds()).forEach(function(c){var txt=c,label=c;if(c==="if"){txt="if "+condFor()+":\n    ";label="if …:";}else if(c==="else:"){txt="else:\n    ";}else if(/^(for|while) /.test(c)){txt=c+"\n    ";}else if(/ < | > | == |^bot\.line|^belt\.box|^mission\.sense/.test(c)){txt="if "+c+":\n    ";label=c;}
   var b=document.createElement("button");b.textContent=label;b.onclick=function(){ins(txt);};box.appendChild(b);});}
  function ins(txt){var v=inp.value,p=inp.selectionStart||v.length,ls=v.lastIndexOf("\n",p-1)+1,line=v.slice(ls,p),ind=/^ */.exec(line)[0],pre="";
   if(line.trim()){pre="\n"+ind;}else{pre=""; }

@@ -55,9 +55,22 @@ P({id:"shifter",cat:"Interface",name:"Logic level shifter",spec:"Makes 5V sensor
 P({id:"adc",cat:"Interface",name:"MCP3008 ADC",spec:"Adds 8 analog inputs · uses 4 pins (SPI)",mA:5,d:4,pn:["CS","CLK","MOSI","MISO"],adc:true,col:0x6d4c41});
 P({id:"buck",cat:"Interface",name:"5V buck converter",spec:"Steps any battery down to a clean 5V",mA:20,buck:true,col:0x00acc1});
 // ================= CHASSIS & MOUNTS =================
+P({id:"rain",cat:"Sensors",name:"Rain sensor plate",spec:"Water drops on the plate → 0–100% · analog",mA:8,a:1,pn:["AOUT"],col:0x37474f});
+P({id:"flame",cat:"Sensors",name:"Flame sensor array (3-way)",spec:"IR flame detector, shows the direction of a fire · analog",mA:15,a:1,pn:["AOUT"],col:0xc62828});
+P({id:"smoke",cat:"Sensors",name:"MQ-2 smoke/gas sensor",spec:"Smoke and gas level 0–100% · analog",mA:150,a:1,pn:["AOUT"],lv:5,col:0x6d4c41});
+P({id:"wlevel",cat:"Sensors",name:"Water level probe",spec:"Water height 0–100% · analog",mA:20,a:1,pn:["AOUT"],col:0x0277bd});
+P({id:"gps",cat:"Sensors",name:"NEO-6M GPS module",spec:"Position of the robot · serial (2 pins)",mA:45,d:2,pn:["TX","RX"],lv:5,col:0x1b5e20});
+P({id:"gsm",cat:"Interface",name:"SIM800L GSM module",spec:"Sends SMS over Safaricom / Airtel · serial (2 pins)",mA:300,d:2,pn:["TX","RX"],lv:5,col:0xad1457});
+P({id:"bt",cat:"Interface",name:"HC-05 Bluetooth module",spec:"Talks to the phone app · serial (2 pins)",mA:40,d:2,pn:["TX","RX"],lv:5,col:0x283593});
+P({id:"servo2",cat:"Actuators",name:"MG996R high-torque servo",spec:"Winch / gate lever, 10 kg·cm · 1 PWM pin",mA:500,d:1,pn:["SIG"],lv:5,col:0x00695c});
+P({id:"ext",cat:"Actuators",name:"Extinguisher nozzle valve",spec:"Sprays water or CO₂ when opened · 1 pin",mA:200,d:1,pn:["SIG"],lv:5,col:0xd32f2f});
+P({id:"soap",cat:"Actuators",name:"Soap dispenser pump",spec:"Dispenses one squirt of soap · 1 pin",mA:120,d:1,pn:["SIG"],lv:5,col:0x7cb342});
+P({id:"claw",cat:"Actuators",name:"Drone fruit-picker claw",spec:"Soft claw that grips fruit gently · 1 PWM pin",mA:180,d:1,pn:["SIG"],lv:5,col:0x00838f});
+P({id:"scoop",cat:"Actuators",name:"Floating scoop net",spec:"Lowered to collect floating waste · 1 pin",mA:200,d:1,pn:["SIG"],lv:5,col:0xef6c00});
 var CHASSIS={
  compact:{id:"compact",name:"Compact 2WD",desc:"Small and quick. 6 deck pads. Fits tight spaces.",R:6,vmax:45,acc:110,pads:6,motorMA:400,wheels:2},
  standard:{id:"standard",name:"Standard 2WD",desc:"Balanced. 8 deck pads.",R:7,vmax:40,acc:100,pads:8,motorMA:500,wheels:2},
+ boat:{id:"boat",name:"Floating catamaran",desc:"Two hulls and two water thrusters. 8 deck pads. Floats on a lake.",R:8,vmax:30,acc:60,pads:8,motorMA:500,wheels:2},
  heavy:{id:"heavy",name:"Heavy 4WD rover",desc:"Bigger and slower, 10 deck pads. Four motors draw 1400 mA: needs a strong driver.",R:9,vmax:30,acc:70,pads:10,motorMA:1400,wheels:4}
 };
 var MT={ctl:["ctl"],batt:["batt"],drv:["drv"],axle:["axle"],axleEnc:["axleEnc"],dist:["front","sideL","sideR"],line:["floorL","floorR"],colour:["floorC","floorL","floorR"],bumper:["bumper"],probe:["probe"],cam:["camTop"],tool:["tool"]};
@@ -94,6 +107,7 @@ var LEVELS=[
  {id:"escarp",name:"23 Escarpment",floor:"workshop",kind:"dronewall",drone:true,mission:"A <b>140 cm cliff</b> (the Rift Valley escarpment) blocks the way. Fly <b>over it</b> and land on the pad on the far side.",hint:"Hint: Take off puts you at 60 cm. Fly up 100 (you need more than 145 cm), cross the cliff, Fly down, then Land.",start:{x:30,y:100,a:0},goal:null,walls:[[135,0,14,200]],wallH:140,pad:[250,100,26],kit:["uno","bank","dronekit"]},
  {id:"sandbox",name:"Free Lab",floor:"workshop",mission:"<b>Free lab.</b> Swap the controller, add any sensors, and watch the readings. Colour tiles, a shaded area, a hot zone, a soil plot and a cube are waiting.",hint:"Try: Raspberry Pi + MCP3008 for analog sensors, or add the colour sensor and see the pin limit.",start:{x:20,y:100,a:0},goal:null,walls:[[200,125,50,8]],tiles:[[30,25,40,35,"red"],[30,75,40,35,"green"],[30,125,40,35,"blue"]],shade:[[110,20,60,70]],hot:[[205,20,80,70,38]],plots:[[110,110,60,60]],cube:{x:270,y:160},kit:["pi4","adc","l298n","gear","bank","shifter","us@front","dht","soil","ldr","imu","led","lcd"]}
 ];
+if(typeof SCN!=="undefined"){var sbx=LEVELS.map(function(l){return l.id;}).indexOf("sandbox");SCN.levels.forEach(function(l,k){LEVELS.splice(sbx+k,0,l);});SCN.bind({st:function(){return st;},wait:function(s){return wait(s);},hitsWall:function(x,y){return hitsWall(x,y);},armTo:function(k,t){return armTo(k,t);}});}
 // ================= STATE =================
 var st={drone:{z:0,flying:false,bat:100,maxZ:0,gate:false,landedOk:false,spin:0},arm:{b:90,s:90,e:0,g:false,held:null},cubes:[],unlocked:{},hands:false,chassis:"standard",lvl:0,robot:{x:0,y:0,a:0},bumps:0,dt:0.02,v:0,w:0,wl:0,wr:0,pump:false,dryWatered:false,wasted:0,status:"idle",msg:"",gen:null,plots:[],zones:[],seed:12345,parts:[],uid:1,odo:0,touching:0,cube:null,gripClosed:false,relay:false,fanHot:false,fanWrong:0,led:"off",lcd:"",beeps:0};
 function L(){return LEVELS[st.lvl];}
@@ -149,7 +163,7 @@ function validate(){
  if(L().needs&&!(st.unlocked&&st.unlocked[L().needs]))E.push("This mission uses a sensor you must build first. Complete "+L().needsName+".");
  if(!ctl)E.push("No controller: add an Arduino, Raspberry Pi, ESP32, Pico or micro:bit.");
  if(!pp)E.push("No power source: add a battery pack or power bank.");
- var AR=!!(L().arm||L().drone);
+ var AR=!!(L().arm||L().drone||L().station);
  if(L().drone&&!hasRaw("dronekit"))E.push("This mission needs the quadcopter drone kit. Add it from Actuators.");
  if(L().arm&&!hasRaw("armkit"))E.push("This mission needs the 3-axis robot arm. Add it from Actuators.");
  if(!AR&&!drv)E.push("The motors need a motor driver (L298N, L293D or TB6612). A microcontroller pin cannot power a motor directly.");
@@ -220,7 +234,7 @@ function importDesign(o){
  st.hands=true;return true;
 }
 // ================= WORLD =================
-function setLevel(i){st.lvl=i;if(!st.hands){st.chassis="standard";applyKit(L().kit);}reset();}
+function setLevel(i){st.lvl=i;if(!st.hands){st.chassis=L().chassis||"standard";applyKit(L().kit);}reset();}
 function reset(){liveFlush();st.man=null;
  var l=L(),s=l.start;st.robot={x:s.x,y:s.y,a:s.a};st.bumps=0;st.v=0;st.w=0;st.wl=0;st.wr=0;st.pump=false;st.odo=0;st.touching=0;
  st.simt=0;st.dryWatered=false;st.wasted=0;st.status="idle";st.msg="";st.gen=null;st.gripClosed=false;st.relay=false;st.fanHot=false;st.fanWrong=0;st.led="off";st.lcd="";st.beeps=0;
@@ -234,6 +248,7 @@ function reset(){liveFlush();st.man=null;
  if(l.zonesDef){var hot=Math.floor(Math.random()*2);st.zones=l.zonesDef.map(function(z,i){return {x:z[0],y:z[1],w:z[2],h:z[3],t:i===hot?Math.round(34+Math.random()*5):Math.round(22+Math.random()*4),hot:i===hot};});}
  else if(l.hot)st.zones=l.hot.map(function(z){return {x:z[0],y:z[1],w:z[2],h:z[3],t:z[4],hot:true};});
  else st.zones=[];
+ st.S=null;if(l.scn&&typeof SCN!=="undefined"&&SCN.def[l.scn]){st.S={};SCN.def[l.scn].init(st.S);}
 }
 function inRect(x,y,r){return x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h;}
 function zoneAt(){for(var i=0;i<st.zones.length;i++)if(inRect(st.robot.x,st.robot.y,st.zones[i]))return st.zones[i];return null;}
@@ -286,8 +301,16 @@ function odo(){need("encoder","No wheel encoder installed.");return st.odo+noise
 function bump(){need("bumper","No bumper switch installed.");return st.touching>0;}
 function camSees(){need("camera","No camera installed.");if(!st.cube)return false;var a=st.robot.a*Math.PI/180,dx=st.cube.x-st.robot.x,dy=st.cube.y-st.robot.y,d=Math.hypot(dx,dy),ang=Math.atan2(dy,dx)-a;ang=Math.atan2(Math.sin(ang),Math.cos(ang));return d<90&&Math.abs(ang)<0.45;}
 function inGoal(){var g=L().goal;return !!g&&st.robot.x>=g[0]&&st.robot.x<=g[0]+g[2]&&st.robot.y>=g[1]&&st.robot.y<=g[1]+g[3];}
+function needAny(n,msg){if(!n)return;var a=Array.isArray(n)?n:[n];if(!a.some(function(x){return has(x);}))throw new Error(msg||("Missing part: "+a.map(function(x){return PARTS[x]?PARTS[x].name:x;}).join(" or ")+"."));}
+function scnMeta(){var l=L();return l.scn&&typeof SCN!=="undefined"?SCN.def[l.scn]:null;}
+function* scnDo(b){var D=scnMeta();if(!D)throw new Error("This mission has no special actions.");var a=D.actions.filter(function(x){return x.id===b.q;})[0];if(!a)throw new Error("Unknown action "+b.q+".");
+ needAny(a.need);if(a.needAlso)needAny(a.needAlso);var r=D.act(st.S,b.q,b.v);if(r&&typeof r.next==="function")yield* r;else yield;}
+function scnVal(id){var D=scnMeta();if(!D)throw new Error("Unknown sensor "+id);var s=D.sensors.filter(function(x){return x.id===id;})[0];if(!s)throw new Error("Unknown sensor "+id);needAny(s.need);return {s:s,v:D.sense(st.S,id)};}
+function sigText(b,ard){var id=String(b.k).slice(4),m=scnMeta(),s=m&&m.sensors.filter(function(x){return x.id===id;})[0];if(!s)return "false";var call=ard?"mission_"+id+"()":'mission.sense("'+id+'")';if(s.type==="bool")return call;if(s.type==="enum")return call+' == "'+b.q+'"';return call+" "+(b.op||(s.gt?">":"<"))+" "+b.v;}
+function scnSig(b){var r=scnVal(String(b.k).slice(4)),s=r.s,v=r.v;if(s.type==="bool")return !!v;if(s.type==="enum")return v===b.q;var op=b.op||(s.gt?">":"<");return op===">"?v>b.v:op==="<"?v<b.v:v===b.v;}
 function cond(b){
  var k=b.k||"front";
+ if(k.indexOf("sig:")===0)return scnSig(b);
  switch(k){
   case "front":case "left":case "right":return dist(k)<b.v;
   case "lineL":return line(-1);
@@ -486,6 +509,7 @@ function* runList(list){
    case "led":need("led","No RGB LED installed.");st.led=b.q||"red";yield;break;
    case "beep":need("buzzer","No buzzer installed.");st.beeps++;yield* wait(0.3);break;
    case "print":need("lcd","No LCD installed.");st.lcd=String(b.q||"");yield;break;
+   case "do":yield* scnDo(b);break;
    case "stop":throw STOP;
    case "repeat":for(var k=0;k<b.v;k++){yield* runList(b.c);yield;}break;
    case "forever":while(true){yield* runList(b.c);yield;}
@@ -496,6 +520,7 @@ function* main(prog){try{yield* runList(prog);}catch(e){if(e!==STOP)throw e;}}
 function finish(win,msg){st.status=win?"win":"lose";st.msg=msg;st.gen=null;st.v=0;st.w=0;st.pump=false;}
 function end(){
  var l=L();
+ if(l.scn&&st.S){var er=SCN.def[l.scn].end(st.S);return finish(er.win,er.msg);}
  if(l.drone){
   var dd=st.drone;if(dd.flying)return finish(false,"The drone is still in the air. Add a Land block at the end.");
   var pad=l.pad,onpad=Math.hypot(st.robot.x-pad[0],st.robot.y-pad[1])<=pad[2];
@@ -551,7 +576,8 @@ function sense(name,arg){switch(name){
  case "humidity":return humid();case "heading":return heading();case "odo":return odo();case "bump":return bump();case "cam":return camSees();case "color":return colorName();
  case "cube":need("armkit","No robot arm installed.");return cubeColour();case "alt":need("dronekit","No drone installed.");return st.drone.z;
  case "dfront":need("dronekit","No drone installed.");return droneFront();case "bat":need("dronekit","No drone installed.");return st.drone.bat;case "dlight":need("dronekit","No drone installed.");return droneLight();
- case "box":need("armkit","No robot arm installed.");return !!boxAtSpot();}
+ case "box":need("armkit","No robot arm installed.");return !!boxAtSpot();
+ case "scn":return scnVal(arg).v;}
  throw new Error("Unknown sensor "+name);}
 
 // ---- Manual driving (joystick / keyboard / tilt) ----
@@ -582,6 +608,7 @@ function _tick(el){
   try{r=st.gen.next();}catch(e){st.status="lose";st.msg=e.message&&e.message.indexOf("No ")===0||/Missing/.test(e.message)?"Sensor / part problem: "+e.message:"Program error: "+e.message;st.gen=null;st.v=0;st.w=0;return;}
   if(L().drone&&st.status==="run"){try{dronePhysics(d);}catch(e){st.status="lose";st.msg=e.message;st.gen=null;return;}}
   if(L().arm&&st.status==="run"){try{armPhysics(d);beltStep(d);}catch(e){st.status="lose";st.msg=e.message;st.gen=null;return;}}
+  if(L().scn&&st.status==="run"&&st.S){try{var SD=SCN.def[L().scn];SD.step(st.S,d);var ck=SD.check(st.S);if(ck){finish(ck.win,ck.msg);return;}}catch(e){st.status="lose";st.msg="Mission error: "+e.message;st.gen=null;return;}}
   if(L().find&&st.cube&&Math.hypot(st.cube.x-st.robot.x,st.cube.y-st.robot.y)<=25){finish(true,"★ Beacon reached!");return;}
   if(L().reach&&inGoal()){finish(true,"★ Mission complete!");return;}
   if(r.done)end();
@@ -606,8 +633,9 @@ function readouts(){
   else if(i.pid==="bumper")add("Bumper",function(){return bump()?"PRESSED":"free";});
   else if(i.pid==="camera")add("Camera",function(){return camSees()?"cube ahead":"nothing";});
  });
+ if(L().scn&&st.S){try{SCN.def[L().scn].info(st.S).forEach(function(r){out.push(r);});}catch(e){}}
  if(st.lcd)out.push(["LCD",st.lcd]);
- if(!L().arm&&!L().drone)out.push(["Bumps",String(st.bumps)]);
+ if(!L().arm&&!L().drone&&!L().station)out.push(["Bumps",String(st.bumps)]);
  return out;
 }
 // ================= CODE GENERATOR =================
@@ -643,6 +671,7 @@ function codeFor(prog,force){
    case "led":return ard?"setLed("+String(b.q||"red").toUpperCase()+");":'bot.led("'+(b.q||"red")+'")';
    case "beep":return ard?"beep(300);":"bot.beep(0.3)";
    case "print":return ard?'lcdPrint("'+(b.q||"")+'");':'bot.lcd("'+(b.q||"")+'")';
+   case "do":return ard?"mission_"+b.q+"("+(b.v!==undefined?b.v:"")+");":"mission.do(\""+b.q+"\""+(b.v!==undefined?", "+b.v:"")+")";
    case "stop":return ard?"motorsStop(); while (true) {}":"bot.stop(); raise SystemExit";
   }
   return "";
@@ -652,7 +681,7 @@ function codeFor(prog,force){
   list.forEach(function(b){
    if(b.t==="repeat"){out.push(ard?ind(n)+"for (int i = 0; i < "+b.v+"; i++) {":ind(n)+"for _ in range("+b.v+"):");body(b.c,n+1);if(ard)out.push(ind(n)+"}");}
    else if(b.t==="forever"){out.push(ard?ind(n)+"while (true) {":ind(n)+"while True:");body(b.c,n+1);if(ard)out.push(ind(n)+"}");}
-   else if(b.t==="if"){var fn=T[b.k||"front"],c=fn?fn(b):"false";out.push(ard?ind(n)+"if ("+c+") {":ind(n)+"if "+c+":");body(b.c,n+1);
+   else if(b.t==="if"){var fn=T[b.k||"front"],c=fn?fn(b):"false";if(String(b.k).indexOf("sig:")===0)c=sigText(b,ard);out.push(ard?ind(n)+"if ("+c+") {":ind(n)+"if "+c+":");body(b.c,n+1);
     if(b.e&&b.e.length){out.push(ard?ind(n)+"} else {":ind(n)+"else:");body(b.e,n+1);}if(ard)out.push(ind(n)+"}");}
    else out.push(ind(n)+act(b));
   });
@@ -669,6 +698,6 @@ function codeFor(prog,force){
  }
  return out.join("\n");
 }
-return {setFrontDistance:setFrontDistance,startManual:startManual,manual:manual,startLive:startLive,liveDo:liveDo,liveEnd:liveEnd,liveFail:liveFail,liveAlive:liveAlive,sense:sense,setSensor:setSensor,droneLight:droneLight,drone:function(){return st.drone;},armIdle:armIdle,armGrip:function(x){try{armGrip(x);}catch(e){}},ARM:ARM,armTip:armTip,armSet:armSet,W:W,H:H,R:R,MAXR:MAXR,LEVELS:LEVELS,PARTS:PARTS,CATS:CATS,CHASSIS:CHASSIS,st:st,byCat:byCat,mountsFor:mountsFor,mountLabel:mountLabel,mountPart:mountPart,unmountPart:unmountPart,instAt:instAt,setPin:setPin,pinOptions:pinOptions,setHands:setHands,setChassis:setChassis,clearAll:clearAll,autoWire:autoWire,exportDesign:exportDesign,importDesign:importDesign,mtype:mtype,WHY:WHY,addPart:addPart,removePart:removePart,applyKit:applyKit,validate:validate,setLevel:setLevel,reset:reset,start:start,stop:stop,tick:tick,readouts:readouts,codeFor:codeFor,find:find,has:has,distSafe:function(slot){try{return dist(slot);}catch(e){return null;}},ctlInst:ctlInst,plotAt:plotAt};
+return {scnMeta:scnMeta,needAny:needAny,setFrontDistance:setFrontDistance,startManual:startManual,manual:manual,startLive:startLive,liveDo:liveDo,liveEnd:liveEnd,liveFail:liveFail,liveAlive:liveAlive,sense:sense,setSensor:setSensor,droneLight:droneLight,drone:function(){return st.drone;},armIdle:armIdle,armGrip:function(x){try{armGrip(x);}catch(e){}},ARM:ARM,armTip:armTip,armSet:armSet,W:W,H:H,R:R,MAXR:MAXR,LEVELS:LEVELS,PARTS:PARTS,CATS:CATS,CHASSIS:CHASSIS,st:st,byCat:byCat,mountsFor:mountsFor,mountLabel:mountLabel,mountPart:mountPart,unmountPart:unmountPart,instAt:instAt,setPin:setPin,pinOptions:pinOptions,setHands:setHands,setChassis:setChassis,clearAll:clearAll,autoWire:autoWire,exportDesign:exportDesign,importDesign:importDesign,mtype:mtype,WHY:WHY,addPart:addPart,removePart:removePart,applyKit:applyKit,validate:validate,setLevel:setLevel,reset:reset,start:start,stop:stop,tick:tick,readouts:readouts,codeFor:codeFor,find:find,has:has,distSafe:function(slot){try{return dist(slot);}catch(e){return null;}},ctlInst:ctlInst,plotAt:plotAt};
 })();
 if(typeof module!=="undefined")module.exports=Core;

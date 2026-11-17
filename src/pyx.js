@@ -13,6 +13,9 @@ var N="(-?\\d+(?:\\.\\d+)?)";
 C('bot\\.distance\\("(front|left|right)"\\)\\s*<\\s*'+N,function(m){return {k:m[1],v:+m[2]};});
 C('bot\\.line\\("left"\\)',function(){return {k:"lineL"};});C('bot\\.line\\("right"\\)',function(){return {k:"lineR"};});
 [["bot\\.soil_percent\\(\\)","<","soil"],["drone\\.altitude\\(\\)","<","alt"],["drone\\.front_cm\\(\\)","<","dfront"],["drone\\.battery\\(\\)","<","bat"],["drone\\.light_percent\\(\\)",">","dlight"],["bot\\.light_percent\\(\\)","<","light"],["bot\\.temperature_c\\(\\)",">","temp"],["bot\\.humidity_percent\\(\\)","<","humid"],["bot\\.heading_deg\\(\\)","<","heading"],["bot\\.distance_travelled_cm\\(\\)",">","odo"]].forEach(function(r){C(r[0]+"\\s*"+r[1]+"\\s*"+N,function(m){return {k:r[2],v:+m[1]};});});
+C('mission\\.sense\\("(\\w+)"\\)\\s*(<|>)\\s*'+N,function(m){return {k:"sig:"+m[1],op:m[2],v:+m[3]};});
+C('mission\\.sense\\("(\\w+)"\\)\\s*==\\s*"(\\w+)"',function(m){return {k:"sig:"+m[1],q:m[2]};});
+C('mission\\.sense\\("(\\w+)"\\)',function(m){return {k:"sig:"+m[1]};});
 C('belt\\.box_at_pick_spot\\(\\)',function(){return {k:"boxspot"};});
 C('arm\\.cube_colour\\(\\)\\s*==\\s*"(\\w+)"',function(m){return {k:"cubecol",q:m[1]};});
 C('bot\\.color\\(\\)\\s*==\\s*"(\\w+)"',function(m){return {k:"color",q:m[1]};});
@@ -56,6 +59,7 @@ function compile(src){
  function stmt(s,ln,out){var m=/^([A-Za-z_][\w.]*)\((.*)\)$/.exec(s);
   if(!m){errs.push({line:ln,msg:"I don't understand \""+s+"\". Each line should be a command like bot.forward(50)."});return;}
   var name=m[1],arg=sub(m[2].trim()),def=null;ACTS.forEach(function(a){if(a[0]===name)def=a;});
+  if(name==="mission.do"){var mm=/^"(\w+)"\s*(?:,\s*(-?\d+(?:\.\d+)?))?$/.exec(arg);if(!mm){errs.push({line:ln,msg:"mission.do() needs the action name in quotes, like mission.do(\"grab\")."});return;}var bb={t:"do",q:mm[1]};if(mm[2]!==undefined)bb.v=+mm[2];out.push(bb);return;}
   if(!def){var sg=suggest(name);errs.push({line:ln,msg:"I don't know \""+name+"\"."+(sg?" Did you mean "+sg+"?":" Tap a command below to insert it.")});return;}
   var b={t:def[1]},kind=def[2];
   if(kind==="n"){if(!new RegExp("^"+N+"$").test(arg)){errs.push({line:ln,msg:name+"() needs a number inside the brackets, like "+name+"(50)."});return;}b.v=+arg;}
@@ -68,7 +72,7 @@ function compile(src){
  var prog=block(items.length?items[0].ind:0);
  while(pos<items.length){var it=items[pos];errs.push({line:it.ln,msg:"Check the indentation of this line."});pos++;}
  return {prog:prog,errors:errs};}
-var CMDS={wheeled:["bot.forward(50)","bot.backward(30)","bot.turn_left(90)","bot.turn_right(90)","time.sleep(1)",'bot.led("red")',"bot.beep(0.3)",'bot.distance("front") < 30','bot.line("left")',"for _ in range(3):","while True:","if","else:","bot.stop()"],
+var CMDS={station:["time.sleep(1)","for _ in range(3):","while True:","if","else:"],wheeled:["bot.forward(50)","bot.backward(30)","bot.turn_left(90)","bot.turn_right(90)","time.sleep(1)",'bot.led("red")',"bot.beep(0.3)",'bot.distance("front") < 30','bot.line("left")',"for _ in range(3):","while True:","if","else:","bot.stop()"],
  arm:["arm.base(90)","arm.shoulder(60)","arm.elbow(30)","bot.gripper_close()","bot.gripper_open()","time.sleep(1)","belt.run_until_box()","belt.box_at_pick_spot()",'arm.cube_colour() == "red"',"for _ in range(3):","if","else:"],
  drone:["drone.takeoff()","drone.land()","drone.up(50)","drone.down(50)","drone.forward(100)","bot.turn_left(90)","bot.turn_right(90)","drone.altitude() < 100","drone.front_cm() < 40","drone.light_percent() > 50","for _ in range(3):","if","else:"]};
 return {compile:compile,CMDS:CMDS,ACTS:ACTS};

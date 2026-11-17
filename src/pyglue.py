@@ -104,7 +104,14 @@ class _Belt:
     async def stop(self): await _do({"t": "beltoff"})
     def box_at_pick_spot(self): return _sense("box")
 
-bot = _Bot(); arm = _Arm(); drone = _Drone(); belt = _Belt()
+class _Mission:
+    async def do(self, name, value=None):
+        b = {"t": "do", "q": str(name)}
+        if value is not None: b["v"] = _num(value, "do")
+        await _do(b)
+    def sense(self, name): return _sense("scn", str(name))
+
+bot = _Bot(); arm = _Arm(); drone = _Drone(); belt = _Belt(); mission = _Mission()
 bot.forward_drone = drone.forward
 sys.modules["milestonebot"] = bot
 

@@ -427,6 +427,316 @@ img.logo{width:38px;height:38px;border-radius:10px;background:#fff;object-fit:co
 </main>
 <script src="three.min.js"></script>
 <script>
+// SCN: scenario missions (waste sorting, lake clean-up, irrigation, clothesline, fruit-picking drone,
+// crop monitoring, pothole drone, fire-fighting arm, hand washing, dam gate). Pure logic, no THREE.
+var SCN=(function(){
+"use strict";
+var def={},levels=[],api=null;
+function bind(a){api=a;}
+function R(a,b){return a+Math.random()*(b-a);}
+function RI(a,b){return Math.floor(R(a,b+1));}
+function pick(a){return a[Math.floor(Math.random()*a.length)];}
+function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),t=a[i];a[i]=a[j];a[j]=t;}return a;}
+function D(ax,ay,bx,by){return Math.hypot(ax-bx,ay-by);}
+function rad(d){return d*Math.PI/180;}
+function wrap(a){a%=360;if(a>180)a-=360;if(a<-180)a+=360;return a;}
+function fwd(st,r){var a=rad(st.robot.a);return [st.robot.x+Math.cos(a)*r,st.robot.y+Math.sin(a)*r];}
+function bearing(st,x,y){return wrap(Math.atan2(y-st.robot.y,x-st.robot.x)*180/Math.PI-st.robot.a);}
+function noise(s){return (Math.random()-0.5)*(s||1);}
+function register(d){def[d.id]=d;
+ var l={id:d.id,name:d.name,floor:d.floor||"workshop",mission:d.mission,hint:d.hint,start:d.start||{x:25,y:100,a:0},goal:null,walls:d.walls||[],kit:d.kit,scn:d.id,kind:d.kind||d.id};
+ ["station","drone","arm","chassis","pad","wallH","drain","bins","cubes","dur","needsAny"].forEach(function(k){if(d[k]!==undefined)l[k]=d[k];});
+ levels.push(l);}
+function inRect(x,y,r){return x>=r[0]&&x<=r[0]+r[2]&&y>=r[1]&&y<=r[1]+r[3];}
+function nearestAhead(st,list,maxd,cone,filter,off){
+ var best=null,bd=1e9,fp=off?fwd(st,off):[st.robot.x,st.robot.y];
+ list.forEach(function(it){if(it.held||it.bin||it.hold||it.gone||(filter&&!filter(it)))return;var d=D(st.robot.x,st.robot.y,it.x,it.y);if(d>maxd)return;var b=Math.abs(bearing(st,it.x,it.y));if(b>cone)return;if(d<bd){bd=d;best=it;}});
+ return best;}
+
+// ============================ 1 & 2: land waste sorting ============================
+function wasteDef(o){
+ var d={id:o.id,name:o.name,floor:"workshop",mission:o.mission,hint:o.hint,kit:o.kit,dur:o.dur||160,
+  actions:[{id:"grab",label:"Grab item",need:"servo",tip:"Close the gripper on the item in front"},{id:"release",label:"Release item",need:"servo",tip:"Open the gripper (drops into a bin if you are over one)"}],
+  sensors:o.sensors,
+  init:function(S){var st=api.st();S.t=0;S.held=null;S.sorted=0;S.bins=o.bins;S.items=[];var types=shuffle(o.types);
+   types.forEach(function(ty,i){var k=pick(o.kinds[ty]);S.items.push({id:i,type:ty,kind:k,x:o.lane.x0+i*o.lane.dx,y:o.lane.y+noise(4),m:ty==="wet"||ty==="organic"?RI(62,92):RI(2,20),held:false,bin:null,rot:R(0,6)});});
+   S.total=S.items.length;S.log=[];},
+  step:function(S,dt){S.t+=dt;var st=api.st();if(S.held){var f=fwd(st,13);S.held.x=f[0];S.held.y=f[1];}},
+  act:function*(S,id){var st=api.st();
+   if(id==="grab"){if(S.held){S.log.push("Already holding something");return;}var f=nearestAhead(st,S.items,22,45);if(!f){S.log.push("Nothing in reach");yield* api.wait(0.4);return;}S.held=f;f.held=true;yield* api.wait(0.5);return;}
+   if(id==="release"){if(!S.held){yield* api.wait(0.3);return;}var it=S.held,fp=fwd(st,13),bn=null;S.bins.forEach(function(b){if(inRect(fp[0],fp[1],b.r))bn=b;});S.held=null;it.held=false;
+    if(!bn){it.x=fp[0];it.y=fp[1];yield* api.wait(0.4);return;}
+    if(bn.accepts.indexOf(it.type)<0){S.bad={item:it,bin:bn};return;}
+    it.bin=bn.id;it.x=bn.r[0]+8+Math.random()*(bn.r[2]-16);it.y=bn.r[1]+8+Math.random()*(bn.r[3]-16);S.sorted++;yield* api.wait(0.5);}},
+  sense:function(S,id){var st=api.st();
+   if(id==="moisture"){var f=nearestAhead(st,S.items,22,45);return f?Math.round(f.m+noise(6)):Math.round(2+Math.random()*3);}
+   if(id==="item_dist"){var f2=nearestAhead(st,S.items,150,22);return f2?Math.round(Math.max(0,D(st.robot.x,st.robot.y,f2.x,f2.y)-8)):150;}
+   if(id==="item_type"){var f3=nearestAhead(st,S.items,70,30);return f3?f3.type:"none";}
+   if(id==="holding")return !!S.held;return 0;},
+  check:function(S){if(S.bad)return {win:false,msg:"Contaminated bin: a "+S.bad.item.kind+" ("+S.bad.item.type+") was put in the "+S.bad.bin.label+" bin. Check the item before you release it."};
+   if(S.sorted>=S.total)return {win:true,msg:"★ All "+S.total+" items are in the right bins! "+o.win};
+   if(S.t>=this.dur)return {win:false,msg:"Time is up: "+S.sorted+" of "+S.total+" items sorted."};return null;},
+  end:function(S){return S.sorted>=S.total?{win:true,msg:"★ All "+S.total+" items are in the right bins! "+o.win}:{win:false,msg:"The program ended with "+(S.total-S.sorted)+" item(s) still on the floor."};},
+  info:function(S){return [["Sorted",S.sorted+" / "+S.total],["Holding",S.held?"yes":"no"]];}};
+ return d;}
+register(wasteDef({id:"wetdry",name:"24 Wet & Dry",
+ mission:"Sort the rubbish! <b>Wet waste</b> (food, damp) goes in the <b>WET</b> bin at the top. <b>Dry waste</b> (paper, plastic, cans) goes in the <b>DRY</b> bin at the bottom. A moisture probe tells you which is which.",
+ hint:"Hint: Forever → Forward until item distance &lt; 15 → Grab → If moisture &gt; 40: turn left 90, forward 60, release, back 60, turn right 90 (else the same towards the DRY bin).",
+ kit:["uno","bank","l298n","gear","us@front","soil","servo","buzzer"],
+ types:["wet","dry","wet","dry","wet","dry"],lane:{x0:62,dx:32,y:100},
+ kinds:{wet:["banana peel","orange peel","leftover ugali"],dry:["paper","plastic bottle","tin can"]},
+ bins:[{id:"wet",label:"WET",accepts:["wet"],r:[20,8,260,34]},{id:"dry",label:"DRY",accepts:["dry"],r:[20,158,260,34]}],
+ sensors:[{id:"moisture",label:"Moisture of item ahead >",unit:"%",type:"num",gt:true,need:"soil"},{id:"item_dist",label:"Item ahead closer than",unit:"cm",type:"num",need:"us"},{id:"holding",label:"Holding an item",type:"bool"}],
+ win:"The city stays clean and the compost is pure."}));
+register(wasteDef({id:"wastetype",name:"25 Recycling Centre",
+ mission:"Sort 4 items into <b>four labelled bins</b>: <b>PLASTIC, PAPER, METAL, ORGANIC</b>. The AI camera names each item. Carry it to the matching bin.",
+ hint:"Hint: the camera says what the item is (plastic, paper, metal, organic). Bins along the top wall, left to right: PLASTIC, PAPER, METAL, ORGANIC.",
+ kit:["esp32","bank","l298n","gear","us@front","camera","servo","buzzer"],
+ types:["plastic","paper","metal","organic"],lane:{x0:62,dx:40,y:128},
+ kinds:{plastic:["plastic bottle","plastic bag"],paper:["newspaper","cardboard box"],metal:["tin can","soda can"],organic:["banana peel","mango seed"]},
+ bins:[{id:"plastic",label:"PLASTIC",accepts:["plastic"],r:[10,8,64,36]},{id:"paper",label:"PAPER",accepts:["paper"],r:[82,8,64,36]},{id:"metal",label:"METAL",accepts:["metal"],r:[154,8,64,36]},{id:"organic",label:"ORGANIC",accepts:["organic"],r:[226,8,64,36]}],
+ sensors:[{id:"item_type",label:"Item ahead is",type:"enum",opts:["plastic","paper","metal","organic","none"],need:"camera"},{id:"item_dist",label:"Item ahead closer than",unit:"cm",type:"num",need:"us"},{id:"holding",label:"Holding an item",type:"bool"}],
+ win:"Recycling rate: 100%."}));
+
+// ============================ 3: floating lake clean-up ============================
+register({id:"lake",name:"26 Lake Clean-up",floor:"lake",chassis:"boat",walls:[[272,0,28,200]],wallH:6,start:{x:30,y:100,a:0},dur:180,
+ mission:"Lake Victoria is full of rubbish! Drive the <b>floating robot</b>, scoop up plastic, cans and other waste, and unload each item into the matching <b>labelled bin at the shore</b> (right side).",
+ hint:"Hint: Scoop down → drive into an item to collect it (the hold carries 3) → drive to the shore → Drop in bin. The camera tells you what each item is.",
+ kit:["esp32","bank","l298n","gear","us@front","camera","scoop","buzzer"],
+ actions:[{id:"scoop_down",label:"Scoop down",need:"scoop",tip:"Lower the net: items ahead are collected"},{id:"scoop_up",label:"Scoop up",need:"scoop"},{id:"drop_bin",label:"Drop top item in bin",need:"scoop",tip:"At the shore: unload the last item into the bin in front"}],
+ sensors:[{id:"item_type",label:"Item ahead is",type:"enum",opts:["plastic","metal","other","none"],need:"camera"},{id:"item_dist",label:"Item ahead closer than",unit:"cm",type:"num",need:"us"},{id:"hold",label:"Items in hold >",unit:"",type:"num",gt:true}],
+ init:function(S){S.t=0;S.scoop=false;S.hold=[];S.sorted=0;S.bins=[{id:"plastic",label:"PLASTIC",accepts:["plastic"],r:[274,12,24,52]},{id:"metal",label:"METAL",accepts:["metal"],r:[274,74,24,52]},{id:"other",label:"OTHER",accepts:["other"],r:[274,136,24,52]}];
+  var kinds={plastic:["plastic bottle","plastic bag","plastic bottle"],metal:["tin can","tin can"],other:["old sandal","tyre"]},ty=shuffle(["plastic","plastic","plastic","metal","metal","other","other"]);
+  S.items=ty.map(function(t,i){return {id:i,type:t,kind:pick(kinds[t]),x:R(80,205),y:R(25,175),hold:false,bin:null,vx:R(-1,1),vy:R(-1,1),rot:R(0,6)};});
+  for(var i=0;i<S.items.length;i++)for(var j=0;j<i;j++)if(D(S.items[i].x,S.items[i].y,S.items[j].x,S.items[j].y)<22)S.items[i].y=Math.min(175,S.items[i].y+26);
+  S.total=S.items.length;S.cur={x:2.4,y:1.2};},
+ step:function(S,dt){var st=api.st();S.t+=dt;
+  var cx=Math.cos(S.t*.3)*0.8+S.cur.x,cy=Math.sin(S.t*.23)*1.0+S.cur.y;
+  if(st.status==="run"){var nx=st.robot.x+cx*dt*0.6,ny=st.robot.y+cy*dt*0.6;if(!api.hitsWall(nx,ny)){st.robot.x=nx;st.robot.y=ny;}}
+  S.items.forEach(function(it){if(it.hold||it.bin)return;var nx=it.x+(cx*0.5+it.vx*.3)*dt,ny=it.y+(cy*0.5+it.vy*.3)*dt;if(nx>6&&nx<262)it.x=nx;if(ny>6&&ny<194)it.y=ny;});
+  if(S.scoop&&S.hold.length<3){var f=fwd(st,12);S.items.forEach(function(it){if(it.hold||it.bin||S.hold.length>=3)return;if(D(f[0],f[1],it.x,it.y)<=12){it.hold=true;S.hold.push(it);}});}},
+ act:function*(S,id){var st=api.st();
+  if(id==="scoop_down"){S.scoop=true;yield* api.wait(0.5);return;}if(id==="scoop_up"){S.scoop=false;yield* api.wait(0.4);return;}
+  if(id==="drop_bin"){if(!S.hold.length){yield* api.wait(0.3);return;}var f=fwd(st,13),bn=null;S.bins.forEach(function(b){if(f[0]>=b.r[0]-14&&f[1]>=b.r[1]-6&&f[1]<=b.r[1]+b.r[3]+6)bn=b;});
+   if(!bn){S.msg="Not at a bin";yield* api.wait(0.3);return;}var it=S.hold.pop();it.hold=false;
+   if(bn.accepts.indexOf(it.type)<0){S.bad={item:it,bin:bn};return;}it.bin=bn.id;it.x=bn.r[0]+6+Math.random()*(bn.r[2]-12);it.y=bn.r[1]+6+Math.random()*(bn.r[3]-12);S.sorted++;yield* api.wait(0.6);}},
+ sense:function(S,id){var st=api.st();
+  if(id==="item_type"){var f=nearestAhead(st,S.items,70,30);return f?f.type:"none";}
+  if(id==="item_dist"){var f2=nearestAhead(st,S.items,150,22);return f2?Math.round(Math.max(0,D(st.robot.x,st.robot.y,f2.x,f2.y)-8)):150;}
+  if(id==="hold")return S.hold.length;return 0;},
+ check:function(S){if(S.bad)return {win:false,msg:"Wrong bin: a "+S.bad.item.kind+" ("+S.bad.item.type+") went into the "+S.bad.bin.label+" bin."};
+  if(S.sorted>=S.total)return {win:true,msg:"★ The lake is clean! All "+S.total+" items are in the right bins."};if(S.t>=this.dur)return {win:false,msg:"Time is up: "+S.sorted+" of "+S.total+" items recovered."};return null;},
+ end:function(S){return S.sorted>=S.total?{win:true,msg:"★ The lake is clean!"}:{win:false,msg:"The program ended with "+(S.total-S.sorted)+" item(s) still in the lake or in the hold."};},
+ info:function(S){return [["Recovered",S.sorted+" / "+S.total],["In hold",S.hold.length+" / 3"]];}});
+
+// ============================ 4: irrigation robot ============================
+register({id:"irrigate",name:"27 Smart Irrigation",floor:"farm",start:{x:18,y:100,a:0},dur:170,
+ mission:"Drive down the aisle between the crop rows. Test the <b>soil moisture</b> of each plant and water <b>only the dry ones</b> (below 35%). The tank holds 4 waterings: refill at the <b>depot</b> at the end.",
+ hint:"Hint: Repeat 5 → Forward 50 → If moisture left &lt; 35: water left. Same on the right. Refill at the depot (right end).",
+ kit:["uno","bank","l298n","gear","soil","pump","buzzer"],
+ actions:[{id:"water_left",label:"Water plant on the left",need:"pump"},{id:"water_right",label:"Water plant on the right",need:"pump"},{id:"refill",label:"Refill tank (at depot)",need:"pump"}],
+ sensors:[{id:"moisture_left",label:"Moisture on LEFT <",unit:"%",type:"num",need:"soil"},{id:"moisture_right",label:"Moisture on RIGHT <",unit:"%",type:"num",need:"soil"},{id:"tank",label:"Water tank left <",unit:"units",type:"num"}],
+ init:function(S){S.t=0;S.tank=4;S.cap=4;S.wasted=0;S.pump=0;S.plants=[];var xs=[62,106,150,194,238],dryN=RI(3,5),ids=shuffle([0,1,2,3,4,5,6,7,8,9]).slice(0,dryN);
+  [60,140].forEach(function(y,r){xs.forEach(function(x,c){var i=r*5+c,dry=ids.indexOf(i)>=0;S.plants.push({x:x+noise(6),y:y,side:r===0?"left":"right",m:dry?RI(6,28):RI(48,88),dry:dry,watered:false});});});
+  S.dryN=dryN;S.msg="";},
+ step:function(S,dt){S.t+=dt;S.pump=Math.max(0,S.pump-dt);},
+ plantAt:function(S,side){var st=api.st(),best=null,bd=99;S.plants.forEach(function(p){if(p.side!==side)return;var d=Math.abs(p.x-st.robot.x);if(d<14&&d<bd){bd=d;best=p;}});return best;},
+ act:function*(S,id){var st=api.st(),me=def.irrigate;
+  if(id==="refill"){if(st.robot.x>=246){S.tank=S.cap;S.msg="Tank refilled";yield* api.wait(1.2);}else{S.msg="Not at the depot";yield* api.wait(0.3);}return;}
+  var side=id==="water_left"?"left":"right",p=me.plantAt(S,side);
+  if(S.tank<=0){S.msg="Tank empty";yield* api.wait(0.5);return;}
+  S.tank--;S.pump=1.3;S.pside=side;S.pp=p;
+  yield* api.wait(1.3);
+  if(p&&p.dry&&!p.watered){p.watered=true;p.m=Math.min(90,p.m+55);}else S.wasted++;},
+ sense:function(S,id){var me=def.irrigate;
+  if(id==="moisture_left"||id==="moisture_right"){var p=me.plantAt(S,id==="moisture_left"?"left":"right");return p?Math.round(p.m+noise(4)):0;}
+  if(id==="tank")return S.tank;return 0;},
+ check:function(S){if(S.t>=this.dur)return me2(S);return null;},
+ end:function(S){return me2(S);},
+ info:function(S){var d=S.plants.filter(function(p){return p.dry&&p.watered;}).length;return [["Dry plants watered",d+" / "+S.dryN],["Tank",S.tank+" / "+S.cap],["Water wasted",String(S.wasted)]];}});
+function me2(S){var left=S.plants.filter(function(p){return p.dry&&!p.watered;}).length;
+ if(S.wasted>0)return {win:false,msg:"Water wasted "+S.wasted+"×: you watered a plant that was already moist (or empty air). Test the soil first."};
+ if(left>0)return {win:false,msg:left+" dry plant"+(left>1?"s were":" was")+" not watered."};
+ return {win:true,msg:"★ Every dry plant is watered and not a drop was wasted!"};}
+
+// ============================ 5: rain clothesline ============================
+register({id:"cloth",name:"28 Rain Clothesline",floor:"farm",station:true,dur:100,start:{x:150,y:100,a:0},
+ mission:"The washing is hanging out to dry. When <b>drizzle</b> starts, <b>fold</b> the clothesline under the roof. When the rain <b>stops</b>, <b>unfold</b> it so the sun can dry the clothes. Be fast: wet clothes never dry!",
+ hint:"Hint: Forever → If rain sensor &gt; 25: Fold line, else: Unfold line. The clothes need about 45 s of sunshine to dry.",
+ kit:["uno","bank","rain","servo2","ldr","lcd"],
+ actions:[{id:"fold",label:"Fold clothesline (cover)",need:"servo2",tip:"Winch pulls the clothes under the roof"},{id:"unfold",label:"Unfold clothesline",need:"servo2"}],
+ sensors:[{id:"rain",label:"Rain sensor >",unit:"%",type:"num",gt:true,need:"rain"},{id:"sunlight",label:"Sunlight >",unit:"%",type:"num",gt:true,need:"ldr"},{id:"line_pos",label:"Line extended >",unit:"%",type:"num",gt:true}],
+ init:function(S){S.t=0;S.pos=1;S.target=1;S.damp=100;S.rain=0;S.showers=[];var s1=R(10,22);S.showers.push({s:s1,e:s1+R(14,20),k:R(45,70)});var s2=R(55,66);S.showers.push({s:s2,e:s2+R(12,16),k:R(60,90)});S.wetSec=0;S.sun=true;},
+ step:function(S,dt){S.t+=dt;var r=0;S.showers.forEach(function(w){if(S.t>=w.s&&S.t<=w.e)r=w.k*Math.min(1,(S.t-w.s)/2.5)*Math.min(1,(w.e-S.t)/1.5+0.2);});
+  S.rain+=(r-S.rain)*Math.min(1,dt*3);if(Math.abs(S.rain)<0.5)S.rain=0;S.sun=S.rain===0;
+  var sp=0.45*dt;S.pos+=Math.max(-sp,Math.min(sp,S.target-S.pos));
+  if(S.pos>0.3&&S.rain>0){S.damp=Math.min(100,S.damp+S.rain*0.09*dt);S.wetSec+=dt;}
+  else if(S.pos>0.8&&S.sun){S.damp=Math.max(0,S.damp-2.3*dt);}},
+ act:function*(S,id){S.target=id==="fold"?0:1;yield* api.wait(0.25);},
+ sense:function(S,id){if(id==="rain")return Math.round(Math.max(0,S.rain*(S.pos>0.3?1:1)+noise(3)));if(id==="sunlight")return Math.round(S.sun?(80+noise(6)):(25+noise(6)));if(id==="line_pos")return Math.round(S.pos*100);return 0;},
+ check:function(S){if(S.t>=this.dur)return cl2(S);return null;},end:function(S){return cl2(S);},
+ info:function(S){return [["Rain",Math.round(S.rain)+"%"],["Clothes dampness",Math.round(S.damp)+"%"],["Line",S.pos>0.9?"out":S.pos<0.1?"folded":"moving"]];}});
+function cl2(S){if(S.damp<=30)return {win:true,msg:"★ Dry, clean clothes! The line folded in time and spent "+Math.round(S.wetSec)+" s in the rain."};
+ return {win:false,msg:"The clothes are still "+Math.round(S.damp)+"% damp. "+(S.wetSec>6?"They stayed out in the rain for "+Math.round(S.wetSec)+" s. Fold faster.":"They did not get enough sunshine. Unfold as soon as the rain stops.")};}
+
+// ============================ 6: drone picks ripe tomatoes ============================
+register({id:"tomato",name:"29 Tomato Picker",floor:"farm",drone:true,pad:[30,40,20],start:{x:30,y:40,a:0},walls:[],dur:170,
+ mission:"Fly the <b>drone</b> over the tomato rows. Use the <b>camera</b> to spot <b>ripe (red)</b> tomatoes, pick them with the gripper, and drop them in the <b>basket</b> next to the pad. Leave the <b>green</b> ones to ripen, then land.",
+ hint:"Hint: Take off, climb to the fruit height, turn to line up (fruit offset), fly forward until fruit distance &lt; 20, Pick. The tray holds 3.",
+ kit:["esp32","bank","dronekit","camera","claw"],
+ actions:[{id:"pick",label:"Pick fruit in claw reach",need:"claw",tip:"Grabs the fruit just in front of the drone"},{id:"drop_basket",label:"Drop tray into basket",need:"claw",tip:"Above the basket by the pad"}],
+ sensors:[{id:"fruit_colour",label:"Fruit ahead is",type:"enum",opts:["red","green","none"],need:"camera"},{id:"fruit_dx",label:"Fruit sideways offset >",unit:"cm",type:"num",gt:true,need:"camera"},{id:"fruit_dz",label:"Fruit height offset >",unit:"cm",type:"num",gt:true,need:"camera"},{id:"fruit_dist",label:"Fruit distance <",unit:"cm",type:"num",need:"camera"}],
+ init:function(S){S.t=0;S.fruit=[];S.tray=[];S.basket=0;S.bad=null;S.lost=0;S.basketPos=[30,110];
+  var plants=[[95,60],[155,60],[215,60],[95,140],[155,140],[215,140]];S.plants=plants.map(function(p){return {x:p[0],y:p[1]};});
+  var ripeN=RI(3,5),slots=shuffle([0,1,2,3,4,5,6,7,8,9,10,11]).slice(0,ripeN);
+  plants.forEach(function(p,i){for(var k=0;k<2;k++){var idx=i*2+k,side=p[1]<100?1:-1;S.fruit.push({id:idx,x:p[0]+noise(8),y:p[1]+side*14+noise(3),z:RI(70,115)+k*8,ripe:slots.indexOf(idx)>=0,gone:false,hold:false});}});
+  S.ripeN=ripeN;},
+ step:function(S,dt){S.t+=dt;},
+ view:function(S,f){var st=api.st(),d=st.drone;var a=rad(st.robot.a),dx=f.x-st.robot.x,dy=f.y-st.robot.y,fw=dx*Math.cos(a)+dy*Math.sin(a),sd=-dx*Math.sin(a)+dy*Math.cos(a);return {fw:fw,sd:sd,dz:f.z-d.z};},
+ near:function(S,fw,sd,dz,filter){var me=def.tomato,best=null,bd=1e9;S.fruit.forEach(function(f){if(f.gone||f.hold||(filter&&!filter(f)))return;var v=me.view(S,f);if(v.fw<0||v.fw>fw||Math.abs(v.sd)>sd||Math.abs(v.dz)>dz)return;if(v.fw<bd){bd=v.fw;best=f;}});return best;},
+ act:function*(S,id){var st=api.st(),me=def.tomato;
+  if(id==="pick"){if(!st.drone.flying)throw new Error("The drone must be flying to pick fruit.");if(S.tray.length>=3){S.msg="Tray full";yield* api.wait(0.4);return;}var f=me.near(S,26,15,15);if(!f){S.msg="Nothing in reach";yield* api.wait(0.5);return;}
+   if(!f.ripe){S.bad="You picked an unripe (green) tomato. Check the colour with the camera first.";return;}f.hold=true;S.tray.push(f);yield* api.wait(0.8);return;}
+  if(id==="drop_basket"){if(!S.tray.length){yield* api.wait(0.3);return;}var d=D(st.robot.x,st.robot.y,S.basketPos[0],S.basketPos[1]);
+   if(d<=26&&st.drone.z<=95){S.tray.forEach(function(f){f.hold=false;f.gone=true;f.inBasket=true;S.basket++;});S.tray=[];yield* api.wait(0.8);return;}
+   S.tray.forEach(function(f){f.hold=false;f.gone=true;S.lost++;});S.tray=[];S.bad="You dropped the tomatoes away from the basket. Fly above the basket (next to the pad) first.";}},
+ sense:function(S,id){var me=def.tomato,f=me.near(S,70,28,32);
+  if(id==="fruit_colour")return f?(f.ripe?"red":"green"):"none";
+  if(!f)return id==="fruit_dist"?150:0;var v=me.view(S,f);
+  if(id==="fruit_dx")return Math.round(v.sd);if(id==="fruit_dz")return Math.round(v.dz);if(id==="fruit_dist")return Math.round(v.fw);return 0;},
+ check:function(S){if(S.bad)return {win:false,msg:S.bad};if(S.t>=this.dur)return {win:false,msg:"Time is up: "+S.basket+" of "+S.ripeN+" ripe tomatoes are in the basket."};return null;},
+ end:function(S){var st=api.st();if(st.drone.flying)return {win:false,msg:"The drone is still in the air. Land it at the end."};
+  if(S.tray.length)return {win:false,msg:"There are still tomatoes in the tray. Drop them in the basket."};
+  return S.basket>=S.ripeN?{win:true,msg:"★ "+S.ripeN+" ripe tomatoes picked, none wasted, drone landed safely!"}:{win:false,msg:S.basket+" of "+S.ripeN+" ripe tomatoes are in the basket."};},
+ info:function(S){return [["In basket",S.basket+" / "+S.ripeN],["Tray",S.tray.length+" / 3"]];}});
+
+// ============================ 7: crop monitoring + phone app ============================
+register({id:"cropmon",name:"30 Crop Monitor",floor:"farm",start:{x:18,y:100,a:0},dur:150,needsAny:true,
+ plots:[[40,70,52,60],[104,70,52,60],[168,70,52,60],[232,70,52,60]],
+ mission:"Patrol the farm and check every plot: <b>moisture, temperature, humidity and leaf health</b> (camera AI). <b>Send the data</b> to the farmer's phone, and send an <b>alert</b> for each problem you find: dry soil, heat stress, high humidity (fungus risk) or crop disease. No false alarms!",
+ hint:"Hint: Repeat 4 → Forward 64 → Send data. If moisture &lt; 30 → Alert 1 (dry). If temperature &gt; 33 → Alert 2. If leaf is blight/rust → Alert 3. If humidity &gt; 80 → Alert 4.",
+ kit:["esp32","bank","l298n","gear","soil","dht","camera","bt"],
+ actions:[{id:"send_data",label:"Send plot data to phone",need:["esp32","bt","gsm"],tip:"Updates the farmer's phone dashboard"},{id:"send_alert",label:"Send alert to phone (1 dry, 2 hot, 3 disease, 4 humid)",p:{def:1,unit:"",min:1,max:4},need:["esp32","bt","gsm"]}],
+ sensors:[{id:"moisture",label:"Soil moisture <",unit:"%",type:"num",need:"soil"},{id:"temperature",label:"Temperature >",unit:"°C",type:"num",gt:true,need:"dht"},{id:"humidity",label:"Humidity >",unit:"%",type:"num",gt:true,need:"dht"},{id:"leaf",label:"Leaf health is",type:"enum",opts:["healthy","blight","rust"],need:"camera"}],
+ init:function(S){S.t=0;S.msgs=[];S.data={};S.false=0;S.rep={};S.plots=[0,1,2,3].map(function(i){return {i:i,m:RI(48,78),t:+(R(25,30)).toFixed(1),h:RI(50,68),leaf:"healthy",x:40+i*64,y:70,w:52,h2:60};});
+  var kinds=shuffle(["dry","hot","disease","humid"]).slice(0,RI(2,3)),spots=shuffle([0,1,2,3]);S.issues=[];
+  kinds.forEach(function(k,j){var p=S.plots[spots[j]];if(k==="dry")p.m=RI(8,24);else if(k==="hot")p.t=+(R(35,40)).toFixed(1);else if(k==="disease")p.leaf=pick(["blight","rust"]);else p.h=RI(86,96);S.issues.push({plot:p.i,code:{dry:1,hot:2,disease:3,humid:4}[k],kind:k,done:false});});},
+ step:function(S,dt){S.t+=dt;},
+ plot:function(S){var st=api.st(),p=null;S.plots.forEach(function(q){if(st.robot.x>=q.x&&st.robot.x<=q.x+q.w)p=q;});return p;},
+ act:function*(S,id,v){var me=def.cropmon,p=me.plot(S),st=api.st();if(!p){S.msg="Not over a plot";yield* api.wait(0.3);return;}
+  if(id==="send_data"){S.data[p.i]={m:p.m,t:p.t,h:p.h,leaf:p.leaf};S.msgs.push({t:S.t,txt:"Plot "+(p.i+1)+": moisture "+p.m+"%, "+p.t+"°C, humidity "+p.h+"%, leaf "+p.leaf});yield* api.wait(0.6);return;}
+  var code=Math.round(v||1),iss=S.issues.filter(function(x){return x.plot===p.i&&x.code===code;})[0],names={1:"DRY SOIL",2:"HEAT STRESS",3:"CROP DISEASE",4:"HIGH HUMIDITY (fungus risk)"};
+  if(!iss||iss.done){S.false++;S.msgs.push({t:S.t,txt:"⚠ FALSE ALARM: "+(names[code]||"alert")+" at plot "+(p.i+1),bad:true});return;}
+  iss.done=true;S.msgs.push({t:S.t,txt:"🚨 ALERT: "+names[code]+" at plot "+(p.i+1),alert:true});yield* api.wait(0.6);},
+ sense:function(S,id){var p=def.cropmon.plot(S);if(!p)return id==="leaf"?"healthy":(id==="moisture"?0:id==="temperature"?24:50);
+  if(id==="moisture")return Math.round(p.m+noise(4));if(id==="temperature")return +(p.t+noise(.8)).toFixed(1);if(id==="humidity")return Math.round(p.h+noise(3));if(id==="leaf")return p.leaf;return 0;},
+ check:function(S){if(S.false>=1)return {win:false,msg:"False alarm sent to the farmer. Only send an alert when a reading is really out of range."};if(S.t>=this.dur)return cm2(S);return null;},end:function(S){return cm2(S);},
+ info:function(S){return [["Problems reported",S.issues.filter(function(x){return x.done;}).length+" / "+S.issues.length],["Plots logged",Object.keys(S.data).length+" / 4"]];}});
+function cm2(S){var left=S.issues.filter(function(x){return !x.done;}).length;if(left)return {win:false,msg:left+" problem"+(left>1?"s were":" was")+" not reported to the farmer's phone."};
+ if(Object.keys(S.data).length<4)return {win:false,msg:"All problems found, but only "+Object.keys(S.data).length+" of 4 plots sent their data. Log every plot."};
+ return {win:true,msg:"★ Smart farm! All "+S.issues.length+" problems reported to the phone and all plots logged."};}
+
+// ============================ 8: pothole drone ============================
+register({id:"pothole",name:"31 Pothole Patrol",floor:"road",drone:true,pad:[30,100,22],start:{x:30,y:100,a:0},walls:[],dur:150,drain:1.0,
+ mission:"Fly the <b>drone along the road</b>. The camera AI spots <b>potholes</b>. For each one, send an <b>SMS to the roads authority</b> and <b>warn drivers on the map</b> (through the phone), then land back on the pad. No false reports!",
+ hint:"Hint: Take off, climb to ~80 cm, fly forward in short steps. If pothole below → SMS authority, Warn on map. Then Land on the pad.",
+ kit:["esp32","bank","dronekit","camera","gps","gsm"],
+ actions:[{id:"sms_authority",label:"SMS the roads authority (KURA/KeRRA)",need:"gsm",needAlso:"gps",tip:"Sends the GPS position of the pothole"},{id:"warn_map",label:"Warn road users on the map",need:["bt","esp32"],needAlso:"gps"}],
+ sensors:[{id:"pothole_below",label:"Pothole below drone",type:"bool",need:"camera"},{id:"pothole_dist",label:"Pothole ahead closer than",unit:"cm",type:"num",need:"camera"}],
+ init:function(S){S.t=0;S.holes=[];var n=RI(3,4),xs=shuffle([90,125,160,195,230]).slice(0,n);xs.forEach(function(x,i){S.holes.push({id:i,x:x+noise(8),y:100+R(-22,22),r:R(8,12),sms:false,map:false});});S.msgs=[];S.warn=[];S.bad=null;S.roadName="Thika Road";},
+ step:function(S,dt){S.t+=dt;},
+ under:function(S,hole){var st=api.st(),d=st.drone;return D(st.robot.x,st.robot.y,hole.x,hole.y)<=hole.r+8&&d.z>=15&&d.z<=180;},
+ act:function*(S,id){var st=api.st(),me=def.pothole,h=S.holes.filter(function(q){return me.under(S,q);})[0];
+  if(!st.drone.flying)throw new Error("The drone must be flying over the pothole to report it.");
+  if(!h){S.bad="False report: there is no pothole under the drone. Use the camera to check first.";return;}
+  var lat=(-1.2183-(h.x-30)*0.00009).toFixed(5),lon=(36.8872+(h.y-100)*0.00004+ (h.x-30)*0.00003).toFixed(5);
+  if(id==="sms_authority"){if(h.sms){yield* api.wait(0.3);return;}h.sms=true;S.msgs.push({t:S.t,txt:"To: KURA Roads Authority\nPOTHOLE REPORT #"+(h.id+1)+": "+S.roadName+", GPS "+lat+", "+lon+". Approx "+Math.round(h.r*2)+" cm wide. Please repair.",ok:true});yield* api.wait(0.8);return;}
+  if(!h.map){h.map=true;S.warn.push({id:h.id,x:h.x,y:h.y,lat:lat,lon:lon});}yield* api.wait(0.8);},
+ sense:function(S,id){var st=api.st(),me=def.pothole;
+  if(id==="pothole_below")return S.holes.some(function(h){return me.under(S,h);});
+  var best=150;S.holes.forEach(function(h){var b=Math.abs(bearing(st,h.x,h.y));var d=D(st.robot.x,st.robot.y,h.x,h.y);if(b<30&&d<best)best=d;});return Math.round(best);},
+ check:function(S){if(S.bad)return {win:false,msg:S.bad};if(S.t>=this.dur)return {win:false,msg:"Time is up before every pothole was reported."};return null;},
+ end:function(S){var st=api.st(),d=st.drone;if(d.flying)return {win:false,msg:"The drone is still in the air. Land on the pad."};var left=S.holes.filter(function(h){return !h.sms||!h.map;}).length;
+  if(left)return {win:false,msg:left+" pothole"+(left>1?"s still need":" still needs")+" both an SMS and a map warning."};
+  if(D(st.robot.x,st.robot.y,30,100)>22)return {win:false,msg:"All potholes reported, but the drone did not land on the pad."};
+  return {win:true,msg:"★ "+S.holes.length+" potholes reported to the roads authority and shown on the map. Safer roads!"};},
+ info:function(S){return [["SMS sent",S.holes.filter(function(h){return h.sms;}).length+" / "+S.holes.length],["Map warnings",S.holes.filter(function(h){return h.map;}).length+" / "+S.holes.length]];}});
+
+// ============================ 9: fire detection + extinguisher arm ============================
+register({id:"fire",name:"32 Fire Fighter",floor:"workshop",arm:true,start:{x:150,y:178,a:270},walls:[],cubes:[],bins:[],dur:70,
+ mission:"A <b>fire</b> starts! Sound the <b>alarm</b>, then aim the robot arm at the flames and <b>spray</b> the extinguisher. The fire <b>moves</b>: follow it with the flame sensor until it is out. Do not waste water!",
+ hint:"Hint: Alarm on → Forever: Spray off; if fire direction &gt; 6 → turn base +6; else if &lt; −6 → turn base −6; else Spray on, wait 0.5.",
+ kit:["uno","bank","armkit","flame","smoke","ext","buzzer"],
+ actions:[{id:"alarm_on",label:"Sound the fire alarm",need:"buzzer"},{id:"base_by",label:"Turn arm base by",p:{def:6,unit:"°",min:-45,max:45},need:"armkit",tip:"Relative turn: positive = towards the right"},{id:"alarm_off",label:"Alarm off",need:"buzzer"},{id:"spray_on",label:"Spray extinguisher ON",need:"ext"},{id:"spray_off",label:"Spray OFF",need:"ext"}],
+ sensors:[{id:"flame_dir",label:"Fire direction (− left, + right) >",unit:"°",type:"num",gt:true,need:"flame"},{id:"flame",label:"Flame strength >",unit:"%",type:"num",gt:true,need:"flame"},{id:"smoke",label:"Smoke level >",unit:"%",type:"num",gt:true,need:"smoke"}],
+ init:function(S){var A0=api.st().arm;A0.s=55;A0.e=40;S.t=0;S.fire=100;S.ang=RI(40,140);S.alarm=false;S.alarmT=null;S.spray=false;S.tank=100;S.used=0;S.hit=false;S.moves=[{t:16,a:null},{t:32,a:null}];S.moves.forEach(function(m){m.a=Math.max(25,Math.min(155,S.ang+(Math.random()<.5?-1:1)*RI(35,60)));});S.mi=0;S.smoke=0;S.fireT0=3;},
+ step:function(S,dt){var st=api.st();S.t+=dt;
+  if(S.t>=S.fireT0&&S.fire>0){S.smoke=Math.min(100,S.smoke+9*dt);}
+  if(S.mi<S.moves.length&&S.t>=S.moves[S.mi].t&&S.fire>0){S.ang=S.moves[S.mi].a;S.mi++;}
+  var err=S.ang-st.arm.b;
+  if(S.spray&&S.tank>0){S.tank=Math.max(0,S.tank-4.5*dt);S.used+=4.5*dt;if(Math.abs(err)<=8){S.fire=Math.max(0,S.fire-16*dt);S.hit=true;}}
+  else if(S.fire>0&&S.t>S.fireT0)S.fire=Math.min(100,S.fire+1.4*dt);
+  if(S.fire<=0)S.smoke=Math.max(0,S.smoke-20*dt);},
+ act:function*(S,id,v){var st=api.st();if(id==="base_by"){var nb=Math.max(0,Math.min(180,st.arm.b+(v==null?6:+v)));yield* api.armTo("b",nb);return;}if(id==="alarm_on"){S.alarm=true;if(S.alarmT==null)S.alarmT=S.t;}else if(id==="alarm_off")S.alarm=false;else if(id==="spray_on")S.spray=true;else if(id==="spray_off")S.spray=false;yield* api.wait(0.15);},
+ sense:function(S,id){var st=api.st();var err=S.ang-st.arm.b;
+  if(id==="flame_dir")return S.fire>0?Math.round(err+noise(2)):0;if(id==="flame")return S.fire>0?Math.round(Math.max(0,S.fire*(1-Math.min(1,Math.abs(err)/110)))+noise(3)):0;
+  if(id==="smoke")return Math.round(S.smoke+noise(3));return 0;},
+ check:function(S){if(S.fire<=0){if(S.alarmT==null)return {win:false,msg:"The fire is out, but you never sounded the alarm. People must be warned first!"};
+   if(S.used>70)return {win:false,msg:"Fire out, but you used "+Math.round(S.used)+"% of the water tank. Aim better next time."};return {win:true,msg:"★ Fire out in "+Math.round(S.t)+" s, alarm raised and only "+Math.round(S.used)+"% of the water used!"};}
+  if(S.tank<=0&&S.fire>0)return {win:false,msg:"The extinguisher tank ran empty and the fire is still burning."};
+  if(S.t>=this.dur)return {win:false,msg:"The fire spread out of control. Be faster at aiming."};return null;},
+ end:function(S){return S.fire<=0?this.check(S):{win:false,msg:"The program ended with the fire still burning ("+Math.round(S.fire)+"%)."};},
+ info:function(S){return [["Fire",Math.round(S.fire)+"%"],["Alarm",S.alarm?"ON":"off"],["Water tank",Math.round(S.tank)+"%"]];}});
+
+// ============================ 10: automatic hand washing ============================
+register({id:"handwash",name:"33 Hand Washing",floor:"workshop",station:true,dur:80,start:{x:150,y:100,a:0},
+ mission:"Build an <b>automatic hand-washing station</b>. When <b>hands</b> appear: run the water, dispense <b>soap once</b>, keep scrubbing, and <b>turn the water off</b> as soon as the hands leave. 3 people will come. Do not waste water!",
+ hint:"Hint: Forever → If hands detected: Water on, Soap, Wait 4, … else: Water off. Soap only once per person!",
+ kit:["uno","bank","irobs","pump","soap","buzzer","lcd"],
+ actions:[{id:"water_on",label:"Tap water ON",need:"pump"},{id:"water_off",label:"Tap water OFF",need:"pump"},{id:"soap",label:"Dispense soap",need:"soap"},{id:"beep",label:"Scrub timer beep",need:"buzzer"}],
+ sensors:[{id:"hands",label:"Hands under the tap",type:"bool",need:["irobs","us","sharp"]}],
+ init:function(S){S.t=0;S.water=false;S.visits=[];var t=R(5,9);for(var i=0;i<3;i++){S.visits.push({s:t,e:t+14,soap:0,wetT:0,done:false,beeps:0});t+=14+R(8,14);}S.waste=0;S.used=0;S.bad=null;S.last=null;},
+ step:function(S,dt){S.t+=dt;var v=S.visits.filter(function(q){return S.t>=q.s&&S.t<=q.e;})[0];S.here=v||null;
+  if(S.water){S.used+=0.15*dt;if(v)v.wetT+=dt;else S.waste+=0.15*dt;}
+  S.visits.forEach(function(q){if(!q.done&&S.t>q.e){q.done=true;if(q.soap===0)S.bad="Person "+(S.visits.indexOf(q)+1)+" left without soap. Dispense soap when hands are under the tap.";else if(q.wetT<4)S.bad="Person "+(S.visits.indexOf(q)+1)+" got only "+q.wetT.toFixed(1)+" s of running water (need 4 s) to rinse.";}});},
+ act:function*(S,id){if(id==="water_on")S.water=true;else if(id==="water_off")S.water=false;
+  else if(id==="soap"){var v=S.here;if(v){v.soap++;if(v.soap>1){S.bad="Soap wasted: you dispensed soap twice for the same person.";return;}}else{S.bad="Soap wasted: no hands were under the dispenser.";return;}S.soapT=S.t;yield* api.wait(0.6);return;}
+  else if(id==="beep"){if(S.here)S.here.beeps++;yield* api.wait(0.3);return;}yield* api.wait(0.1);},
+ sense:function(S,id){return !!S.here;},
+ check:function(S){if(S.bad)return {win:false,msg:S.bad};if(S.waste>0.45)return {win:false,msg:"Water wasted: the tap ran with nobody there ("+S.waste.toFixed(2)+" L). Switch it off when hands leave."};if(S.t>=this.dur)return hw2(S);return null;},end:function(S){return hw2(S);},
+ info:function(S){return [["Tap",S.water?"RUNNING":"off"],["Water used",S.used.toFixed(2)+" L"],["Wasted",S.waste.toFixed(2)+" L"]];}});
+function hw2(S){if(S.visits.some(function(v){return v.soap===0||v.wetT<4;}))return {win:false,msg:"Not every person got soap and water."};
+ return {win:true,msg:"★ 3 people washed their hands properly. Water used "+S.used.toFixed(2)+" L, wasted only "+S.waste.toFixed(2)+" L."};}
+
+// ============================ 11: smart dam gate ============================
+register({id:"dam",name:"34 Smart Dam Gate",floor:"workshop",station:true,dur:120,start:{x:150,y:100,a:0},
+ mission:"Run the <b>dam gate</b> automatically. Rain is coming! Keep the water level <b>between 35% and 85%</b>. Open the gate when it rises, close it when it falls, and sound the <b>siren</b> before opening wide (&gt; 60%) to warn people downstream.",
+ hint:"Hint: Forever → If water level &gt; 70: Set gate 80 (siren first!), else if level &lt; 45: Set gate 10. The rain gauge warns you about storms.",
+ kit:["uno","bank","wlevel","servo2","rain","buzzer","lcd"],
+ actions:[{id:"set_gate",label:"Set gate opening to",p:{def:50,unit:"%",min:0,max:100},need:"servo2"},{id:"siren",label:"Sound downstream siren",need:"buzzer"}],
+ sensors:[{id:"water_level",label:"Dam water level >",unit:"%",type:"num",gt:true,need:["wlevel","us"]},{id:"rain_gauge",label:"Upstream rain gauge >",unit:"%",type:"num",gt:true,need:"rain"},{id:"gate",label:"Gate opening >",unit:"%",type:"num",gt:true}],
+ init:function(S){S.t=0;S.level=52;S.gate=0;S.target=0;S.inband=0;S.siren=-99;S.warnDue=null;S.bad=null;S.storm=R(24,34);S.peak=R(6.4,7.4);S.hist=[];S.over=0;},
+ inflow:function(S){var t=S.t,s=S.storm,base=1.6;if(t>s&&t<s+34){var k=Math.sin(Math.PI*(t-s)/34);return base+(S.peak-base)*Math.pow(k,0.7);}if(t>s+60&&t<s+80){return base+3.2*Math.sin(Math.PI*(t-s-60)/20);}return base;},
+ step:function(S,dt){S.t+=dt;var sp=24*dt;S.gate+=Math.max(-sp,Math.min(sp,S.target-S.gate));
+  var inf=def.dam.inflow(S),out=S.gate/100*9*Math.sqrt(Math.max(0,S.level)/100);S.level+=(inf-out)*dt;S.level=Math.max(0,S.level);
+  if(S.level>=35&&S.level<=85)S.inband+=dt;S.in=inf;
+  if(S.warnDue!=null&&S.t>S.warnDue&&S.t-S.siren>6&&!S.bad)S.bad="The gate opened wide but the downstream siren was not sounded. People and cattle by the river were not warned.";
+  if(S.t%1<dt)S.hist.push(S.level);},
+ act:function*(S,id,v){if(id==="siren"){S.siren=S.t;S.warnDue=null;yield* api.wait(0.5);return;}
+  var g=Math.max(0,Math.min(100,Math.round(v==null?50:v)));if(g>60&&S.target<=60&&S.t-S.siren>15)S.warnDue=S.t+3;S.target=g;yield* api.wait(0.2);},
+ sense:function(S,id){if(id==="water_level")return Math.round(S.level+noise(1.2));if(id==="gate")return Math.round(S.gate);
+  if(id==="rain_gauge"){var lead=S.storm-7,t=S.t,v=0;if(t>lead&&t<S.storm+34)v=Math.min(100,(t-lead)/10*60+Math.max(0,t-S.storm)*1.2);if(t>S.storm+34)v=Math.max(0,60-(t-S.storm-34)*4);if(t>S.storm+57&&t<S.storm+80)v=45;return Math.round(Math.max(0,v+noise(4)));}return 0;},
+ check:function(S){if(S.bad)return {win:false,msg:S.bad};if(S.level>=95)return {win:false,msg:"The dam overtopped at "+Math.round(S.level)+"%! Open the gate earlier (watch the rain gauge)."};if(S.level<=10&&S.t>5)return {win:false,msg:"The reservoir ran almost dry ("+Math.round(S.level)+"%): downstream farms and towns lose their water supply."};
+  if(S.t>=this.dur){var pc=S.inband/S.t*100;return pc>=80?{win:true,msg:"★ Dam under control! The level stayed in the safe band "+Math.round(pc)+"% of the time."}:{win:false,msg:"The level was safe only "+Math.round(pc)+"% of the time (need 80%). Respond faster."};}return null;},
+ end:function(S){return this.check(S)||{win:false,msg:"Program ended early."};},
+ info:function(S){return [["Water level",Math.round(S.level)+"%"],["Gate",Math.round(S.gate)+"%"],["Inflow",S.in.toFixed(1)+" /s"]];}});
+
+return {def:def,levels:levels,bind:bind};
+})();
+//if(typeof module!=="undefined")module.exports=SCN;
+
+</script>
+<script>
 var Core=(function(){
 "use strict";
 var W=300,H=200,R=7,MAXR=150,VMAX=40,ACC=100,WMAX=130,WACC=420,STOP={};
@@ -484,9 +794,22 @@ P({id:"shifter",cat:"Interface",name:"Logic level shifter",spec:"Makes 5V sensor
 P({id:"adc",cat:"Interface",name:"MCP3008 ADC",spec:"Adds 8 analog inputs · uses 4 pins (SPI)",mA:5,d:4,pn:["CS","CLK","MOSI","MISO"],adc:true,col:0x6d4c41});
 P({id:"buck",cat:"Interface",name:"5V buck converter",spec:"Steps any battery down to a clean 5V",mA:20,buck:true,col:0x00acc1});
 // ================= CHASSIS & MOUNTS =================
+P({id:"rain",cat:"Sensors",name:"Rain sensor plate",spec:"Water drops on the plate → 0–100% · analog",mA:8,a:1,pn:["AOUT"],col:0x37474f});
+P({id:"flame",cat:"Sensors",name:"Flame sensor array (3-way)",spec:"IR flame detector, shows the direction of a fire · analog",mA:15,a:1,pn:["AOUT"],col:0xc62828});
+P({id:"smoke",cat:"Sensors",name:"MQ-2 smoke/gas sensor",spec:"Smoke and gas level 0–100% · analog",mA:150,a:1,pn:["AOUT"],lv:5,col:0x6d4c41});
+P({id:"wlevel",cat:"Sensors",name:"Water level probe",spec:"Water height 0–100% · analog",mA:20,a:1,pn:["AOUT"],col:0x0277bd});
+P({id:"gps",cat:"Sensors",name:"NEO-6M GPS module",spec:"Position of the robot · serial (2 pins)",mA:45,d:2,pn:["TX","RX"],lv:5,col:0x1b5e20});
+P({id:"gsm",cat:"Interface",name:"SIM800L GSM module",spec:"Sends SMS over Safaricom / Airtel · serial (2 pins)",mA:300,d:2,pn:["TX","RX"],lv:5,col:0xad1457});
+P({id:"bt",cat:"Interface",name:"HC-05 Bluetooth module",spec:"Talks to the phone app · serial (2 pins)",mA:40,d:2,pn:["TX","RX"],lv:5,col:0x283593});
+P({id:"servo2",cat:"Actuators",name:"MG996R high-torque servo",spec:"Winch / gate lever, 10 kg·cm · 1 PWM pin",mA:500,d:1,pn:["SIG"],lv:5,col:0x00695c});
+P({id:"ext",cat:"Actuators",name:"Extinguisher nozzle valve",spec:"Sprays water or CO₂ when opened · 1 pin",mA:200,d:1,pn:["SIG"],lv:5,col:0xd32f2f});
+P({id:"soap",cat:"Actuators",name:"Soap dispenser pump",spec:"Dispenses one squirt of soap · 1 pin",mA:120,d:1,pn:["SIG"],lv:5,col:0x7cb342});
+P({id:"claw",cat:"Actuators",name:"Drone fruit-picker claw",spec:"Soft claw that grips fruit gently · 1 PWM pin",mA:180,d:1,pn:["SIG"],lv:5,col:0x00838f});
+P({id:"scoop",cat:"Actuators",name:"Floating scoop net",spec:"Lowered to collect floating waste · 1 pin",mA:200,d:1,pn:["SIG"],lv:5,col:0xef6c00});
 var CHASSIS={
  compact:{id:"compact",name:"Compact 2WD",desc:"Small and quick. 6 deck pads. Fits tight spaces.",R:6,vmax:45,acc:110,pads:6,motorMA:400,wheels:2},
  standard:{id:"standard",name:"Standard 2WD",desc:"Balanced. 8 deck pads.",R:7,vmax:40,acc:100,pads:8,motorMA:500,wheels:2},
+ boat:{id:"boat",name:"Floating catamaran",desc:"Two hulls and two water thrusters. 8 deck pads. Floats on a lake.",R:8,vmax:30,acc:60,pads:8,motorMA:500,wheels:2},
  heavy:{id:"heavy",name:"Heavy 4WD rover",desc:"Bigger and slower, 10 deck pads. Four motors draw 1400 mA: needs a strong driver.",R:9,vmax:30,acc:70,pads:10,motorMA:1400,wheels:4}
 };
 var MT={ctl:["ctl"],batt:["batt"],drv:["drv"],axle:["axle"],axleEnc:["axleEnc"],dist:["front","sideL","sideR"],line:["floorL","floorR"],colour:["floorC","floorL","floorR"],bumper:["bumper"],probe:["probe"],cam:["camTop"],tool:["tool"]};
@@ -523,6 +846,7 @@ var LEVELS=[
  {id:"escarp",name:"23 Escarpment",floor:"workshop",kind:"dronewall",drone:true,mission:"A <b>140 cm cliff</b> (the Rift Valley escarpment) blocks the way. Fly <b>over it</b> and land on the pad on the far side.",hint:"Hint: Take off puts you at 60 cm. Fly up 100 (you need more than 145 cm), cross the cliff, Fly down, then Land.",start:{x:30,y:100,a:0},goal:null,walls:[[135,0,14,200]],wallH:140,pad:[250,100,26],kit:["uno","bank","dronekit"]},
  {id:"sandbox",name:"Free Lab",floor:"workshop",mission:"<b>Free lab.</b> Swap the controller, add any sensors, and watch the readings. Colour tiles, a shaded area, a hot zone, a soil plot and a cube are waiting.",hint:"Try: Raspberry Pi + MCP3008 for analog sensors, or add the colour sensor and see the pin limit.",start:{x:20,y:100,a:0},goal:null,walls:[[200,125,50,8]],tiles:[[30,25,40,35,"red"],[30,75,40,35,"green"],[30,125,40,35,"blue"]],shade:[[110,20,60,70]],hot:[[205,20,80,70,38]],plots:[[110,110,60,60]],cube:{x:270,y:160},kit:["pi4","adc","l298n","gear","bank","shifter","us@front","dht","soil","ldr","imu","led","lcd"]}
 ];
+if(typeof SCN!=="undefined"){var sbx=LEVELS.map(function(l){return l.id;}).indexOf("sandbox");SCN.levels.forEach(function(l,k){LEVELS.splice(sbx+k,0,l);});SCN.bind({st:function(){return st;},wait:function(s){return wait(s);},hitsWall:function(x,y){return hitsWall(x,y);},armTo:function(k,t){return armTo(k,t);}});}
 // ================= STATE =================
 var st={drone:{z:0,flying:false,bat:100,maxZ:0,gate:false,landedOk:false,spin:0},arm:{b:90,s:90,e:0,g:false,held:null},cubes:[],unlocked:{},hands:false,chassis:"standard",lvl:0,robot:{x:0,y:0,a:0},bumps:0,dt:0.02,v:0,w:0,wl:0,wr:0,pump:false,dryWatered:false,wasted:0,status:"idle",msg:"",gen:null,plots:[],zones:[],seed:12345,parts:[],uid:1,odo:0,touching:0,cube:null,gripClosed:false,relay:false,fanHot:false,fanWrong:0,led:"off",lcd:"",beeps:0};
 function L(){return LEVELS[st.lvl];}
@@ -578,7 +902,7 @@ function validate(){
  if(L().needs&&!(st.unlocked&&st.unlocked[L().needs]))E.push("This mission uses a sensor you must build first. Complete "+L().needsName+".");
  if(!ctl)E.push("No controller: add an Arduino, Raspberry Pi, ESP32, Pico or micro:bit.");
  if(!pp)E.push("No power source: add a battery pack or power bank.");
- var AR=!!(L().arm||L().drone);
+ var AR=!!(L().arm||L().drone||L().station);
  if(L().drone&&!hasRaw("dronekit"))E.push("This mission needs the quadcopter drone kit. Add it from Actuators.");
  if(L().arm&&!hasRaw("armkit"))E.push("This mission needs the 3-axis robot arm. Add it from Actuators.");
  if(!AR&&!drv)E.push("The motors need a motor driver (L298N, L293D or TB6612). A microcontroller pin cannot power a motor directly.");
@@ -649,7 +973,7 @@ function importDesign(o){
  st.hands=true;return true;
 }
 // ================= WORLD =================
-function setLevel(i){st.lvl=i;if(!st.hands){st.chassis="standard";applyKit(L().kit);}reset();}
+function setLevel(i){st.lvl=i;if(!st.hands){st.chassis=L().chassis||"standard";applyKit(L().kit);}reset();}
 function reset(){liveFlush();st.man=null;
  var l=L(),s=l.start;st.robot={x:s.x,y:s.y,a:s.a};st.bumps=0;st.v=0;st.w=0;st.wl=0;st.wr=0;st.pump=false;st.odo=0;st.touching=0;
  st.simt=0;st.dryWatered=false;st.wasted=0;st.status="idle";st.msg="";st.gen=null;st.gripClosed=false;st.relay=false;st.fanHot=false;st.fanWrong=0;st.led="off";st.lcd="";st.beeps=0;
@@ -663,6 +987,7 @@ function reset(){liveFlush();st.man=null;
  if(l.zonesDef){var hot=Math.floor(Math.random()*2);st.zones=l.zonesDef.map(function(z,i){return {x:z[0],y:z[1],w:z[2],h:z[3],t:i===hot?Math.round(34+Math.random()*5):Math.round(22+Math.random()*4),hot:i===hot};});}
  else if(l.hot)st.zones=l.hot.map(function(z){return {x:z[0],y:z[1],w:z[2],h:z[3],t:z[4],hot:true};});
  else st.zones=[];
+ st.S=null;if(l.scn&&typeof SCN!=="undefined"&&SCN.def[l.scn]){st.S={};SCN.def[l.scn].init(st.S);}
 }
 function inRect(x,y,r){return x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h;}
 function zoneAt(){for(var i=0;i<st.zones.length;i++)if(inRect(st.robot.x,st.robot.y,st.zones[i]))return st.zones[i];return null;}
@@ -715,8 +1040,16 @@ function odo(){need("encoder","No wheel encoder installed.");return st.odo+noise
 function bump(){need("bumper","No bumper switch installed.");return st.touching>0;}
 function camSees(){need("camera","No camera installed.");if(!st.cube)return false;var a=st.robot.a*Math.PI/180,dx=st.cube.x-st.robot.x,dy=st.cube.y-st.robot.y,d=Math.hypot(dx,dy),ang=Math.atan2(dy,dx)-a;ang=Math.atan2(Math.sin(ang),Math.cos(ang));return d<90&&Math.abs(ang)<0.45;}
 function inGoal(){var g=L().goal;return !!g&&st.robot.x>=g[0]&&st.robot.x<=g[0]+g[2]&&st.robot.y>=g[1]&&st.robot.y<=g[1]+g[3];}
+function needAny(n,msg){if(!n)return;var a=Array.isArray(n)?n:[n];if(!a.some(function(x){return has(x);}))throw new Error(msg||("Missing part: "+a.map(function(x){return PARTS[x]?PARTS[x].name:x;}).join(" or ")+"."));}
+function scnMeta(){var l=L();return l.scn&&typeof SCN!=="undefined"?SCN.def[l.scn]:null;}
+function* scnDo(b){var D=scnMeta();if(!D)throw new Error("This mission has no special actions.");var a=D.actions.filter(function(x){return x.id===b.q;})[0];if(!a)throw new Error("Unknown action "+b.q+".");
+ needAny(a.need);if(a.needAlso)needAny(a.needAlso);var r=D.act(st.S,b.q,b.v);if(r&&typeof r.next==="function")yield* r;else yield;}
+function scnVal(id){var D=scnMeta();if(!D)throw new Error("Unknown sensor "+id);var s=D.sensors.filter(function(x){return x.id===id;})[0];if(!s)throw new Error("Unknown sensor "+id);needAny(s.need);return {s:s,v:D.sense(st.S,id)};}
+function sigText(b,ard){var id=String(b.k).slice(4),m=scnMeta(),s=m&&m.sensors.filter(function(x){return x.id===id;})[0];if(!s)return "false";var call=ard?"mission_"+id+"()":'mission.sense("'+id+'")';if(s.type==="bool")return call;if(s.type==="enum")return call+' == "'+b.q+'"';return call+" "+(b.op||(s.gt?">":"<"))+" "+b.v;}
+function scnSig(b){var r=scnVal(String(b.k).slice(4)),s=r.s,v=r.v;if(s.type==="bool")return !!v;if(s.type==="enum")return v===b.q;var op=b.op||(s.gt?">":"<");return op===">"?v>b.v:op==="<"?v<b.v:v===b.v;}
 function cond(b){
  var k=b.k||"front";
+ if(k.indexOf("sig:")===0)return scnSig(b);
  switch(k){
   case "front":case "left":case "right":return dist(k)<b.v;
   case "lineL":return line(-1);
@@ -915,6 +1248,7 @@ function* runList(list){
    case "led":need("led","No RGB LED installed.");st.led=b.q||"red";yield;break;
    case "beep":need("buzzer","No buzzer installed.");st.beeps++;yield* wait(0.3);break;
    case "print":need("lcd","No LCD installed.");st.lcd=String(b.q||"");yield;break;
+   case "do":yield* scnDo(b);break;
    case "stop":throw STOP;
    case "repeat":for(var k=0;k<b.v;k++){yield* runList(b.c);yield;}break;
    case "forever":while(true){yield* runList(b.c);yield;}
@@ -925,6 +1259,7 @@ function* main(prog){try{yield* runList(prog);}catch(e){if(e!==STOP)throw e;}}
 function finish(win,msg){st.status=win?"win":"lose";st.msg=msg;st.gen=null;st.v=0;st.w=0;st.pump=false;}
 function end(){
  var l=L();
+ if(l.scn&&st.S){var er=SCN.def[l.scn].end(st.S);return finish(er.win,er.msg);}
  if(l.drone){
   var dd=st.drone;if(dd.flying)return finish(false,"The drone is still in the air. Add a Land block at the end.");
   var pad=l.pad,onpad=Math.hypot(st.robot.x-pad[0],st.robot.y-pad[1])<=pad[2];
@@ -980,7 +1315,8 @@ function sense(name,arg){switch(name){
  case "humidity":return humid();case "heading":return heading();case "odo":return odo();case "bump":return bump();case "cam":return camSees();case "color":return colorName();
  case "cube":need("armkit","No robot arm installed.");return cubeColour();case "alt":need("dronekit","No drone installed.");return st.drone.z;
  case "dfront":need("dronekit","No drone installed.");return droneFront();case "bat":need("dronekit","No drone installed.");return st.drone.bat;case "dlight":need("dronekit","No drone installed.");return droneLight();
- case "box":need("armkit","No robot arm installed.");return !!boxAtSpot();}
+ case "box":need("armkit","No robot arm installed.");return !!boxAtSpot();
+ case "scn":return scnVal(arg).v;}
  throw new Error("Unknown sensor "+name);}
 
 // ---- Manual driving (joystick / keyboard / tilt) ----
@@ -1011,6 +1347,7 @@ function _tick(el){
   try{r=st.gen.next();}catch(e){st.status="lose";st.msg=e.message&&e.message.indexOf("No ")===0||/Missing/.test(e.message)?"Sensor / part problem: "+e.message:"Program error: "+e.message;st.gen=null;st.v=0;st.w=0;return;}
   if(L().drone&&st.status==="run"){try{dronePhysics(d);}catch(e){st.status="lose";st.msg=e.message;st.gen=null;return;}}
   if(L().arm&&st.status==="run"){try{armPhysics(d);beltStep(d);}catch(e){st.status="lose";st.msg=e.message;st.gen=null;return;}}
+  if(L().scn&&st.status==="run"&&st.S){try{var SD=SCN.def[L().scn];SD.step(st.S,d);var ck=SD.check(st.S);if(ck){finish(ck.win,ck.msg);return;}}catch(e){st.status="lose";st.msg="Mission error: "+e.message;st.gen=null;return;}}
   if(L().find&&st.cube&&Math.hypot(st.cube.x-st.robot.x,st.cube.y-st.robot.y)<=25){finish(true,"★ Beacon reached!");return;}
   if(L().reach&&inGoal()){finish(true,"★ Mission complete!");return;}
   if(r.done)end();
@@ -1035,8 +1372,9 @@ function readouts(){
   else if(i.pid==="bumper")add("Bumper",function(){return bump()?"PRESSED":"free";});
   else if(i.pid==="camera")add("Camera",function(){return camSees()?"cube ahead":"nothing";});
  });
+ if(L().scn&&st.S){try{SCN.def[L().scn].info(st.S).forEach(function(r){out.push(r);});}catch(e){}}
  if(st.lcd)out.push(["LCD",st.lcd]);
- if(!L().arm&&!L().drone)out.push(["Bumps",String(st.bumps)]);
+ if(!L().arm&&!L().drone&&!L().station)out.push(["Bumps",String(st.bumps)]);
  return out;
 }
 // ================= CODE GENERATOR =================
@@ -1072,6 +1410,7 @@ function codeFor(prog,force){
    case "led":return ard?"setLed("+String(b.q||"red").toUpperCase()+");":'bot.led("'+(b.q||"red")+'")';
    case "beep":return ard?"beep(300);":"bot.beep(0.3)";
    case "print":return ard?'lcdPrint("'+(b.q||"")+'");':'bot.lcd("'+(b.q||"")+'")';
+   case "do":return ard?"mission_"+b.q+"("+(b.v!==undefined?b.v:"")+");":"mission.do(\""+b.q+"\""+(b.v!==undefined?", "+b.v:"")+")";
    case "stop":return ard?"motorsStop(); while (true) {}":"bot.stop(); raise SystemExit";
   }
   return "";
@@ -1081,7 +1420,7 @@ function codeFor(prog,force){
   list.forEach(function(b){
    if(b.t==="repeat"){out.push(ard?ind(n)+"for (int i = 0; i < "+b.v+"; i++) {":ind(n)+"for _ in range("+b.v+"):");body(b.c,n+1);if(ard)out.push(ind(n)+"}");}
    else if(b.t==="forever"){out.push(ard?ind(n)+"while (true) {":ind(n)+"while True:");body(b.c,n+1);if(ard)out.push(ind(n)+"}");}
-   else if(b.t==="if"){var fn=T[b.k||"front"],c=fn?fn(b):"false";out.push(ard?ind(n)+"if ("+c+") {":ind(n)+"if "+c+":");body(b.c,n+1);
+   else if(b.t==="if"){var fn=T[b.k||"front"],c=fn?fn(b):"false";if(String(b.k).indexOf("sig:")===0)c=sigText(b,ard);out.push(ard?ind(n)+"if ("+c+") {":ind(n)+"if "+c+":");body(b.c,n+1);
     if(b.e&&b.e.length){out.push(ard?ind(n)+"} else {":ind(n)+"else:");body(b.e,n+1);}if(ard)out.push(ind(n)+"}");}
    else out.push(ind(n)+act(b));
   });
@@ -1098,7 +1437,7 @@ function codeFor(prog,force){
  }
  return out.join("\n");
 }
-return {setFrontDistance:setFrontDistance,startManual:startManual,manual:manual,startLive:startLive,liveDo:liveDo,liveEnd:liveEnd,liveFail:liveFail,liveAlive:liveAlive,sense:sense,setSensor:setSensor,droneLight:droneLight,drone:function(){return st.drone;},armIdle:armIdle,armGrip:function(x){try{armGrip(x);}catch(e){}},ARM:ARM,armTip:armTip,armSet:armSet,W:W,H:H,R:R,MAXR:MAXR,LEVELS:LEVELS,PARTS:PARTS,CATS:CATS,CHASSIS:CHASSIS,st:st,byCat:byCat,mountsFor:mountsFor,mountLabel:mountLabel,mountPart:mountPart,unmountPart:unmountPart,instAt:instAt,setPin:setPin,pinOptions:pinOptions,setHands:setHands,setChassis:setChassis,clearAll:clearAll,autoWire:autoWire,exportDesign:exportDesign,importDesign:importDesign,mtype:mtype,WHY:WHY,addPart:addPart,removePart:removePart,applyKit:applyKit,validate:validate,setLevel:setLevel,reset:reset,start:start,stop:stop,tick:tick,readouts:readouts,codeFor:codeFor,find:find,has:has,distSafe:function(slot){try{return dist(slot);}catch(e){return null;}},ctlInst:ctlInst,plotAt:plotAt};
+return {scnMeta:scnMeta,needAny:needAny,setFrontDistance:setFrontDistance,startManual:startManual,manual:manual,startLive:startLive,liveDo:liveDo,liveEnd:liveEnd,liveFail:liveFail,liveAlive:liveAlive,sense:sense,setSensor:setSensor,droneLight:droneLight,drone:function(){return st.drone;},armIdle:armIdle,armGrip:function(x){try{armGrip(x);}catch(e){}},ARM:ARM,armTip:armTip,armSet:armSet,W:W,H:H,R:R,MAXR:MAXR,LEVELS:LEVELS,PARTS:PARTS,CATS:CATS,CHASSIS:CHASSIS,st:st,byCat:byCat,mountsFor:mountsFor,mountLabel:mountLabel,mountPart:mountPart,unmountPart:unmountPart,instAt:instAt,setPin:setPin,pinOptions:pinOptions,setHands:setHands,setChassis:setChassis,clearAll:clearAll,autoWire:autoWire,exportDesign:exportDesign,importDesign:importDesign,mtype:mtype,WHY:WHY,addPart:addPart,removePart:removePart,applyKit:applyKit,validate:validate,setLevel:setLevel,reset:reset,start:start,stop:stop,tick:tick,readouts:readouts,codeFor:codeFor,find:find,has:has,distSafe:function(slot){try{return dist(slot);}catch(e){return null;}},ctlInst:ctlInst,plotAt:plotAt};
 })();
 //if(typeof module!=="undefined")module.exports=Core;
 
@@ -1683,6 +2022,249 @@ function drone(inner,props,leds,Mbasic){
 return {robot:robot,arm:arm,drone:drone,rbox:rbox,flat:flat,pbr:pbr,paint:paint,carbonTex:carbonTex,brushTex:brushTex,M:M,cyl:cyl,screws:screws,ring:ring,labelTex:labelTex};
 })();
 
+// SCN3D: 3D scenery + animation for the scenario missions (see scn.js). Needs THREE and app helpers.
+var SCN3D=(function(){
+"use strict";
+var E=null,cur=null,phone=null;
+function init(env){E=env;}
+function T(){return E.THREE;}
+function lab(text,w,h,bg,fg,fs){var c=document.createElement("canvas");c.width=256;c.height=Math.round(256*h/w);var g=c.getContext("2d");if(bg){g.fillStyle=bg;g.fillRect(0,0,c.width,c.height);g.strokeStyle="rgba(255,255,255,.85)";g.lineWidth=6;g.strokeRect(5,5,c.width-10,c.height-10);}g.shadowColor="rgba(0,0,0,.6)";g.shadowBlur=bg?0:6;g.fillStyle=fg||"#fff";g.font="bold "+(fs||Math.round(c.height*0.5))+"px sans-serif";g.textAlign="center";g.textBaseline="middle";g.fillText(text,c.width/2,c.height/2+2);
+ var t=new (T().CanvasTexture)(c);t.anisotropy=4;var m=new (T().Mesh)(new (T().PlaneGeometry)(w,h),new (T().MeshBasicMaterial)({map:t,transparent:!bg}));return m;}
+function MM(c,r,m){return E.M(c,r,m);}
+function cyl(g,r,h,mat,x,y,z,rx,rz,seg){var o=new (T().Mesh)(new (T().CylinderGeometry)(r,r,h,seg||16),mat);o.position.set(x,y,z);if(rx)o.rotation.x=rx;if(rz)o.rotation.z=rz;o.castShadow=true;o.receiveShadow=true;g.add(o);return o;}
+function sph(g,r,mat,x,y,z,sx,sy,sz){var o=new (T().Mesh)(new (T().SphereGeometry)(r,14,10),mat);o.position.set(x,y,z);o.scale.set(sx||1,sy||1,sz||1);o.castShadow=true;g.add(o);return o;}
+function box(g,w,h,d,mat,x,y,z){return E.B(w,h,d,mat,x,y,z,g);}
+function tr(o,x,y,z){o.position.set(x,y,z);return o;}
+
+// ---------------- items ----------------
+function itemMesh(kind){var t=T(),g=new t.Group(),s=1;
+ function C(col,r,m){return MM(col,r===undefined?0.6:r,m);}
+ var tm=function(col,op){return new t.MeshStandardMaterial({color:col,roughness:0.2,transparent:true,opacity:op||0.55});};
+ switch(kind){
+  case "banana peel":{var b=new t.Mesh(new t.TorusGeometry(3.2,1.1,8,14,Math.PI*1.2),C(0xe9c53a,0.8));b.rotation.x=Math.PI/2;b.position.y=1.2;g.add(b);sph(g,0.9,C(0x4a3520),3.2,1.2,0);break;}
+  case "orange peel":{sph(g,3.4,C(0xf08a24,0.9),0,2,0,1,0.55,1);sph(g,2,C(0xffb347,0.9),0.5,2.8,0.4);break;}
+  case "leftover ugali":{sph(g,3.6,C(0xf4efe0,0.95),0,2,0,1,0.7,1);sph(g,2.2,C(0xfaf6e9,0.95),0.4,3.2,0.2);break;}
+  case "mango seed":{sph(g,3,C(0xd9b66a,0.9),0,2,0,1.4,0.8,0.9);break;}
+  case "paper":{sph(g,3.2,C(0xf7f7f2,0.95),0,3,0,1,1,1);sph(g,2.4,C(0xe8e8e0,0.95),1.4,3.5,.8);break;}
+  case "newspaper":{box(g,8,0.8,6,C(0xe6e3d6,0.95),0,0.5,0);box(g,6,0.3,0.4,C(0x555555),0,1,-1);box(g,6,0.3,0.4,C(0x555555),0,1,0.8);break;}
+  case "cardboard box":{box(g,7,5,6,C(0xb98a4e,0.9),0,2.6,0);box(g,7.1,0.4,1.2,C(0xd9b074,0.9),0,5.2,0);break;}
+  case "plastic bottle":{cyl(g,1.6,8,tm(0x6fc3ff,0.6),0,4,0,0,0.0);g.children[0].rotation.z=Math.PI/2;g.children[0].position.y=1.7;cyl(g,0.9,1.2,C(0x1565c0),4.3,1.7,0,0,Math.PI/2);cyl(g,1.65,2,C(0x2e7d32),0,1.7,0,0,Math.PI/2);break;}
+  case "plastic bag":{sph(g,3.4,tm(0xffffff,0.75),0,2.4,0,1,0.8,1);sph(g,2,tm(0xe8e8ff,0.8),1.5,3.4,0.6);break;}
+  case "tin can":case "soda can":{var cc=kind==="soda can"?0xd32f2f:0xb0b7bf;cyl(g,2.1,5.2,C(cc,0.3,0.7),0,2.7,0);cyl(g,1.7,0.3,C(0xdde3e8,0.3,0.8),0,5.4,0);break;}
+  case "old sandal":{box(g,3,0.8,8,C(0x5d4037,0.9),0,0.6,0);box(g,3.4,0.5,1.2,C(0x8d6e63),0,1.1,-1.6);box(g,0.6,0.6,4,C(0x111),-1.3,1.4,0.5);break;}
+  case "tyre":{var ty=new t.Mesh(new t.TorusGeometry(3.6,1.6,10,18),C(0x1a1a1a,0.95));ty.rotation.x=Math.PI/2;ty.position.y=1.7;g.add(ty);break;}
+  default:sph(g,3,C(0xaaaaaa),0,2,0);
+ }
+ g.traverse(function(o){if(o.isMesh){o.castShadow=true;}});return g;}
+
+function bin(G,r,label,col,topY){var t=T(),g=new t.Group(),w=r[2],d=r[3],hgt=12,th=1.4,m=MM(col,0.55),inner=MM(0x20262c,0.9);
+ box(g,w,0.8,d,inner,r[0]+w/2,0.4,r[1]+d/2);
+ box(g,w,hgt,th,m,r[0]+w/2,hgt/2,r[1]+th/2);box(g,w,hgt,th,m,r[0]+w/2,hgt/2,r[1]+d-th/2);box(g,th,hgt,d,m,r[0]+th/2,hgt/2,r[1]+d/2);box(g,th,hgt,d,m,r[0]+w-th/2,hgt/2,r[1]+d/2);
+ var s=lab(label,Math.min(w-6,40),9,"#"+("000000"+col.toString(16)).slice(-6),"#fff");s.position.set(r[0]+w/2,hgt-4,r[1]+d+0.2);g.add(s);
+ var f=lab(label,Math.min(w-8,38),Math.min(d-8,14),null,"#ffffff",30);f.rotation.x=-Math.PI/2;f.position.set(r[0]+w/2,0.9,r[1]+d/2);g.add(f);
+ g.position.y=topY||0;G.add(g);return g;}
+
+function waterTex(){var c=document.createElement("canvas");c.width=c.height=256;var g=c.getContext("2d");var gr=g.createLinearGradient(0,0,256,256);gr.addColorStop(0,"#2d7fb5");gr.addColorStop(1,"#1e6b9c");g.fillStyle=gr;g.fillRect(0,0,256,256);
+ g.strokeStyle="rgba(255,255,255,.22)";g.lineWidth=2;for(var i=0;i<40;i++){var x=Math.random()*256,y=Math.random()*256;g.beginPath();g.arc(x,y,6+Math.random()*10,Math.PI*1.1,Math.PI*1.9);g.stroke();}
+ var t=new (T().CanvasTexture)(c);t.wrapS=t.wrapT=T().RepeatWrapping;return t;}
+
+// =============================== builders ===============================
+var B={};
+function waste(G,l,S){
+ var items=[];S.bins.forEach(function(b){var col={wet:0x2e9e4f,dry:0x1e63d6,plastic:0xf2b01e,paper:0x2f7fd6,metal:0x78909c,organic:0x6a8f3a}[b.id]||0x888888;bin(G,b.r,b.label,col);});
+ S.items.forEach(function(it){var m=itemMesh(it.kind);m.scale.setScalar(1.25);G.add(m);items.push(m);});
+ return function(t,st){S.items.forEach(function(it,i){var m=items[i];if(it.held){m.position.set(it.x,6,it.y);m.rotation.y=-st.robot.a*Math.PI/180;}else if(it.bin){m.position.set(it.x,1.2+(i%3)*0.7,it.y);m.rotation.y=it.rot;}else{m.position.set(it.x,0.2,it.y);m.rotation.y=it.rot;}});st.gripClosed=!!S.held;};}
+B.wetdry=waste;B.wastetype=waste;
+
+function lake(G,l,S){var t=T(),items=[],wt=waterTex();wt.repeat.set(5,3.4);
+ var sea=new t.Mesh(new t.PlaneGeometry(272,200),new t.MeshStandardMaterial({map:wt,transparent:true,opacity:0.5,roughness:0.15,metalness:0.1,depthWrite:false}));sea.rotation.x=-Math.PI/2;sea.position.set(136,0.35,100);G.add(sea);
+ var qm=MM(0x9e9a8f,0.95);for(var i=0;i<12;i++)box(G,2,1,8+Math.random()*4,MM(0x8d8a80,1),270.5,6.5,4+i*16.5);
+ S.bins.forEach(function(b){var col={plastic:0xf2b01e,metal:0x78909c,other:0x8d5a33}[b.id];bin(G,b.r,b.label,col,6);});
+ box(G,2,22,2,MM(0x888,0.5,0.5),262,11,5);box(G,2,22,2,MM(0x888,0.5,0.5),262,11,195);
+ for(var k=0;k<5;k++){var rx=-14+k*3;}
+ S.items.forEach(function(it){var m=itemMesh(it.kind);m.scale.setScalar(1.4);G.add(m);items.push(m);});
+ var reeds=new t.Group();for(var r=0;r<26;r++){var x=Math.random()*270,y=Math.random()<.5?Math.random()*10:190+Math.random()*10;if(x>250)continue;var rd=cyl(reeds,0.4,14,MM(0x4e8f3a),x,7,y);rd.rotation.z=(Math.random()-.5)*0.3;}G.add(reeds);
+ return function(tm,st){wt.offset.x=tm*0.004;wt.offset.y=tm*0.0027;
+  S.items.forEach(function(it,i){var m=items[i];if(it.bin){m.position.set(it.x,7.6+(i%3)*0.6,it.y);m.rotation.y=it.rot;}
+   else if(it.hold){var j=S.hold.indexOf(it);var a=st.robot.a*Math.PI/180,bx=st.robot.x-Math.cos(a)*(2+j*4),bz=st.robot.y-Math.sin(a)*(2+j*4);m.position.set(bx,7+j*0.3,bz);m.rotation.y=-a;}
+   else{m.position.set(it.x,0.6+Math.sin(tm*1.6+i*1.7)*0.5,it.y);m.rotation.y=it.rot+Math.sin(tm+i)*0.3;m.rotation.z=Math.sin(tm*1.3+i)*0.12;}});};}
+B.lake=lake;
+
+function irrigate(G,l,S){var t=T(),W=E.World,handles=[],jet;
+ S.plants.forEach(function(p,i){var r={x:p.x-15,y:p.y-15,w:30,h:30};handles.push(W.buildPlot(G,r,i,p.dry));});
+ // depot
+ var dx=268,dy=100,tank=cyl(G,13,24,MM(0x1e88e5,0.4,0.3),dx,14,dy);cyl(G,13.2,2,MM(0x0d47a1),dx,28,dy);cyl(G,2,26,MM(0x666,0.5,0.5),dx-10,13,dy+14);cyl(G,2,26,MM(0x666,0.5,0.5),dx+10,13,dy+14);cyl(G,2,26,MM(0x666,0.5,0.5),dx,13,dy-16);
+ var s=lab("WATER DEPOT",46,9,"#0d47a1","#fff");s.position.set(dx,31,dy+14);G.add(s);
+ var pad=new t.Mesh(new t.PlaneGeometry(54,44),new t.MeshStandardMaterial({color:0xf2c200,roughness:0.9}));pad.rotation.x=-Math.PI/2;pad.position.set(272,0.3,100);G.add(pad);for(var k=0;k<6;k++){var st2=new t.Mesh(new t.PlaneGeometry(4,26),new t.MeshBasicMaterial({color:0x222222}));st2.rotation.x=-Math.PI/2;st2.rotation.z=0.6;st2.position.set(250+k*9,0.35,100);G.add(st2);}
+ jet=new t.Mesh(new t.CylinderGeometry(0.9,0.5,1,10,1,true),new t.MeshBasicMaterial({color:0x66bbff,transparent:true,opacity:0.6}));jet.visible=false;G.add(jet);
+ var bf=null;
+ return function(tm,st){
+  S.plants.forEach(function(p,i){var wet=!(p.dry&&!p.watered);if(handles[i]&&handles[i]._wet!==wet){handles[i]._wet=wet;W.setPlotState(handles[i],!wet);}});
+  if(S.pump>0&&S.pp!==undefined){var tx=S.pp?S.pp.x:st.robot.x,ty=S.pp?S.pp.y:(S.pside==="left"?st.robot.y-30:st.robot.y+30),sx=st.robot.x,sy=st.robot.y,dx2=tx-sx,dy2=ty-sy,len=Math.hypot(dx2,dy2);jet.visible=true;jet.scale.set(1,len,1);jet.position.set((sx+tx)/2,8,(sy+ty)/2);jet.rotation.set(0,0,0);jet.rotation.x=Math.PI/2;jet.rotation.z=0;jet.rotation.y=0;jet.lookAt(tx,2,ty);jet.rotateX(Math.PI/2);}else jet.visible=false;
+  st.pump=S.pump>0;};}
+B.irrigate=irrigate;
+
+function cloth(G,l,S){var t=T(),clothes=[],rain,pos=[];
+ var wall=MM(0xe8d9b5,0.9),roofm=MM(0x7a2e22,0.8);
+ box(G,80,56,70,wall,70,28,100);box(G,12,10,20,MM(0x5a3b22,0.8),110.2,16,100);box(G,0.6,16,12,MM(0x7fb5d8,0.2),110.3,32,76);box(G,0.6,16,12,MM(0x7fb5d8,0.2),110.3,32,124);
+ var roof=box(G,110,2.2,88,roofm,95,58,100);roof.rotation.z=-0.1;roof.position.y=57;
+ var aw=box(G,64,1.6,52,roofm,142,44,100);aw.rotation.z=0.0;
+ [[112,60],[112,140],[172,60],[172,140]].forEach(function(p){cyl(G,1.4,44,MM(0x8a6a44,0.9),p[0],22,p[1]);});
+ // rain sensor plate + sunlight sensor on awning
+ var rp=box(G,9,0.6,6,MM(0x263238,0.4,0.4),130,45.2,70);rp.rotation.z=0.25;box(G,3,2,3,MM(0xef6c00),150,45.4,70);
+ var lb=lab("RAIN SENSOR",26,6,"#37474f","#fff");lb.position.set(130,40,69.5);G.add(lb);
+ // winch box and pole
+ box(G,10,10,10,MM(0x00695c,0.5),112,5,100);var ws=lab("WINCH",14,5,"#004d40","#fff");ws.position.set(112,11,105.3);G.add(ws);
+ cyl(G,1.6,60,MM(0x8a8a8a,0.5,0.6),262,30,100);box(G,8,1.4,1.4,MM(0x777),262,58,100);
+ var rope=new t.Mesh(new t.CylinderGeometry(0.35,0.35,150,6),MM(0xdddddd,0.7));rope.rotation.z=Math.PI/2;rope.position.set(187,40,100);G.add(rope);
+ var cols=[0xe53935,0x1e88e5,0xfdd835,0x43a047,0xffffff,0xab47bc,0xff7043];
+ for(var i=0;i<7;i++){var g=new t.Group(),col=cols[i%cols.length],body=new t.Mesh(new t.PlaneGeometry(12,15),new t.MeshStandardMaterial({color:col,roughness:0.9,side:t.DoubleSide}));body.position.set(0,-8,0);body.castShadow=true;g.add(body);
+  var sl=new t.Mesh(new t.PlaneGeometry(5,9),new t.MeshStandardMaterial({color:col,roughness:0.9,side:t.DoubleSide}));sl.position.set(-8,-6,0);sl.rotation.z=0.4;g.add(sl);var sr=sl.clone();sr.position.x=8;sr.rotation.z=-0.4;g.add(sr);G.add(g);clothes.push({g:g,mats:[body.material,sl.material,sr.material],col:new t.Color(col)});}
+ var n=420,geo=new t.BufferGeometry(),arr=new Float32Array(n*6),seed=[];for(var d=0;d<n;d++){seed.push([Math.random()*300,Math.random()*200,Math.random()*110]);}
+ geo.setAttribute("position",new t.BufferAttribute(arr,3));rain=new t.LineSegments(geo,new t.LineBasicMaterial({color:0x9ec8ee,transparent:true,opacity:0.7}));rain.frustumCulled=false;G.add(rain);
+ var sun=new t.Mesh(new t.SphereGeometry(10,16,12),new t.MeshBasicMaterial({color:0xffe066}));sun.position.set(240,150,-40);G.add(sun);
+ return function(tm,st){var x0=118+0,k=S.pos;
+  clothes.forEach(function(c,i){var xe=170+i*13,xf=126+i*4.2,x=xf+(xe-xf)*k,sx=0.45+0.55*k;c.g.position.set(x,40,100);c.g.scale.set(sx,1,1);var wet=S.damp/100,f=1-0.55*wet;c.mats.forEach(function(m){m.color.copy(c.col).multiplyScalar(f);});c.g.rotation.z=Math.sin(tm*2+i)*0.03*(1-wet*0.7);});
+  var a=rain.geometry.attributes.position,on=S.rain>1;rain.visible=on;if(on){var sp=(60+S.rain)*0.02;for(var d=0;d<n;d++){var s=seed[d];s[2]-=(2+S.rain*0.09);if(s[2]<0)s[2]+=110;var x=s[0],z=s[2],y=s[1];a.setXYZ(d*2,x,z,y);a.setXYZ(d*2+1,x-0.4,z+3+S.rain*0.04,y);}a.needsUpdate=true;}
+  sun.visible=S.sun;E.scene.background&&0;};}
+B.cloth=cloth;
+
+function tomato(G,l,S){var t=T(),fm=[],tm=null;
+ var leaf=MM(0x2f7a2c,0.85),stem=MM(0x6b4a2b,0.9);
+ S.plants.forEach(function(p){cyl(G,0.8,130,MM(0x8a6a44,0.9),p.x,65,p.y);for(var k=0;k<34;k++){var lf=sph(G,3+Math.random()*2.2,leaf,p.x+(Math.random()-.5)*15,18+k*3.3,p.y+(Math.random()-.5)*13,1.2,0.5,1);lf.rotation.y=Math.random()*3;lf.rotation.z=(Math.random()-.5)*0.8;}});
+ for(var r=0;r<2;r++){var y=r?140:60;var bed=new t.Mesh(new t.PlaneGeometry(170,26),new t.MeshStandardMaterial({color:0x3a281a,roughness:1}));bed.rotation.x=-Math.PI/2;bed.position.set(155,0.35,y);G.add(bed);}
+ S.fruit.forEach(function(f){var m=new t.Group();var s=sph(m,4.2,new t.MeshStandardMaterial({color:f.ripe?0xe53935:0x5aa83a,roughness:0.35}),0,0,0);var cap=sph(m,2.2,MM(0x2e7d32),0,3.8,0,1,0.35,1);G.add(m);fm.push(m);});
+ var bk=S.basketPos||[30,110];var basket=cyl(G,13,12,MM(0xc89b5a,0.95),bk[0],6,bk[1],0,0,20);cyl(G,12,0.6,MM(0x6b4a2b),bk[0],1,bk[1]);var bl=lab("BASKET",22,6,"#6b4a2b","#fff");bl.position.set(bk[0],16,bk[1]+13.5);G.add(bl);
+ var bk2=[];S.fruit.forEach(function(){bk2.push(0);});
+ return function(tmv,st){S.fruit.forEach(function(f,i){var m=fm[i];if(f.inBasket){m.visible=true;var j=i%6;m.position.set(bk[0]+(j%3-1)*5,8+(j>2?3:0),bk[1]+(j>2?3:-3)+(j%2)*2);}else if(f.gone){m.visible=false;}else if(f.hold){m.visible=true;var k=S.tray.indexOf(f);m.position.set(st.robot.x+(k-1)*4,st.drone.z-8,st.robot.y);}else{m.visible=true;m.position.set(f.x,f.z,f.y);}});};}
+B.tomato=tomato;
+
+function cropmon(G,l,S,st){var t=T(),W=E.World,hs=[],spots=[],poles=[];
+ S.plots.forEach(function(p,i){var r={x:p.x,y:p.y,w:p.w,h:p.h2};var dry=p.m<30;hs.push(W.buildPlot(G,r,i,dry));
+  cyl(G,0.9,30,MM(0x607d8b,0.5,0.5),p.x+p.w/2,15,p.y-6);var s=lab("PLOT "+(i+1),20,7,"#37474f","#fff");s.position.set(p.x+p.w/2,31,p.y-5);G.add(s);
+  if(p.leaf!=="healthy"){for(var k=0;k<16;k++){var d=new t.Mesh(new t.CircleGeometry(1.5+Math.random()*1.4,8),new t.MeshBasicMaterial({color:p.leaf==="blight"?0x4e342e:0xd2691e,side:t.DoubleSide}));d.rotation.x=-Math.PI/2;d.position.set(p.x+6+Math.random()*(p.w-12),5.2+Math.random()*3,p.y+6+Math.random()*(p.h2-12));G.add(d);}}
+  if(p.t>34){var h=new t.Mesh(new t.CylinderGeometry(p.w/2,p.w/2,26,18,1,true),new t.MeshBasicMaterial({color:0xff7043,transparent:true,opacity:0.12,side:t.DoubleSide,depthWrite:false}));h.position.set(p.x+p.w/2,13,p.y+p.h2/2);G.add(h);poles.push(h);}
+  if(p.h>80){var m=new t.Mesh(new t.CylinderGeometry(p.w/2,p.w/2,18,18,1,true),new t.MeshBasicMaterial({color:0xb0d4ff,transparent:true,opacity:0.14,side:t.DoubleSide,depthWrite:false}));m.position.set(p.x+p.w/2,9,p.y+p.h2/2);G.add(m);}});
+ // gateway antenna tower
+ cyl(G,1.2,60,MM(0x777,0.5,0.5),288,30,100);sph(G,3,MM(0xff3b3b),288,62,100);
+ return function(tm,st){S.plots.forEach(function(p,i){var wet=!(p.m<30);if(hs[i]&&hs[i]._wet!==wet){hs[i]._wet=wet;W.setPlotState(hs[i],!wet);}});poles.forEach(function(h,i){h.material.opacity=0.1+0.05*Math.sin(tm*3+i);});};}
+B.cropmon=cropmon;
+
+function pothole(G,l,S){var t=T(),cones=[];
+ // fences and verge
+ for(var i=0;i<14;i++)box(G,1.2,7,1.2,MM(0xeeeeee,0.7),10+i*21,3.5,52.5),box(G,1.2,7,1.2,MM(0xeeeeee,0.7),10+i*21,3.5,147.5);
+ var sg=lab("THIKA ROAD",30,8,"#0b6b3a","#fff");sg.position.set(60,20,48);G.add(sg);cyl(G,0.8,18,MM(0x777,0.5,0.5),60,9,48);
+ S.holes.forEach(function(h){var m=new t.Mesh(new t.CylinderGeometry(h.r,h.r*0.8,3,18),new t.MeshStandardMaterial({color:0x14110f,roughness:1}));m.position.set(h.x,-0.8,h.y);m.scale.z=0.8;G.add(m);
+  var rim=new t.Mesh(new t.TorusGeometry(h.r*0.95,1.4,6,18),new t.MeshStandardMaterial({color:0x2b2926,roughness:1}));rim.rotation.x=Math.PI/2;rim.scale.y=0.8;rim.position.set(h.x,0.2,h.y);G.add(rim);
+  var cone=new t.Group();cyl(cone,0.1,0.1,MM(0xff6d00),0,0,0);var c1=new t.Mesh(new t.ConeGeometry(2.8,8,12),MM(0xff6d00,0.6));c1.position.y=4;cone.add(c1);var c2=new t.Mesh(new t.CylinderGeometry(1.5,1.9,1.3,12),MM(0xffffff,0.6));c2.position.y=3.5;cone.add(c2);var bs=box(cone,8,0.6,8,MM(0x222,0.9),0,0.3,0);cone.position.set(h.x-h.r-5,0,h.y+h.r+3);cone.visible=false;G.add(cone);
+  var sgn=lab("ROAD DAMAGE",22,7,"#f9a825","#222",36);sgn.position.set(h.x-h.r-5,14,h.y+h.r+4);sgn.visible=false;G.add(sgn);cones.push({c:cone,s:sgn,h:h});
+  var ring=new t.Mesh(new t.RingGeometry(h.r+3,h.r+4.5,28),new t.MeshBasicMaterial({color:0x00e5ff,transparent:true,opacity:0.0,side:t.DoubleSide}));ring.rotation.x=-Math.PI/2;ring.position.set(h.x,0.5,h.y);G.add(ring);cones[cones.length-1].ring=ring;});
+ var pad=S.padPos||[30,100];
+ return function(tm,st){cones.forEach(function(o){o.c.visible=o.s.visible=!!o.h.map;o.ring.material.opacity=o.h.sms?0.6+0.3*Math.sin(tm*4):0;});};}
+B.pothole=pothole;
+
+function fire(G,l,S){var t=T(),flames=[],puffs=[],AR=E.AR;
+ // room dressing
+ var wall=MM(0xcfd8dc,0.9);box(G,300,50,4,wall,150,25,-2);box(G,4,50,200,wall,-2,25,100);box(G,4,50,200,wall,302,25,100);
+ var sg=lab("FIRE LAB",34,8,"#b71c1c","#fff");sg.position.set(150,42,0.5);G.add(sg);
+ var fx=function(a){return [AR.x+92*Math.cos(a*Math.PI/180),AR.y-92*Math.sin(a*Math.PI/180)];};
+ var pile=new t.Group();for(var i=0;i<5;i++){cyl(pile,2.4,26,MM(0x5d4037,0.95),(i-2)*4.6,4,0,0,Math.PI/2);}pile.position.y=2;G.add(pile);
+ for(var f=0;f<7;f++){var fm=new t.Mesh(new t.ConeGeometry(4+Math.random()*3,14+Math.random()*10,10),new t.MeshBasicMaterial({color:f%3===0?0xffd54f:f%3===1?0xff8f00:0xe65100,transparent:true,opacity:0.85,depthWrite:false}));G.add(fm);flames.push({m:fm,ph:Math.random()*6,ox:(Math.random()-.5)*14,oz:(Math.random()-.5)*8});}
+ for(var p=0;p<8;p++){var sm=new t.Mesh(new t.SphereGeometry(4,10,8),new t.MeshBasicMaterial({color:0x4b4b4b,transparent:true,opacity:0.0,depthWrite:false}));G.add(sm);puffs.push({m:sm,ph:p/8});}
+ var beacon=new t.PointLight(0xff0000,0,160,1.5);beacon.position.set(150,44,20);G.add(beacon);
+ var bc=new t.Mesh(new t.SphereGeometry(4,12,10),new t.MeshStandardMaterial({color:0x550000,emissive:0xff0000,emissiveIntensity:0}));bc.position.set(150,46,20);G.add(bc);box(G,8,4,8,MM(0x333),150,41,20);
+ var al=lab("ALARM",16,5,"#b71c1c","#fff");al.position.set(150,36,24.2);G.add(al);
+ var glow=new t.PointLight(0xff8a30,0,140,1.4);G.add(glow);
+ var jet=new t.Mesh(new t.CylinderGeometry(1.1,0.6,1,10,1,true),new t.MeshBasicMaterial({color:0xaad8ff,transparent:true,opacity:0.7}));jet.visible=false;G.add(jet);
+ var spots=[];for(var q=0;q<5;q++){var dp=new t.Mesh(new t.SphereGeometry(0.9,6,5),new t.MeshBasicMaterial({color:0xcfe8ff,transparent:true,opacity:0.8}));dp.visible=false;G.add(dp);spots.push(dp);}
+ var lastBeep=0;
+ return function(tm,st){var P=fx(S.ang),k=S.fire/100;pile.position.set(P[0],2,P[1]);pile.rotation.y=-S.ang*Math.PI/180;
+  flames.forEach(function(o,i){var vis=k>0.02;o.m.visible=vis;if(!vis)return;var h=(0.55+0.45*Math.sin(tm*9+o.ph))*k;o.m.scale.set(0.6+0.5*k,0.3+h*1.3,0.6+0.5*k);o.m.position.set(P[0]+o.ox*k,6+h*8,P[1]+o.oz*k);});
+  glow.position.set(P[0],14,P[1]);glow.intensity=k*1.4*(0.8+0.2*Math.sin(tm*14));
+  puffs.forEach(function(o){var ph=(tm*0.35+o.ph)%1,sm=S.smoke/100;o.m.position.set(P[0]+Math.sin(ph*5+o.ph*9)*5,10+ph*38,P[1]+(ph*8));o.m.scale.setScalar(0.6+ph*1.8);o.m.material.opacity=sm*0.4*(1-ph);o.m.visible=sm>0.03;});
+  var on=S.alarm;beacon.intensity=on?(Math.sin(tm*10)>0?2.2:0.2):0;bc.material.emissiveIntensity=on?(Math.sin(tm*10)>0?2.5:0.3):0;
+  if(on&&tm-lastBeep>0.7){lastBeep=tm;st.beeps++;}
+  var tip=C0().armTip();if(S.spray&&S.tank>0){var dx=P[0]-tip.x,dy=P[1]-tip.y,len=Math.hypot(dx,dy,tip.z-4);jet.visible=true;jet.position.set((tip.x+P[0])/2,(tip.z+4)/2,(tip.y+P[1])/2);jet.scale.set(1,len,1);jet.lookAt(P[0],4,P[1]);jet.rotateX(Math.PI/2);}else jet.visible=false;};}
+B.fire=fire;
+function C0(){return E.C;}
+
+function handwash(G0,l,S){var t=T(),W=null,G=new t.Group();G.scale.setScalar(1.7);G.position.set(150-150*1.7,0,100-52*1.7);G0.add(G);
+ var wall=MM(0xcfd8dc,0.9),tile=MM(0xffffff,0.35);
+ box(G,200,90,5,MM(0xb0bec5,0.85),150,45,28);for(var i=0;i<10;i++)for(var j=0;j<4;j++)if((i+j)%2===0)box(G,19.5,19.5,0.4,MM(0xe3f2fd,0.3),60+i*20,12+j*20,25.3);
+ box(G,110,6,52,MM(0xd7ccc8,0.7),150,40,52);box(G,110,34,50,MM(0x8d6e63,0.9),150,20,52);
+ var basin=cyl(G,24,5,MM(0xffffff,0.2,0.1),150,43.5,52,0,0,28);cyl(G,19,1,MM(0xdfe7ea,0.4),150,41.2,52,0,0,24);
+ cyl(G,3,3,MM(0x444),150,41,52);
+ var tap=new t.Group();cyl(tap,1.6,22,MM(0xcfd8dc,0.15,0.9),0,11,0);var arm=cyl(tap,1.5,24,MM(0xcfd8dc,0.15,0.9),0,22,12,Math.PI/2);var nz=cyl(tap,2,4,MM(0xcfd8dc,0.15,0.9),0,22,24);tap.position.set(150,43,36);G.add(tap);
+ var ir=box(G,8,5,3,MM(0x222,0.4),150,58,63);var irl=new t.Mesh(new t.SphereGeometry(1.4,10,8),new t.MeshStandardMaterial({color:0x330000,emissive:0xff0000,emissiveIntensity:0.2}));irl.position.set(150,58,64.8);G.add(irl);var irsl=lab("IR SENSOR",14,4,"#222","#fff");irsl.position.set(150,64,64.6);G.add(irsl);
+ var sbot=cyl(G,5,16,MM(0x81c784,0.4),188,52,48);cyl(G,1.3,6,MM(0xcfd8dc,0.3,0.7),188,63,48);var sp=box(G,2,1.2,8,MM(0xcfd8dc,0.3,0.7),188,65,52);var sl=lab("SOAP",9,4,"#2e7d32","#fff");sl.position.set(188,52,53.2);G.add(sl);
+ box(G,34,22,6,MM(0x263238,0.6),150,72,26);var lcd=lab("WASH HANDS",30,12,"#0d2b2b","#37d6c6",34);lcd.position.set(150,72,23.1);G.add(lcd);
+ var stream=new t.Mesh(new t.CylinderGeometry(0.8,0.6,1,10,1,true),new t.MeshBasicMaterial({color:0x8fd0ff,transparent:true,opacity:0.65}));stream.visible=false;G.add(stream);
+ var foam=sph(G,3.2,MM(0xffffff,0.95),150,48,56,1,0.6,1);foam.visible=false;
+ var hands=new t.Group(),skin=[0xf1c27d,0x8d5524,0xc68642,0xe0ac69];for(var h=0;h<2;h++){var hm=new t.Group();box(hm,6,2.4,10,MM(0xf1c27d,0.7),0,0,0);box(hm,5,2,14,MM(0xf1c27d,0.7),0,0,-11);hm.position.set(h?5:-5,0,0);hands.add(hm);}hands.position.set(150,52,56);hands.visible=false;G.add(hands);
+ var ppl=[0x1e88e5,0xe53935,0x43a047],people=[];ppl.forEach(function(c,i){var p=new t.Group();cyl(p,7,30,MM(c,0.8),0,15+40,0);sph(p,6,MM(skin[i%4],0.7),0,62,0);p.position.set(150,0,90);p.visible=false;G.add(p);people.push(p);});
+ return function(tm,st){var v=S.here,vi=v?S.visits.indexOf(v):-1;people.forEach(function(p,i){p.visible=i===vi;});hands.visible=!!v;if(v){hands.children.forEach(function(h,i){h.position.y=Math.sin(tm*8+i*2)*0.8*(S.water?1:0.1);h.rotation.y=Math.sin(tm*8+i)*0.15*(S.water?1:0);h.children[0].material.color.setHex(skin[vi%4]);});}
+  irl.material.emissiveIntensity=v?2.5:0.15;irl.material.color.setHex(v?0xff3030:0x330000);
+  stream.visible=S.water;if(S.water){stream.scale.set(1,18,1);stream.position.set(150,52,50+ (Math.sin(tm*30)*0.2));stream.position.y=44+9;}
+  foam.visible=!!v&&v.soap>0&&(S.water||tm%2>0);foam.position.y=48+Math.sin(tm*6)*0.6;};}
+B.handwash=handwash;
+
+function dam(G,l,S){var t=T(),conc=MM(0xb7b2a8,0.9),wt=waterTex();wt.repeat.set(4,3);
+ var valley=new t.Mesh(new t.PlaneGeometry(300,200),new t.MeshStandardMaterial({color:0x4c6a30,roughness:1}));valley.rotation.x=-Math.PI/2;valley.position.set(150,0.1,100);G.add(valley);
+ var res=new t.Mesh(new t.BoxGeometry(128,1,150),new t.MeshStandardMaterial({map:wt,color:0x7fb8e0,transparent:true,opacity:0.85,roughness:0.15}));res.position.set(84,10,100);G.add(res);
+ var riv=new t.Mesh(new t.PlaneGeometry(150,36),new t.MeshStandardMaterial({map:wt,roughness:0.2,transparent:true,opacity:0.9}));riv.rotation.x=-Math.PI/2;riv.position.set(225,1,100);G.add(riv);
+ // banks of reservoir
+ box(G,130,22,6,MM(0x6b5b45,1),84,11,22);box(G,130,14,6,MM(0x6b5b45,1),84,7,178);box(G,6,22,160,MM(0x6b5b45,1),18,11,100);
+ // dam wall with gate slot
+ box(G,10,64,60,conc,150,32,43);box(G,10,64,60,conc,150,32,157);box(G,10,26,40,conc,150,51,100);box(G,12,2,160,MM(0x9e9a8f,0.9),150,65,100);
+ for(var i=0;i<9;i++)box(G,1,5,1,MM(0x666),145,68,26+i*18);
+ var gate=box(G,2.6,36,38,MM(0xe65100,0.5,0.4),146,20,100);var gl=lab("GATE",12,5,"#bf360c","#fff");gl.rotation.y=-Math.PI/2;gl.position.set(144.6,20,100);G.add(gl);
+ var servoBox=box(G,12,9,14,MM(0x00695c,0.5),150,72,100);var sl=lab("SERVO",10,4,"#004d40","#fff");sl.position.set(150,72,107.3);G.add(sl);
+ var jet=new t.Mesh(new t.BoxGeometry(60,1,36),new t.MeshBasicMaterial({color:0xcfe9ff,transparent:true,opacity:0.7}));jet.position.set(184,4,100);G.add(jet);
+ // level staff
+ var staff=box(G,3,60,3,MM(0xffffff,0.6),138,30,40);var band=box(G,3.2,30,3.2,MM(0x43a047,0.5),138,10+30*0.35+15,40);
+ var bl=lab("SAFE 35-85%",20,5,"#2e7d32","#fff");bl.rotation.y=-Math.PI/2;bl.position.set(139.8,70,40);G.add(bl);
+ var cur=box(G,6,1.2,6,MM(0xd32f2f,0.4),138,10,40);
+ // siren tower
+ cyl(G,1.6,50,MM(0x777,0.5,0.5),230,25,52);var sirenL=new t.PointLight(0xff3300,0,150,1.5);sirenL.position.set(230,56,52);G.add(sirenL);var sir=new t.Mesh(new t.CylinderGeometry(3.4,3.4,6,12),new t.MeshStandardMaterial({color:0x550000,emissive:0xff2200,emissiveIntensity:0}));sir.position.set(230,53,52);G.add(sir);var tl=lab("SIREN",14,5,"#b71c1c","#fff");tl.position.set(230,44,55);G.add(tl);
+ var cow=new t.Group();box(cow,10,6,5,MM(0xf5f5f5,0.9),0,5,0);box(cow,3,5,3,MM(0x222),6,7,0);cow.position.set(230,0,112);G.add(cow);
+ // rain
+ var n=300,geo=new t.BufferGeometry(),arr=new Float32Array(n*6),seed=[];for(var d=0;d<n;d++)seed.push([Math.random()*160,Math.random()*200,Math.random()*100]);geo.setAttribute("position",new t.BufferAttribute(arr,3));var rain=new t.LineSegments(geo,new t.LineBasicMaterial({color:0x9ec8ee,transparent:true,opacity:0.7}));rain.frustumCulled=false;G.add(rain);
+ var lastBeep=0;
+ return function(tm,st){wt.offset.x=tm*0.01;var lv=S.level;res.scale.y=1;res.position.y=4+lv*0.5;res.scale.set(1,Math.max(1,lv*0.5+8),1);res.position.y=(lv*0.5+8)/2;
+  gate.position.y=20+S.gate/100*30;jet.visible=S.gate>2;jet.scale.set(1,1,0.3+S.gate/100*0.9);jet.position.y=2+S.gate/100*5;
+  cur.position.y=10+lv*0.5;
+  var on=tm-S.siren<5;sirenL.intensity=on?(Math.sin(tm*12)>0?2.4:0.2):0;sir.material.emissiveIntensity=on?(Math.sin(tm*12)>0?2.5:0.2):0;if(on&&tm-lastBeep>0.6){lastBeep=tm;st.beeps++;}
+  var rr=S.in>2.2?Math.min(100,(S.in-1.6)*18):0;rain.visible=rr>2;if(rr>2){var a=rain.geometry.attributes.position;for(var d=0;d<n;d++){var s=seed[d];s[2]-=3;if(s[2]<0)s[2]+=100;a.setXYZ(d*2,s[0],s[2],s[1]);a.setXYZ(d*2+1,s[0]-0.5,s[2]+4,s[1]);}a.needsUpdate=true;}};}
+B.dam=dam;
+
+// =============================== phone app overlay ===============================
+function phoneShow(on,html){if(!phone){var host=document.getElementById("stage")||document.getElementById("view3d")||E.box;phone=document.createElement("div");phone.style.cssText="position:absolute;right:8px;top:58px;width:150px;max-height:86%;overflow:auto;background:#0f172a;color:#e5e7eb;border:3px solid #334155;border-radius:16px;padding:7px 8px;font:11px/1.35 system-ui,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.45);z-index:6;pointer-events:none";(E.box).appendChild(phone);}
+ phone.style.display=on?"block":"none";if(on&&html!==undefined&&phone._h!==html){phone._h=html;phone.innerHTML=html;}}
+function phoneHtml(l,S){
+ if(l.id==="cropmon"){var h='<div style="font-weight:700;margin-bottom:3px">📱 Farmer app</div>';
+  for(var i=0;i<4;i++){var d=S.data[i];h+='<div style="background:#1e293b;border-radius:6px;padding:3px 5px;margin:2px 0"><b>Plot '+(i+1)+'</b> '+(d?'💧'+d.m+'% 🌡'+d.t+'° 💨'+d.h+'%':'<span style="opacity:.5">no data yet</span>')+'</div>';}
+  S.msgs.filter(function(m){return m.alert||m.bad;}).slice(-4).forEach(function(m){h+='<div style="background:'+(m.bad?'#78350f':'#7f1d1d')+';border-radius:6px;padding:3px 5px;margin:2px 0">'+m.txt+'</div>';});return h;}
+ if(l.id==="pothole"){var h2='<div style="font-weight:700;margin-bottom:3px">📱 Roads app</div><div style="background:#1e293b;border-radius:6px;height:62px;position:relative;margin-bottom:3px;overflow:hidden"><div style="position:absolute;left:0;right:0;top:22px;height:18px;background:#475569"></div><div style="position:absolute;left:0;right:0;top:30px;border-top:2px dashed #e2e8f0"></div>';
+  S.warn.forEach(function(w){h2+='<div style="position:absolute;left:'+Math.round(w.x/300*140)+'px;top:'+(Math.round((w.y-60)/80*18)+18)+'px;font-size:14px">⚠️</div>';});h2+='</div>';
+  S.msgs.slice(-3).forEach(function(m){h2+='<div style="background:#1e3a8a;border-radius:6px;padding:3px 5px;margin:2px 0;white-space:pre-wrap">'+m.txt+'</div>';});
+  h2+='<div style="opacity:.7;margin-top:2px">Warnings on map: '+S.warn.length+'</div>';return h2;}
+ return "";}
+
+// =============================== public ===============================
+function build(G,l,S){cur=null;if(phone)phone.style.display="none";if(!l.scn||!S||!B[l.id])return;
+ var upd=B[l.id](G,l,S,E.C.st);var showPhone=l.id==="cropmon"||l.id==="pothole";
+ cur={upd:upd,l:l,S:S,phone:showPhone};}
+function update(tm){if(!cur)return;var st=E.C.st;try{cur.upd(tm,st);}catch(e){}
+ if(cur.phone)phoneShow(true,phoneHtml(cur.l,cur.S));}
+function boat(bot,wheels,wheels2,on){
+ if(!bot._boat){var t=T(),g=new t.Group(),m=MM(0xeceff1,0.4),dk=MM(0x37474f,0.5);[-5.6,5.6].forEach(function(z){var h=new t.Mesh(new t.CylinderGeometry(2.4,2.4,17,14),m);h.rotation.z=Math.PI/2;h.position.set(0,1.6,z);g.add(h);sph(g,2.4,m,8.5,1.6,z);sph(g,2.4,m,-8.5,1.6,z);cyl(g,0.5,6,dk,-10.5,2,z,0,0);var pr=new t.Mesh(new t.BoxGeometry(0.4,5,1.2),dk);pr.position.set(-11.5,2,z);pr.name="prop";g.add(pr);});
+  var net=new t.Group();var fr=new t.Mesh(new t.TorusGeometry(5.2,0.4,6,14,Math.PI),MM(0xef6c00,0.5));fr.rotation.set(Math.PI/2,0,Math.PI/2);net.add(fr);var mesh=new t.Mesh(new t.SphereGeometry(5,10,8,0,Math.PI*2,Math.PI/2,Math.PI/2),new t.MeshBasicMaterial({color:0xffb74d,wireframe:true}));mesh.rotation.x=0;net.add(mesh);net.position.set(11,4,0);net.name="net";g.add(net);
+  g.visible=false;bot.add(g);bot._boat=g;}
+ bot._boat.visible=on;wheels.forEach(function(w){if(w.g)w.g.visible=!on;});wheels2.forEach(function(w){w.visible=!on&&w.visible;});
+ if(on){var S=E.C.st.S,net=bot._boat.getObjectByName("net");if(net&&S)net.rotation.z=S.scoop?-0.1:0.9;bot._boat.children.forEach(function(c){if(c.name==="prop")c.rotation.x+=0.4;});}}
+return {init:init,build:build,update:update,boat:boat,phoneShow:phoneShow};
+})();
+
 (function(){
 "use strict";
 var C=Core,W=C.W,H=C.H,st=C.st,LEVELS=C.LEVELS,PARTS=C.PARTS;
@@ -1696,11 +2278,19 @@ var grass=World.grassTex();
 var concrete=tex(256,256,function(g,w,h){g.fillStyle="#8d96a0";g.fillRect(0,0,w,h);speckle(g,w,h,2500,["#838c96","#98a1ab","#7b848e"],3);},true);concrete.repeat.set(12,12);
 var skyTex=tex(8,256,function(g,w,h){var gr=g.createLinearGradient(0,0,0,h);gr.addColorStop(0,"#5aa0e0");gr.addColorStop(0.6,"#a9d2f0");gr.addColorStop(1,"#e6f1f7");g.fillStyle=gr;g.fillRect(0,0,w,h);});
 var TILECOL={red:"#d32f2f",green:"#2e9e4f",blue:"#1e63d6"};
+function paintLake(g,w,h,S){var gr=g.createLinearGradient(0,0,w,0);gr.addColorStop(0,"#1f6c9c");gr.addColorStop(0.75,"#2f8fc0");gr.addColorStop(1,"#4aa8d0");g.fillStyle=gr;g.fillRect(0,0,w,h);
+ g.strokeStyle="rgba(255,255,255,.18)";g.lineWidth=2;for(var i=0;i<160;i++){var x=Math.random()*w*0.9,y=Math.random()*h,r=(5+Math.random()*12)*S/2;g.beginPath();g.arc(x,y,r,Math.PI*1.1,Math.PI*1.9);g.stroke();}
+ var sg=g.createLinearGradient(w*0.86,0,w*0.91,0);sg.addColorStop(0,"rgba(214,190,140,0)");sg.addColorStop(1,"rgba(214,190,140,1)");g.fillStyle=sg;g.fillRect(w*0.86,0,w*0.14,h);}
+function paintRoad(g,w,h,S){g.fillStyle="#6f8a49";g.fillRect(0,0,w,h);speckle(g,w,h,3000,["#5f7a3d","#7e9856","#6a8444"],4);g.fillStyle="#a07850";g.fillRect(0,48*S,w,10*S);g.fillRect(0,142*S,w,10*S);
+ g.fillStyle="#3b3f45";g.fillRect(0,56*S,w,88*S);speckle(g,w,56*S+88*S,9000,["#33373c","#454a50","#3f4349"],2);
+ g.fillStyle="#f2f2f2";g.fillRect(0,60*S,w,1.6*S);g.fillRect(0,138.4*S,w,1.6*S);
+ g.fillStyle="#f6c700";for(var x=0;x<w;x+=26*S){g.fillRect(x,99*S,14*S,2*S);}}
 function floorTex(i){
  var l=LEVELS[i],S=4;
  return tex(W*S,H*S,function(g,w,h){
   var tape=l.floor==="tape",farm=l.floor==="farm";
-  if(farm){World.paintSoil(g,0,0,w,h,"field",3);}
+  if(l.floor==="lake"){paintLake(g,w,h,S);}else if(l.floor==="road"){paintRoad(g,w,h,S);}
+  else if(farm){World.paintSoil(g,0,0,w,h,"field",3);}
   else{World.paintFloor(g,w,h,tape);
    g.strokeStyle=tape?"rgba(160,170,180,.35)":"rgba(120,130,140,.4)";g.lineWidth=2;for(var x=0;x<=w;x+=25*S){g.beginPath();g.moveTo(x,0);g.lineTo(x,h);g.stroke();}for(var y=0;y<=h;y+=25*S){g.beginPath();g.moveTo(0,y);g.lineTo(w,y);g.stroke();}}
   st.plots.forEach(function(p){
@@ -1712,7 +2302,7 @@ function floorTex(i){
   (l.zonesDef||[]).forEach(function(z,k){g.fillStyle="rgba(120,190,120,.28)";g.fillRect(z[0]*S,z[1]*S,z[2]*S,z[3]*S);g.strokeStyle="#2e7d32";g.lineWidth=5;g.setLineDash([18,10]);g.strokeRect(z[0]*S,z[1]*S,z[2]*S,z[3]*S);g.setLineDash([]);g.fillStyle="#1b5e20";g.font="bold 36px sans-serif";g.fillText("BAY "+(k+1),z[0]*S+16,z[1]*S+46);});
   if(l.track){g.strokeStyle="#15171a";g.lineWidth=3*S;g.lineJoin="round";g.lineCap="round";g.beginPath();l.track.forEach(function(p,k){if(k)g.lineTo(p[0]*S,p[1]*S);else g.moveTo(p[0]*S,p[1]*S);});g.stroke();}
   if(l.goal){var q=l.goal;g.fillStyle="rgba(34,197,94,.55)";g.fillRect(q[0]*S,q[1]*S,q[2]*S,q[3]*S);g.save();g.beginPath();g.rect(q[0]*S,q[1]*S,q[2]*S,q[3]*S);g.clip();g.strokeStyle="rgba(255,255,255,.55)";g.lineWidth=8;for(var d=-q[3]*S;d<q[2]*S+q[3]*S;d+=28){g.beginPath();g.moveTo(q[0]*S+d,q[1]*S);g.lineTo(q[0]*S+d+q[3]*S,q[1]*S+q[3]*S);g.stroke();}g.restore();g.strokeStyle="#15803d";g.lineWidth=6;g.strokeRect(q[0]*S,q[1]*S,q[2]*S,q[3]*S);}
-  var s=l.start;if(!l.drone&&!l.arm){g.fillStyle="rgba(37,99,235,.35)";g.beginPath();g.arc(s.x*S,s.y*S,10*S,0,7);g.fill();}
+  var s=l.start;if(!l.drone&&!l.arm&&!l.station){g.fillStyle="rgba(37,99,235,.35)";g.beginPath();g.arc(s.x*S,s.y*S,10*S,0,7);g.fill();}
  });
 }
 // ---------- scene ----------
@@ -1867,12 +2457,13 @@ function buildRobotParts(){
 // ---------- level ----------
 var plantMeshes=[],lastWet=[],lastWetBuilt=0;
 function tree(x,z,s,v){World.tree(levelGroup,x,z,s,v===undefined?Math.round(x/10)+Math.round(z/10):v);}
+SCN3D.init({THREE:THREE,M:M,B:B,Cy:Cy,World:World,scene:scene,C:C,AR:AR,box:box});
 function buildLevel(){
  var l=LEVELS[st.lvl];
  while(levelGroup.children.length)levelGroup.remove(levelGroup.children[0]);plantMeshes=[];World.resetPlants();
  if(floor.material.map)floor.material.map.dispose();
  floor.material.map=floorTex(st.lvl);floor.material.needsUpdate=true;
- ground.material.map=l.floor==="farm"?grass:World.murramTex();ground.material.needsUpdate=true;
+ ground.material.map=(l.floor==="farm"||l.floor==="lake"||l.floor==="road")?grass:World.murramTex();ground.material.needsUpdate=true;
  scene.fog.color.set(0xcfe3ee);setNight(!!l.night);
  var bm=function(w,h){if(l.id==="escarp")return World.rockMat(w,h);var t=brick.clone();t.needsUpdate=true;t.repeat.set(Math.max(1,w/22),Math.max(1,h/22));return new THREE.MeshStandardMaterial({map:t,roughness:0.9});};
  var wH=l.wallH||16;l.walls.forEach(function(r){var w=r[2],d=r[3];B(w,wH,d,bm(Math.max(w,d),wH),r[0]+w/2,wH/2,r[1]+d/2,levelGroup);B(w+0.6,1,d+0.6,M(0x8a8f96,0.8),r[0]+w/2,wH+0.4,r[1]+d/2,levelGroup);});
@@ -1890,6 +2481,7 @@ function buildLevel(){
  lastWet=st.plots.map(function(p){return p.watered;});
  if(l.arm)buildArmLevel(l);
  if(l.drone)buildDroneLevel(l);
+ try{SCN3D.build(levelGroup,l,st.S);}catch(e){try{console.error(e);}catch(_){}}
 }
 function refreshPlot(i){var p=st.plots[i];if(!p)return;World.setPlotState(plantMeshes[i],p.dry&&!p.watered);}
 function qHigh(){var q=document.getElementById("quality");return !q||q.value==="high";}
@@ -1922,12 +2514,12 @@ function beep(){try{if(!actx)return;var o=actx.createOscillator(),g=actx.createG
 // ---------- draw ----------
 var clock=0,grip=0,frameN=0,LEDCOL={red:0xff2222,green:0x22dd44,blue:0x2266ff,yellow:0xffdd22,white:0xffffff,off:0x222222};
 function draw(){
- var a=st.robot.a*Math.PI/180,x=st.robot.x,y=st.robot.y,AM=!!LEVELS[st.lvl].arm,DM=!!LEVELS[st.lvl].drone;bot.visible=!AM&&!DM;armG.visible=AM;droneG.visible=DM;droneShadow.visible=DM&&!!renderer&&!renderer.shadowMap.enabled;if(AM)drawArm();if(DM)drawDrone();
+ var a=st.robot.a*Math.PI/180,x=st.robot.x,y=st.robot.y,AM=!!LEVELS[st.lvl].arm,DM=!!LEVELS[st.lvl].drone;bot.visible=!AM&&!DM&&!LEVELS[st.lvl].station;armG.visible=AM;droneG.visible=DM;droneShadow.visible=DM&&!!renderer&&!renderer.shadowMap.enabled;if(AM)drawArm();if(DM)drawDrone();
  var chs=C.CHASSIS[st.chassis]||C.CHASSIS.standard;bot.position.set(x,0,y);bot.rotation.y=-a;bot.scale.setScalar(chs.R/7);
- wheels[0].g.rotation.z=-st.wl;wheels[1].g.rotation.z=-st.wr;wheels2[0].visible=wheels2[1].visible=chs.wheels===4;wheels2[0].rotation.z=-st.wl;wheels2[1].rotation.z=-st.wr;
+ SCN3D.boat(bot,wheels,wheels2,chs.id==="boat");wheels[0].g.rotation.z=-st.wl;wheels[1].g.rotation.z=-st.wr;wheels2[0].visible=wheels2[1].visible=chs.wheels===4;wheels2[0].rotation.z=-st.wl;wheels2[1].rotation.z=-st.wr;
  ["front","left","right"].forEach(function(k){
   var d=C.distSafe(k),off={front:0,left:-90,right:90}[k],aa=(st.robot.a+off)*Math.PI/180,L=rayLines[k],D=hitDots[k];
-  if(d===null){L.visible=false;D.visible=false;return;}
+  if(d===null||LEVELS[st.lvl].station){L.visible=false;D.visible=false;return;}
   var ex=x+Math.cos(aa)*d,ez=y+Math.sin(aa)*d,p=L.geometry.attributes.position;
   p.setXYZ(0,x+Math.cos(aa)*8,6,y+Math.sin(aa)*8);p.setXYZ(1,ex,6,ez);p.needsUpdate=true;L.visible=true;D.position.set(ex,6,ez);D.visible=d<149;});
  spray.visible=st.pump;if(st.pump){clock+=0.4;spray.scale.set(1+0.2*Math.sin(clock),1,1+0.2*Math.sin(clock));}
@@ -1937,6 +2529,7 @@ function draw(){
  grip+=((st.gripClosed?1:0)-grip)*0.2;if(fx.fingers)fx.fingers.forEach(function(f){f.position.z=f.userData.sd*(3.2-grip*1.0);});
  if(st.cube){cubeMesh.visible=true;cubeMesh.position.set(st.cube.x,st.cube.held?5:4,st.cube.y);cubeMesh.rotation.y=st.cube.held?-a:0.3;}else cubeMesh.visible=false;
  for(var i=0;i<st.plots.length;i++)if(lastWet[i]!==st.plots[i].watered){lastWet[i]=st.plots[i].watered;refreshPlot(i);if(st.plots[i].watered){var q=st.plots[i],m=new THREE.Mesh(new THREE.PlaneGeometry(q.w,q.h),new THREE.MeshBasicMaterial({color:0x1a0f08,transparent:true,opacity:0.3,depthWrite:false}));m.rotation.x=-Math.PI/2;m.position.set(q.x+q.w/2,0.6,q.y+q.h/2);levelGroup.add(m);}}
+ SCN3D.update(performance.now()/1000);
  if(st.beeps!==lastBeeps){if(st.beeps>lastBeeps)beep();lastBeeps=st.beeps;}
  if(renderer){var w=box.clientWidth,fsOn=document.body.classList.contains("fs"),h=fsOn?box.clientHeight:Math.round(w/1.5);if(w&&h&&(w!==lastW||h!==lastH)){lastW=w;lastH=h;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();}placeCamera();renderer.render(scene,camera);}
  if(frameN%8===0)renderHud();
@@ -1965,15 +2558,22 @@ function msg(t,c){$("msg").textContent=t;$("msg").className=c||"";}
 var prog=[],selected=null;
 var LABEL={fwd:"Forward",back:"Back",left:"Turn left",right:"Turn right",wait:"Wait",repeat:"Repeat",forever:"Forever",if:"If",stop:"Stop",water:"Water plant",fanon:"Fan on",fanoff:"Fan off",gripc:"Grip close",gripo:"Grip open",led:"LED",beep:"Beep",print:"Show on LCD",armb:"Arm: base to",beltgo:"Belt: run until box",beltoff:"Belt: stop",arms:"Arm: shoulder to",arme:"Arm: elbow to",takeoff:"Take off",land:"Land",up:"Fly up",down:"Fly down"};
 var CLS={fwd:"mv",back:"mv",left:"tn",right:"tn",wait:"mv",repeat:"lp",forever:"lp",if:"ifb",stop:"st",water:"wt",fanon:"wt",fanoff:"wt",gripc:"wt",gripo:"wt",led:"wt",beep:"wt",print:"wt",armb:"am",beltgo:"am",beltoff:"am",arms:"am",arme:"am",takeoff:"dr",land:"dr",up:"dr",down:"dr"};
+LABEL["do"]="Action";CLS["do"]="wt";
 var DEF={up:50,down:50,armb:90,arms:90,arme:0,fwd:30,back:30,left:90,right:90,repeat:3,wait:1};
 var UNIT={up:"cm",down:"cm",armb:"°",arms:"°",arme:"°",fwd:"cm",back:"cm",left:"°",right:"°",repeat:"×",wait:"s"};
 var NEEDPART={water:"pump",fanon:"fan",fanoff:"fan",gripc:"servo",gripo:"servo",led:"led",beep:"buzzer",print:"lcd",armb:"armkit",beltgo:"armkit",beltoff:"armkit",arms:"armkit",arme:"armkit",takeoff:"dronekit",land:"dronekit",up:"dronekit",down:"dronekit"};
 var COLORS=["red","green","blue","yellow","white","off"];
 var CONDS=[["front","Front distance <","cm"],["left","Left distance <","cm"],["right","Right distance <","cm"],["lineL","Line under LEFT sensor",""],["lineR","Line under RIGHT sensor",""],["soil","Soil moisture <","%"],["color","Floor colour is","c"],["light","Light level <","%"],["temp","Temperature >","°C"],["humid","Humidity <","%"],["heading","Heading <","°"],["odo","Distance travelled >","cm"],["bump","Bumper pressed",""],["cam","Camera sees object",""],["cubecol","Cube under gripper is","c"],["boxspot","Box at pick spot",""],["alt","Altitude <","cm"],["dfront","Wall ahead closer than","cm"],["bat","Battery <","%"],["dlight","Light under drone >","%"]];
+function smeta(){var l=LEVELS[st.lvl];return l.scn&&typeof SCN!=="undefined"?SCN.def[l.scn]:null;}
+function condsList(){var m=smeta();var base=m&&m.station?[]:CONDS;return base.concat(m?m.sensors.map(function(s){return ["sig:"+s.id,s.label,s.type==="bool"?"":s.type==="enum"?"e":(s.unit||"#")];}):[]);}
+function sigSensor(k){var m=smeta();return m&&String(k).indexOf("sig:")===0?m.sensors.filter(function(s){return "sig:"+s.id===k;})[0]:null;}
+function actDef(q){var m=smeta();return m?m.actions.filter(function(a){return a.id===q;})[0]:null;}
+function anyHas(n){if(!n)return true;var a=Array.isArray(n)?n:[n];return a.some(function(x){return C.has(x);});}
+function needName(n){return (Array.isArray(n)?n:[n]).map(function(x){return PARTS[x]?PARTS[x].name:x;}).join(" or ");}
 function distOk(s){return !!(C.find("us",s)||C.find("sharp",s)||C.find("irobs",s));}
 function needPart(t){if(LEVELS[st.lvl].arm&&(t==="gripc"||t==="gripo"))return "armkit";return NEEDPART[t];}
-function condOk(k){switch(k){case "front":case "left":case "right":return distOk(k);case "lineL":return !!C.find("line","left");case "lineR":return !!C.find("line","right");case "soil":return C.has("soil");case "color":return C.has("color");case "light":return C.has("ldr");case "temp":case "humid":return C.has("dht");case "heading":return C.has("imu")||C.has("compass");case "odo":return C.has("encoder");case "bump":return C.has("bumper");case "cam":return C.has("camera");case "cubecol":case "boxspot":return C.has("armkit");case "alt":case "dfront":case "bat":case "dlight":return C.has("dronekit");}return true;}
-function add(t){var b={t:t};if(DEF[t]!==undefined)b.v=DEF[t];if(t==="repeat"||t==="forever"||t==="if")b.c=[];if(t==="if"){b.e=[];b.k="front";b.v=20;}if(t==="led")b.q="red";if(t==="print")b.q="Hello";(selected||prog).push(b);renderProg();}
+function condOk(k){var sg=sigSensor(k);if(sg)return anyHas(sg.need);switch(k){case "front":case "left":case "right":return distOk(k);case "lineL":return !!C.find("line","left");case "lineR":return !!C.find("line","right");case "soil":return C.has("soil");case "color":return C.has("color");case "light":return C.has("ldr");case "temp":case "humid":return C.has("dht");case "heading":return C.has("imu")||C.has("compass");case "odo":return C.has("encoder");case "bump":return C.has("bumper");case "cam":return C.has("camera");case "cubecol":case "boxspot":return C.has("armkit");case "alt":case "dfront":case "bat":case "dlight":return C.has("dronekit");}return true;}
+function add(t,q){var b={t:t};if(t==="do"){b.q=q;var ad=actDef(q);if(ad&&ad.p)b.v=ad.p.def;}if(DEF[t]!==undefined)b.v=DEF[t];if(t==="repeat"||t==="forever"||t==="if")b.c=[];if(t==="if"){b.e=[];b.k="front";b.v=20;var cl=condsList();if(cl.length&&cl[0][0].indexOf("sig:")===0&&(smeta().station||true)&&smeta().station){b.k=cl[0][0];}var sg0=sigSensor(b.k);if(sg0){b.v=sg0.type==="num"?30:0;if(sg0.type==="enum")b.q=sg0.opts[0];b.op=sg0.gt?">":"<";}}if(t==="led")b.q="red";if(t==="print")b.q="Hello";(selected||prog).push(b);renderProg();}
 function exists(list,target){if(list===target)return true;for(var i=0;i<list.length;i++){var b=list[i];if(b.c&&exists(b.c,target))return true;if(b.e&&exists(b.e,target))return true;}return false;}
 function removeFrom(list,b){var i=list.indexOf(b);if(i>=0)list.splice(i,1);}
 function slot(list,label){var d=document.createElement("div");d.className="slot"+(selected===list?" sel":"");var l=document.createElement("div");l.className="lab";l.textContent=label;d.appendChild(l);
@@ -1981,18 +2581,22 @@ function slot(list,label){var d=document.createElement("div");d.className="slot"
 function numInput(b,key,d){var i=document.createElement("input");i.type="number";i.inputMode="decimal";i.value=b[key];i.onclick=function(e){e.stopPropagation();};i.oninput=function(){b[key]=+i.value||0;updateCode();};d.appendChild(i);}
 function block(b,parent){
  var w=document.createElement("div");w.className="wrap";var d=document.createElement("div");d.className="blk "+CLS[b.t];
- var s=document.createElement("span");s.textContent=LABEL[b.t];d.appendChild(s);
- if(needPart(b.t)&&!C.has(needPart(b.t))){var wn=document.createElement("span");wn.className="warn";wn.textContent="⚠ add "+PARTS[needPart(b.t)].name;d.appendChild(wn);}
+ var s=document.createElement("span");var adx=b.t==="do"?actDef(b.q):null;s.textContent=adx?adx.label:LABEL[b.t];d.appendChild(s);
+ if(b.t==="do"){var ad0=actDef(b.q);if(ad0&&!anyHas(ad0.need)){var wn0=document.createElement("span");wn0.className="warn";wn0.textContent="⚠ add "+needName(ad0.need);d.appendChild(wn0);}else if(ad0&&ad0.needAlso&&!anyHas(ad0.needAlso)){var wn1=document.createElement("span");wn1.className="warn";wn1.textContent="⚠ add "+needName(ad0.needAlso);d.appendChild(wn1);}}
+ if(b.t!=="do"&&needPart(b.t)&&!C.has(needPart(b.t))){var wn=document.createElement("span");wn.className="warn";wn.textContent="⚠ add "+PARTS[needPart(b.t)].name;d.appendChild(wn);}
  if(b.t==="if"){
-  var sel=document.createElement("select");CONDS.forEach(function(c){var o=document.createElement("option");o.value=c[0];o.textContent=c[1]+(condOk(c[0])?"":" ⚠");if(c[0]===b.k)o.selected=true;sel.appendChild(o);});
-  sel.onclick=function(e){e.stopPropagation();};sel.onchange=function(){b.k=sel.value;renderProg();};d.appendChild(sel);
-  var cd=CONDS.filter(function(c){return c[0]===b.k;})[0];
+  var sel=document.createElement("select");condsList().forEach(function(c){var o=document.createElement("option");o.value=c[0];o.textContent=c[1]+(condOk(c[0])?"":" ⚠");if(c[0]===b.k)o.selected=true;sel.appendChild(o);});
+  sel.onclick=function(e){e.stopPropagation();};sel.onchange=function(){b.k=sel.value;var sg1=sigSensor(b.k);if(sg1){b.op=sg1.gt?">":"<";if(sg1.type==="enum")b.q=sg1.opts[0];else if(sg1.type==="num"&&(b.v==null||b.v===0))b.v=30;}renderProg();};d.appendChild(sel);
+  var cd=condsList().filter(function(c){return c[0]===b.k;})[0]||CONDS[0];
+  var sgm=sigSensor(b.k);
+  if(sgm&&sgm.type==="num"){var os=document.createElement("select");[["<","less than"],[">","more than"]].forEach(function(p){var o=document.createElement("option");o.value=p[0];o.textContent=p[0];if(p[0]===(b.op||(sgm.gt?">":"<")))o.selected=true;os.appendChild(o);});os.onclick=function(e){e.stopPropagation();};os.onchange=function(){b.op=os.value;updateCode();};d.appendChild(os);}
+  if(sgm&&sgm.type==="enum"){var es=document.createElement("select");sgm.opts.forEach(function(c){var o=document.createElement("option");o.value=c;o.textContent=c;if(c===(b.q||sgm.opts[0]))o.selected=true;es.appendChild(o);});es.onclick=function(e){e.stopPropagation();};es.onchange=function(){b.q=es.value;updateCode();};d.appendChild(es);}else 
   if(cd[2]==="c"){var cs=document.createElement("select");["red","green","blue","black","white","grey","brown"].forEach(function(c){var o=document.createElement("option");o.value=c;o.textContent=c;if(c===(b.q||"red"))o.selected=true;cs.appendChild(o);});cs.onclick=function(e){e.stopPropagation();};cs.onchange=function(){b.q=cs.value;updateCode();};if(!b.q)b.q="red";d.appendChild(cs);}
-  else if(cd[2]){numInput(b,"v",d);var u=document.createElement("span");u.textContent=cd[2];d.appendChild(u);}
+  else if(cd[2]){numInput(b,"v",d);var u=document.createElement("span");u.textContent=cd[2]==="#"?"":cd[2];d.appendChild(u);}
   if(!condOk(b.k)){var w2=document.createElement("span");w2.className="warn";w2.textContent="⚠ sensor not installed";d.appendChild(w2);}
  }else if(b.t==="led"){var ls=document.createElement("select");COLORS.forEach(function(c){var o=document.createElement("option");o.value=c;o.textContent=c;if(c===b.q)o.selected=true;ls.appendChild(o);});ls.onclick=function(e){e.stopPropagation();};ls.onchange=function(){b.q=ls.value;updateCode();};d.appendChild(ls);}
  else if(b.t==="print"){var ti=document.createElement("input");ti.type="text";ti.maxLength=16;ti.value=b.q;ti.style.width="110px";ti.onclick=function(e){e.stopPropagation();};ti.oninput=function(){b.q=ti.value;updateCode();};d.appendChild(ti);}
- else if(b.v!==undefined){numInput(b,"v",d);var u2=document.createElement("span");u2.textContent=UNIT[b.t];d.appendChild(u2);}
+ else if(b.v!==undefined){numInput(b,"v",d);var u2=document.createElement("span");u2.textContent=b.t==="do"?(((actDef(b.q)||{}).p||{}).unit||""):UNIT[b.t];d.appendChild(u2);}
  var x=document.createElement("button");x.className="x";x.textContent="✕";x.onclick=function(e){e.stopPropagation();removeFrom(parent,b);if(selected&&selected!==prog&&!exists(prog,selected))selected=null;renderProg();};d.appendChild(x);
  w.appendChild(d);
  if(b.t==="if"){w.appendChild(slot(b.c,"then"));w.appendChild(slot(b.e,"else"));}else if(b.c)w.appendChild(slot(b.c,"do"));
@@ -2006,11 +2610,28 @@ function renderProg(){
 }
 $("prog").onclick=function(){selected=null;renderProg();};
 function armGroups(){var g=[["Arm",["armb","arms","arme","gripc","gripo","wait"]]];if(LEVELS[st.lvl].belt)g.push(["Conveyor",["beltgo","beltoff"]]);g.push(["Control",["repeat","forever","if","stop"]]);return g;}
+function paletteGroups(){
+ var l=LEVELS[st.lvl],m=smeta(),ctl=["Control",["repeat","forever","if","stop"]],g;
+ if(l.drone)g=[["Fly",["takeoff","land","up","down","fwd","back","left","right","wait"]],ctl];
+ else if(l.arm)g=armGroups();
+ else if(l.station)g=[["Control",["repeat","forever","if","wait","stop"]]];
+ else g=[["Move",["fwd","back","left","right","wait"]],ctl,["Actions",["water","fanon","fanoff","gripc","gripo","led","beep","print"]]];
+ if(m){
+  var mis=["Mission",m.actions.map(function(x){return "do:"+x.id;})];
+  if(l.station)g.unshift(mis);else{var ix=0;g.forEach(function(q,n){if(q[0]==="Control")ix=n;});g.splice(ix,0,mis);}
+  if(l.scn){g=g.map(function(q){return q[0]==="Actions"&&l.id!=="irrigate"&&l.id!=="cropmon"?[q[0],q[1].filter(function(t){return t!=="water"&&t!=="gripc"&&t!=="gripo"&&t!=="fanon"&&t!=="fanoff";})]:q;});}
+ }
+ return g;
+}
 function renderPalette(){
  var pal=$("pal");pal.innerHTML="";
- (LEVELS[st.lvl].drone?[["Fly",["takeoff","land","up","down","fwd","back","left","right","wait"]],["Control",["repeat","forever","if","stop"]]]:LEVELS[st.lvl].arm?armGroups():[["Move",["fwd","back","left","right","wait"]],["Control",["repeat","forever","if","stop"]],["Actions",["water","fanon","fanoff","gripc","gripo","led","beep","print"]]]).forEach(function(grp){
+ paletteGroups().forEach(function(grp){
+  if(!grp[1].length)return;
   var lab=document.createElement("div");lab.className="pg";lab.textContent=grp[0];pal.appendChild(lab);
-  grp[1].forEach(function(t){var b=document.createElement("button");var lock=needPart(t)&&!C.has(needPart(t));b.textContent=(lock?"🔒 ":"+ ")+LABEL[t];if(lock){b.className="dim";b.title="Needs: "+PARTS[needPart(t)].name;}b.onclick=function(){add(t);if(lock)msg("🔒 “"+LABEL[t]+"” needs a "+PARTS[needPart(t)].name+". Add it in the Build tab, then it will work.","bad");};pal.appendChild(b);});
+  grp[1].forEach(function(t){var isDo=t.indexOf("do:")===0,q=isDo?t.slice(3):null,ad=isDo?actDef(q):null;if(isDo&&!ad)return;
+   var nd=isDo?ad.need:needPart(t),lock=isDo?!anyHas(nd):(needPart(t)&&!C.has(needPart(t))),nm=isDo?ad.label:LABEL[t];
+   var b=document.createElement("button");b.textContent=(lock?"🔒 ":"+ ")+nm;if(isDo&&ad.tip)b.title=ad.tip;if(lock){b.className="dim";b.title="Needs: "+needName(nd);}
+   b.onclick=function(){add(isDo?"do":t,q);if(lock)msg("🔒 “"+nm+"” needs a "+needName(nd)+". Add it in the Build tab, then it will work.","bad");};pal.appendChild(b);});
  });
 }
 // ================= PARTS LAB =================
@@ -2927,6 +3548,9 @@ var N="(-?\\d+(?:\\.\\d+)?)";
 C('bot\\.distance\\("(front|left|right)"\\)\\s*<\\s*'+N,function(m){return {k:m[1],v:+m[2]};});
 C('bot\\.line\\("left"\\)',function(){return {k:"lineL"};});C('bot\\.line\\("right"\\)',function(){return {k:"lineR"};});
 [["bot\\.soil_percent\\(\\)","<","soil"],["drone\\.altitude\\(\\)","<","alt"],["drone\\.front_cm\\(\\)","<","dfront"],["drone\\.battery\\(\\)","<","bat"],["drone\\.light_percent\\(\\)",">","dlight"],["bot\\.light_percent\\(\\)","<","light"],["bot\\.temperature_c\\(\\)",">","temp"],["bot\\.humidity_percent\\(\\)","<","humid"],["bot\\.heading_deg\\(\\)","<","heading"],["bot\\.distance_travelled_cm\\(\\)",">","odo"]].forEach(function(r){C(r[0]+"\\s*"+r[1]+"\\s*"+N,function(m){return {k:r[2],v:+m[1]};});});
+C('mission\\.sense\\("(\\w+)"\\)\\s*(<|>)\\s*'+N,function(m){return {k:"sig:"+m[1],op:m[2],v:+m[3]};});
+C('mission\\.sense\\("(\\w+)"\\)\\s*==\\s*"(\\w+)"',function(m){return {k:"sig:"+m[1],q:m[2]};});
+C('mission\\.sense\\("(\\w+)"\\)',function(m){return {k:"sig:"+m[1]};});
 C('belt\\.box_at_pick_spot\\(\\)',function(){return {k:"boxspot"};});
 C('arm\\.cube_colour\\(\\)\\s*==\\s*"(\\w+)"',function(m){return {k:"cubecol",q:m[1]};});
 C('bot\\.color\\(\\)\\s*==\\s*"(\\w+)"',function(m){return {k:"color",q:m[1]};});
@@ -2970,6 +3594,7 @@ function compile(src){
  function stmt(s,ln,out){var m=/^([A-Za-z_][\w.]*)\((.*)\)$/.exec(s);
   if(!m){errs.push({line:ln,msg:"I don't understand \""+s+"\". Each line should be a command like bot.forward(50)."});return;}
   var name=m[1],arg=sub(m[2].trim()),def=null;ACTS.forEach(function(a){if(a[0]===name)def=a;});
+  if(name==="mission.do"){var mm=/^"(\w+)"\s*(?:,\s*(-?\d+(?:\.\d+)?))?$/.exec(arg);if(!mm){errs.push({line:ln,msg:"mission.do() needs the action name in quotes, like mission.do(\"grab\")."});return;}var bb={t:"do",q:mm[1]};if(mm[2]!==undefined)bb.v=+mm[2];out.push(bb);return;}
   if(!def){var sg=suggest(name);errs.push({line:ln,msg:"I don't know \""+name+"\"."+(sg?" Did you mean "+sg+"?":" Tap a command below to insert it.")});return;}
   var b={t:def[1]},kind=def[2];
   if(kind==="n"){if(!new RegExp("^"+N+"$").test(arg)){errs.push({line:ln,msg:name+"() needs a number inside the brackets, like "+name+"(50)."});return;}b.v=+arg;}
@@ -2982,7 +3607,7 @@ function compile(src){
  var prog=block(items.length?items[0].ind:0);
  while(pos<items.length){var it=items[pos];errs.push({line:it.ln,msg:"Check the indentation of this line."});pos++;}
  return {prog:prog,errors:errs};}
-var CMDS={wheeled:["bot.forward(50)","bot.backward(30)","bot.turn_left(90)","bot.turn_right(90)","time.sleep(1)",'bot.led("red")',"bot.beep(0.3)",'bot.distance("front") < 30','bot.line("left")',"for _ in range(3):","while True:","if","else:","bot.stop()"],
+var CMDS={station:["time.sleep(1)","for _ in range(3):","while True:","if","else:"],wheeled:["bot.forward(50)","bot.backward(30)","bot.turn_left(90)","bot.turn_right(90)","time.sleep(1)",'bot.led("red")',"bot.beep(0.3)",'bot.distance("front") < 30','bot.line("left")',"for _ in range(3):","while True:","if","else:","bot.stop()"],
  arm:["arm.base(90)","arm.shoulder(60)","arm.elbow(30)","bot.gripper_close()","bot.gripper_open()","time.sleep(1)","belt.run_until_box()","belt.box_at_pick_spot()",'arm.cube_colour() == "red"',"for _ in range(3):","if","else:"],
  drone:["drone.takeoff()","drone.land()","drone.up(50)","drone.down(50)","drone.forward(100)","bot.turn_left(90)","bot.turn_right(90)","drone.altitude() < 100","drone.front_cm() < 40","drone.light_percent() > 50","for _ in range(3):","if","else:"]};
 return {compile:compile,CMDS:CMDS,ACTS:ACTS};
@@ -3128,11 +3753,13 @@ renderTeacher();
 (function(){
  var inp=$("pyIn");if(!inp||typeof PyX==="undefined")return;
  function lv(){return C.LEVELS[C.st.lvl];}
- function kind(){var l=lv();return l.drone?"drone":l.arm?"arm":"wheeled";}
- var COND={wheeled:'bot.distance("front") < 30',arm:'arm.cube_colour() == "red"',drone:'drone.altitude() < 100'};
+ function kind(){var l=lv();return l.station?"station":l.drone?"drone":l.arm?"arm":"wheeled";}
+ var COND={wheeled:'bot.distance("front") < 30',arm:'arm.cube_colour() == "red"',drone:'drone.altitude() < 100',station:'mission.sense("x")'};
+ function scnCmds(){var m=C.scnMeta&&C.scnMeta();if(!m)return [];var o=[];m.actions.forEach(function(a){o.push('mission.do("'+a.id+'"'+(a.p?", "+a.p.def:"")+")");});m.sensors.forEach(function(s){o.push(s.type==="bool"?'mission.sense("'+s.id+'")':s.type==="enum"?'mission.sense("'+s.id+'") == "'+s.opts[0]+'"':'mission.sense("'+s.id+'") '+(s.gt?">":"<")+" 30");});return o;}
+ function condFor(){var m=C.scnMeta&&C.scnMeta();if(m&&m.station&&m.sensors.length){var s=m.sensors[0];return s.type==="bool"?'mission.sense("'+s.id+'")':s.type==="enum"?'mission.sense("'+s.id+'") == "'+s.opts[0]+'"':'mission.sense("'+s.id+'") '+(s.gt?">":"<")+" 30";}return COND[kind()];}
  function key(){return "mm_py_"+lv().id;}
  var curLvl=-1;
- function chips(){var box=$("pyChips");box.innerHTML="";PyX.CMDS[kind()].forEach(function(c){var txt=c,label=c;if(c==="if"){txt="if "+COND[kind()]+":\n    ";label="if …:";}else if(c==="else:"){txt="else:\n    ";}else if(/^(for|while) /.test(c)){txt=c+"\n    ";}else if(/ < | > | == |^bot\.line|^belt\.box/.test(c)){txt="if "+c+":\n    ";label=c;}
+ function chips(){var box=$("pyChips");box.innerHTML="";PyX.CMDS[kind()].concat(scnCmds()).forEach(function(c){var txt=c,label=c;if(c==="if"){txt="if "+condFor()+":\n    ";label="if …:";}else if(c==="else:"){txt="else:\n    ";}else if(/^(for|while) /.test(c)){txt=c+"\n    ";}else if(/ < | > | == |^bot\.line|^belt\.box|^mission\.sense/.test(c)){txt="if "+c+":\n    ";label=c;}
   var b=document.createElement("button");b.textContent=label;b.onclick=function(){ins(txt);};box.appendChild(b);});}
  function ins(txt){var v=inp.value,p=inp.selectionStart||v.length,ls=v.lastIndexOf("\n",p-1)+1,line=v.slice(ls,p),ind=/^ */.exec(line)[0],pre="";
   if(line.trim()){pre="\n"+ind;}else{pre=""; }
@@ -3149,7 +3776,7 @@ renderTeacher();
  function mode(py){mode3(py?"py":"blocks");}
  $("modeAsk").onclick=function(){mode3("ask");};
  $("modePy").onclick=function(){mode(true);};$("modeBlocks").onclick=function(){mode(false);};
- var PYGLUE="import ast, sys, json, traceback\nimport js\nfrom pyodide.ffi import to_js, JsException\n\nimport contextvars\nclass RobotStopped(BaseException):\n    pass\n\n_GEN = contextvars.ContextVar('gen', default=0)\n_cur = [0]\n\ndef _stale():\n    if _GEN.get() != _cur[0]:\n        raise RobotStopped('A newer run replaced this one.')\n\ndef _clean(e):\n    m = str(e)\n    for p in (\"Error: \", \"JsException: \"):\n        if m.startswith(p):\n            m = m[len(p):]\n    return m.strip()\n\nasync def _do(b):\n    _stale()\n    try:\n        await js.MM_live.do(to_js(b, dict_converter=js.Object.fromEntries))\n    except JsException as e:\n        raise RobotStopped(_clean(e))\n\ndef _sense(name, arg=None):\n    try:\n        return js.MM_live.sense(name, arg)\n    except JsException as e:\n        raise RuntimeError(_clean(e)) from None\n\ndef _num(x, what):\n    if isinstance(x, bool) or not isinstance(x, (int, float)):\n        raise TypeError(what + \" needs a number, like \" + what + \"(50)\")\n    return x\n\n_lc_n = 0\ndef _lc():\n    global _lc_n\n    _lc_n += 1\n    return _lc_n % 400 == 0\n\nasync def _yield():\n    _stale()\n    try:\n        await js.MM_live.tick()\n    except JsException as e:\n        raise RobotStopped(_clean(e))\n\nasync def _sleep(sec):\n    await _do({\"t\": \"wait\", \"v\": _num(sec, \"sleep\")})\n\nclass _Bot:\n    async def forward(self, cm): await _do({\"t\": \"fwd\", \"v\": _num(cm, \"forward\")})\n    async def backward(self, cm): await _do({\"t\": \"back\", \"v\": _num(cm, \"backward\")})\n    async def turn_left(self, deg): await _do({\"t\": \"left\", \"v\": _num(deg, \"turn_left\")})\n    async def turn_right(self, deg): await _do({\"t\": \"right\", \"v\": _num(deg, \"turn_right\")})\n    async def pump(self, sec=1.2): await _do({\"t\": \"water\"})\n    async def gripper_close(self): await _do({\"t\": \"gripc\"})\n    async def gripper_open(self): await _do({\"t\": \"gripo\"})\n    async def beep(self, sec=0.3): await _do({\"t\": \"beep\"})\n    async def stop(self): await _do({\"t\": \"stop\"})\n    async def relay(self, on): await _do({\"t\": \"fanon\" if on else \"fanoff\"})\n    async def led(self, colour): await _do({\"t\": \"led\", \"q\": str(colour)})\n    async def lcd(self, text): await _do({\"t\": \"print\", \"q\": str(text)})\n    def distance(self, side=\"front\"): return _sense(\"distance\", side)\n    def line(self, side): return _sense(\"line\", side)\n    def soil_percent(self): return _sense(\"soil\")\n    def light_percent(self): return _sense(\"light\")\n    def temperature_c(self): return _sense(\"temperature\")\n    def humidity_percent(self): return _sense(\"humidity\")\n    def heading_deg(self): return _sense(\"heading\")\n    def distance_travelled_cm(self): return _sense(\"odo\")\n    def bumper_pressed(self): return _sense(\"bump\")\n    def camera_sees_object(self): return _sense(\"cam\")\n    def color(self): return _sense(\"color\")\n    def begin(self, *a, **k): pass\n\nclass _Arm:\n    async def base(self, deg): await _do({\"t\": \"armb\", \"v\": _num(deg, \"base\")})\n    async def shoulder(self, deg): await _do({\"t\": \"arms\", \"v\": _num(deg, \"shoulder\")})\n    async def elbow(self, deg): await _do({\"t\": \"arme\", \"v\": _num(deg, \"elbow\")})\n    def cube_colour(self): return _sense(\"cube\")\n\nclass _Drone:\n    async def takeoff(self): await _do({\"t\": \"takeoff\"})\n    async def land(self): await _do({\"t\": \"land\"})\n    async def up(self, cm): await _do({\"t\": \"up\", \"v\": _num(cm, \"up\")})\n    async def down(self, cm): await _do({\"t\": \"down\", \"v\": _num(cm, \"down\")})\n    async def forward(self, cm): await _do({\"t\": \"fwd\", \"v\": _num(cm, \"forward\")})\n    async def turn_left(self, deg): await _do({\"t\": \"left\", \"v\": _num(deg, \"turn_left\")})\n    async def turn_right(self, deg): await _do({\"t\": \"right\", \"v\": _num(deg, \"turn_right\")})\n    def altitude(self): return _sense(\"alt\")\n    def front_cm(self): return _sense(\"dfront\")\n    def battery(self): return _sense(\"bat\")\n    def light_percent(self): return _sense(\"dlight\")\n\nclass _Belt:\n    async def run_until_box(self): await _do({\"t\": \"beltgo\"})\n    async def stop(self): await _do({\"t\": \"beltoff\"})\n    def box_at_pick_spot(self): return _sense(\"box\")\n\nbot = _Bot(); arm = _Arm(); drone = _Drone(); belt = _Belt()\nbot.forward_drone = drone.forward\nsys.modules[\"milestonebot\"] = bot\n\nROOTS = {\"bot\": {\"forward\",\"backward\",\"turn_left\",\"turn_right\",\"pump\",\"gripper_close\",\"gripper_open\",\"beep\",\"stop\",\"relay\",\"led\",\"lcd\"},\n         \"arm\": {\"base\",\"shoulder\",\"elbow\"},\n         \"drone\": {\"takeoff\",\"land\",\"up\",\"down\",\"forward\",\"turn_left\",\"turn_right\"},\n         \"belt\": {\"run_until_box\",\"stop\"},\n         \"time\": {\"sleep\"}}\n\ndef _is_action(call, aliases, asyncnames):\n    f = call.func\n    if isinstance(f, ast.Attribute) and isinstance(f.value, ast.Name):\n        root = aliases.get(f.value.id, f.value.id)\n        if root in ROOTS and f.attr in ROOTS[root]:\n            return True\n    if isinstance(f, ast.Name) and f.id in asyncnames:\n        return True\n    if isinstance(f, ast.Attribute) and f.attr in asyncnames and not (isinstance(f.value, ast.Name) and f.value.id in ROOTS):\n        return True\n    return False\n\ndef _prepare(src):\n    tree = ast.parse(src, \"<robot>\")\n    aliases = {\"bot\": \"bot\", \"arm\": \"arm\", \"drone\": \"drone\", \"belt\": \"belt\", \"time\": \"time\"}\n    extra_sleep = set()\n    body = []\n    for node in tree.body:\n        if isinstance(node, ast.ImportFrom) and node.module == \"time\":\n            for a in node.names:\n                if a.name == \"sleep\":\n                    extra_sleep.add(a.asname or \"sleep\")\n            continue\n        if isinstance(node, ast.Import):\n            keep = []\n            for a in node.names:\n                if a.name == \"milestonebot\" and a.asname:\n                    aliases[a.asname] = \"bot\"\n                if a.name == \"time\" and a.asname:\n                    aliases[a.asname] = \"time\"\n                keep.append(a)\n        body.append(node)\n    tree.body = body\n    defs = {}\n    for n in ast.walk(tree):\n        if isinstance(n, ast.FunctionDef) and not (n.name.startswith(\"__\") and n.name.endswith(\"__\")):\n            defs.setdefault(n.name, []).append(n)\n    asyncnames = set()\n    changed = True\n    while changed:\n        changed = False\n        for name, nodes in defs.items():\n            if name in asyncnames:\n                continue\n            for fn in nodes:\n                hit = False\n                for c in ast.walk(fn):\n                    if isinstance(c, ast.Call):\n                        f = c.func\n                        if isinstance(f, ast.Name) and f.id in extra_sleep:\n                            hit = True\n                        elif _is_action(c, aliases, asyncnames):\n                            hit = True\n                    if hit:\n                        break\n                if hit:\n                    asyncnames.add(name)\n                    changed = True\n                    break\n\n    class T(ast.NodeTransformer):\n        def visit_Call(self, node):\n            self.generic_visit(node)\n            f = node.func\n            if isinstance(f, ast.Name) and f.id in extra_sleep:\n                node = ast.Call(func=ast.Name(id=\"_sleep\", ctx=ast.Load()), args=node.args, keywords=node.keywords)\n                return ast.copy_location(ast.Await(value=node), node)\n            if isinstance(f, ast.Attribute) and isinstance(f.value, ast.Name) and aliases.get(f.value.id) == \"time\" and f.attr == \"sleep\":\n                node = ast.Call(func=ast.Name(id=\"_sleep\", ctx=ast.Load()), args=node.args, keywords=node.keywords)\n                return ast.copy_location(ast.Await(value=node), node)\n            if _is_action(node, aliases, asyncnames):\n                return ast.copy_location(ast.Await(value=node), node)\n            return node\n        def visit_FunctionDef(self, node):\n            self.generic_visit(node)\n            if node.name in asyncnames:\n                new = ast.AsyncFunctionDef(name=node.name, args=node.args, body=node.body, decorator_list=node.decorator_list, returns=node.returns, type_comment=None)\n                return ast.copy_location(new, node)\n            return node\n        def _loop(self, node):\n            self.generic_visit(node)\n            guard = ast.If(test=ast.Call(func=ast.Name(id=\"_lc\", ctx=ast.Load()), args=[], keywords=[]),\n                           body=[ast.Expr(value=ast.Await(value=ast.Call(func=ast.Name(id=\"_yield\", ctx=ast.Load()), args=[], keywords=[])))], orelse=[])\n            node.body = [ast.copy_location(guard, node)] + node.body\n            return node\n        visit_While = _loop\n        visit_For = _loop\n    tree = T().visit(tree)\n    ast.fix_missing_locations(tree)\n    return tree\n\nasync def _run(src, gen=0):\n    _cur[0] = gen\n    _GEN.set(gen)\n    out = {\"ok\": True}\n    g = {\"__name__\": \"__main__\", \"bot\": bot, \"arm\": arm, \"drone\": drone, \"belt\": belt, \"_sleep\": _sleep, \"sleep\": _sleep, \"_lc\": _lc, \"_yield\": _yield}\n    try:\n        tree = _prepare(src)\n        code = compile(tree, \"<robot>\", \"exec\", flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)\n        r = eval(code, g)\n        if r is not None and hasattr(r, \"__await__\"):\n            await r\n    except RobotStopped as e:\n        out = {\"ok\": False, \"stopped\": True, \"msg\": str(e)}\n    except SystemExit:\n        pass\n    except SyntaxError as e:\n        out = {\"ok\": False, \"line\": e.lineno or 0, \"msg\": \"Syntax problem: \" + (e.msg or \"check this line\")}\n    except BaseException as e:\n        line = 0\n        for fr in traceback.extract_tb(e.__traceback__):\n            if fr.filename == \"<robot>\":\n                line = fr.lineno\n        msg = type(e).__name__ + \": \" + str(e)\n        if isinstance(e, SyntaxError):\n            msg = \"Syntax problem\"\n        out = {\"ok\": False, \"line\": line, \"msg\": msg}\n    return json.dumps(out)\n",pyo=null,pyLoading=false,PYVER="0.26.4",PYBASE="https://cdn.jsdelivr.net/pyodide/v"+PYVER+"/full/";
+ var PYGLUE="import ast, sys, json, traceback\nimport js\nfrom pyodide.ffi import to_js, JsException\n\nimport contextvars\nclass RobotStopped(BaseException):\n    pass\n\n_GEN = contextvars.ContextVar('gen', default=0)\n_cur = [0]\n\ndef _stale():\n    if _GEN.get() != _cur[0]:\n        raise RobotStopped('A newer run replaced this one.')\n\ndef _clean(e):\n    m = str(e)\n    for p in (\"Error: \", \"JsException: \"):\n        if m.startswith(p):\n            m = m[len(p):]\n    return m.strip()\n\nasync def _do(b):\n    _stale()\n    try:\n        await js.MM_live.do(to_js(b, dict_converter=js.Object.fromEntries))\n    except JsException as e:\n        raise RobotStopped(_clean(e))\n\ndef _sense(name, arg=None):\n    try:\n        return js.MM_live.sense(name, arg)\n    except JsException as e:\n        raise RuntimeError(_clean(e)) from None\n\ndef _num(x, what):\n    if isinstance(x, bool) or not isinstance(x, (int, float)):\n        raise TypeError(what + \" needs a number, like \" + what + \"(50)\")\n    return x\n\n_lc_n = 0\ndef _lc():\n    global _lc_n\n    _lc_n += 1\n    return _lc_n % 400 == 0\n\nasync def _yield():\n    _stale()\n    try:\n        await js.MM_live.tick()\n    except JsException as e:\n        raise RobotStopped(_clean(e))\n\nasync def _sleep(sec):\n    await _do({\"t\": \"wait\", \"v\": _num(sec, \"sleep\")})\n\nclass _Bot:\n    async def forward(self, cm): await _do({\"t\": \"fwd\", \"v\": _num(cm, \"forward\")})\n    async def backward(self, cm): await _do({\"t\": \"back\", \"v\": _num(cm, \"backward\")})\n    async def turn_left(self, deg): await _do({\"t\": \"left\", \"v\": _num(deg, \"turn_left\")})\n    async def turn_right(self, deg): await _do({\"t\": \"right\", \"v\": _num(deg, \"turn_right\")})\n    async def pump(self, sec=1.2): await _do({\"t\": \"water\"})\n    async def gripper_close(self): await _do({\"t\": \"gripc\"})\n    async def gripper_open(self): await _do({\"t\": \"gripo\"})\n    async def beep(self, sec=0.3): await _do({\"t\": \"beep\"})\n    async def stop(self): await _do({\"t\": \"stop\"})\n    async def relay(self, on): await _do({\"t\": \"fanon\" if on else \"fanoff\"})\n    async def led(self, colour): await _do({\"t\": \"led\", \"q\": str(colour)})\n    async def lcd(self, text): await _do({\"t\": \"print\", \"q\": str(text)})\n    def distance(self, side=\"front\"): return _sense(\"distance\", side)\n    def line(self, side): return _sense(\"line\", side)\n    def soil_percent(self): return _sense(\"soil\")\n    def light_percent(self): return _sense(\"light\")\n    def temperature_c(self): return _sense(\"temperature\")\n    def humidity_percent(self): return _sense(\"humidity\")\n    def heading_deg(self): return _sense(\"heading\")\n    def distance_travelled_cm(self): return _sense(\"odo\")\n    def bumper_pressed(self): return _sense(\"bump\")\n    def camera_sees_object(self): return _sense(\"cam\")\n    def color(self): return _sense(\"color\")\n    def begin(self, *a, **k): pass\n\nclass _Arm:\n    async def base(self, deg): await _do({\"t\": \"armb\", \"v\": _num(deg, \"base\")})\n    async def shoulder(self, deg): await _do({\"t\": \"arms\", \"v\": _num(deg, \"shoulder\")})\n    async def elbow(self, deg): await _do({\"t\": \"arme\", \"v\": _num(deg, \"elbow\")})\n    def cube_colour(self): return _sense(\"cube\")\n\nclass _Drone:\n    async def takeoff(self): await _do({\"t\": \"takeoff\"})\n    async def land(self): await _do({\"t\": \"land\"})\n    async def up(self, cm): await _do({\"t\": \"up\", \"v\": _num(cm, \"up\")})\n    async def down(self, cm): await _do({\"t\": \"down\", \"v\": _num(cm, \"down\")})\n    async def forward(self, cm): await _do({\"t\": \"fwd\", \"v\": _num(cm, \"forward\")})\n    async def turn_left(self, deg): await _do({\"t\": \"left\", \"v\": _num(deg, \"turn_left\")})\n    async def turn_right(self, deg): await _do({\"t\": \"right\", \"v\": _num(deg, \"turn_right\")})\n    def altitude(self): return _sense(\"alt\")\n    def front_cm(self): return _sense(\"dfront\")\n    def battery(self): return _sense(\"bat\")\n    def light_percent(self): return _sense(\"dlight\")\n\nclass _Belt:\n    async def run_until_box(self): await _do({\"t\": \"beltgo\"})\n    async def stop(self): await _do({\"t\": \"beltoff\"})\n    def box_at_pick_spot(self): return _sense(\"box\")\n\nclass _Mission:\n    async def do(self, name, value=None):\n        b = {\"t\": \"do\", \"q\": str(name)}\n        if value is not None: b[\"v\"] = _num(value, \"do\")\n        await _do(b)\n    def sense(self, name): return _sense(\"scn\", str(name))\n\nbot = _Bot(); arm = _Arm(); drone = _Drone(); belt = _Belt(); mission = _Mission()\nbot.forward_drone = drone.forward\nsys.modules[\"milestonebot\"] = bot\n\nROOTS = {\"bot\": {\"forward\",\"backward\",\"turn_left\",\"turn_right\",\"pump\",\"gripper_close\",\"gripper_open\",\"beep\",\"stop\",\"relay\",\"led\",\"lcd\"},\n         \"arm\": {\"base\",\"shoulder\",\"elbow\"},\n         \"drone\": {\"takeoff\",\"land\",\"up\",\"down\",\"forward\",\"turn_left\",\"turn_right\"},\n         \"belt\": {\"run_until_box\",\"stop\"},\n         \"time\": {\"sleep\"}}\n\ndef _is_action(call, aliases, asyncnames):\n    f = call.func\n    if isinstance(f, ast.Attribute) and isinstance(f.value, ast.Name):\n        root = aliases.get(f.value.id, f.value.id)\n        if root in ROOTS and f.attr in ROOTS[root]:\n            return True\n    if isinstance(f, ast.Name) and f.id in asyncnames:\n        return True\n    if isinstance(f, ast.Attribute) and f.attr in asyncnames and not (isinstance(f.value, ast.Name) and f.value.id in ROOTS):\n        return True\n    return False\n\ndef _prepare(src):\n    tree = ast.parse(src, \"<robot>\")\n    aliases = {\"bot\": \"bot\", \"arm\": \"arm\", \"drone\": \"drone\", \"belt\": \"belt\", \"time\": \"time\"}\n    extra_sleep = set()\n    body = []\n    for node in tree.body:\n        if isinstance(node, ast.ImportFrom) and node.module == \"time\":\n            for a in node.names:\n                if a.name == \"sleep\":\n                    extra_sleep.add(a.asname or \"sleep\")\n            continue\n        if isinstance(node, ast.Import):\n            keep = []\n            for a in node.names:\n                if a.name == \"milestonebot\" and a.asname:\n                    aliases[a.asname] = \"bot\"\n                if a.name == \"time\" and a.asname:\n                    aliases[a.asname] = \"time\"\n                keep.append(a)\n        body.append(node)\n    tree.body = body\n    defs = {}\n    for n in ast.walk(tree):\n        if isinstance(n, ast.FunctionDef) and not (n.name.startswith(\"__\") and n.name.endswith(\"__\")):\n            defs.setdefault(n.name, []).append(n)\n    asyncnames = set()\n    changed = True\n    while changed:\n        changed = False\n        for name, nodes in defs.items():\n            if name in asyncnames:\n                continue\n            for fn in nodes:\n                hit = False\n                for c in ast.walk(fn):\n                    if isinstance(c, ast.Call):\n                        f = c.func\n                        if isinstance(f, ast.Name) and f.id in extra_sleep:\n                            hit = True\n                        elif _is_action(c, aliases, asyncnames):\n                            hit = True\n                    if hit:\n                        break\n                if hit:\n                    asyncnames.add(name)\n                    changed = True\n                    break\n\n    class T(ast.NodeTransformer):\n        def visit_Call(self, node):\n            self.generic_visit(node)\n            f = node.func\n            if isinstance(f, ast.Name) and f.id in extra_sleep:\n                node = ast.Call(func=ast.Name(id=\"_sleep\", ctx=ast.Load()), args=node.args, keywords=node.keywords)\n                return ast.copy_location(ast.Await(value=node), node)\n            if isinstance(f, ast.Attribute) and isinstance(f.value, ast.Name) and aliases.get(f.value.id) == \"time\" and f.attr == \"sleep\":\n                node = ast.Call(func=ast.Name(id=\"_sleep\", ctx=ast.Load()), args=node.args, keywords=node.keywords)\n                return ast.copy_location(ast.Await(value=node), node)\n            if _is_action(node, aliases, asyncnames):\n                return ast.copy_location(ast.Await(value=node), node)\n            return node\n        def visit_FunctionDef(self, node):\n            self.generic_visit(node)\n            if node.name in asyncnames:\n                new = ast.AsyncFunctionDef(name=node.name, args=node.args, body=node.body, decorator_list=node.decorator_list, returns=node.returns, type_comment=None)\n                return ast.copy_location(new, node)\n            return node\n        def _loop(self, node):\n            self.generic_visit(node)\n            guard = ast.If(test=ast.Call(func=ast.Name(id=\"_lc\", ctx=ast.Load()), args=[], keywords=[]),\n                           body=[ast.Expr(value=ast.Await(value=ast.Call(func=ast.Name(id=\"_yield\", ctx=ast.Load()), args=[], keywords=[])))], orelse=[])\n            node.body = [ast.copy_location(guard, node)] + node.body\n            return node\n        visit_While = _loop\n        visit_For = _loop\n    tree = T().visit(tree)\n    ast.fix_missing_locations(tree)\n    return tree\n\nasync def _run(src, gen=0):\n    _cur[0] = gen\n    _GEN.set(gen)\n    out = {\"ok\": True}\n    g = {\"__name__\": \"__main__\", \"bot\": bot, \"arm\": arm, \"drone\": drone, \"belt\": belt, \"_sleep\": _sleep, \"sleep\": _sleep, \"_lc\": _lc, \"_yield\": _yield}\n    try:\n        tree = _prepare(src)\n        code = compile(tree, \"<robot>\", \"exec\", flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)\n        r = eval(code, g)\n        if r is not None and hasattr(r, \"__await__\"):\n            await r\n    except RobotStopped as e:\n        out = {\"ok\": False, \"stopped\": True, \"msg\": str(e)}\n    except SystemExit:\n        pass\n    except SyntaxError as e:\n        out = {\"ok\": False, \"line\": e.lineno or 0, \"msg\": \"Syntax problem: \" + (e.msg or \"check this line\")}\n    except BaseException as e:\n        line = 0\n        for fr in traceback.extract_tb(e.__traceback__):\n            if fr.filename == \"<robot>\":\n                line = fr.lineno\n        msg = type(e).__name__ + \": \" + str(e)\n        if isinstance(e, SyntaxError):\n            msg = \"Syntax problem\"\n        out = {\"ok\": False, \"line\": line, \"msg\": msg}\n    return json.dumps(out)\n",pyo=null,pyLoading=false,PYVER="0.26.4",PYBASE="https://cdn.jsdelivr.net/pyodide/v"+PYVER+"/full/";
  function out(t,clr){var o=$("pyOut");o.style.display="block";if(clr)o.textContent="";o.textContent+=t;o.scrollTop=o.scrollHeight;}
  window.MM_live={do:function(b){return C.liveDo(b);},sense:function(n,a){return C.sense(n,a);},tick:function(){return new Promise(function(res,rej){setTimeout(function(){C.liveAlive()?res():rej(new Error("The run was stopped."));},0);});}};
  function loadPy(){if(pyo)return Promise.resolve(pyo);return new Promise(function(res,rej){
