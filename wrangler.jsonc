@@ -1,5 +1,4 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
   "name": "coding-and-robotics-lab",
   "main": "worker/index.js",
   "compatibility_date": "2025-09-01",
@@ -7,5 +6,8 @@
     "directory": "./site",
     "binding": "ASSETS",
     "run_worker_first": ["/api/*"]
+  },
+  "vars": {
+    "GEMINI_MODEL": "gemini-3.5-flash-lite"
   }
 }
