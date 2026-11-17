@@ -3822,6 +3822,7 @@ renderClub();
  function say(t,cls){$("vibeMsg").textContent=t;$("vibeMsg").className="sub "+(cls||"");}
  function kind(){return window.MM_py.kind();}
  function allowed(){var k=kind();return PyX.ACTS.map(function(a){return a[0];}).filter(function(n){
+   if(k==="station")return n==="time.sleep";
    if(k==="wheeled")return /^(bot|time)\./.test(n)&&n!=="drone.forward";
    if(k==="arm")return /^(arm|belt|time)\./.test(n)||/^bot\.(gripper|beep|stop)/.test(n);
    return /^(drone|time)\./.test(n)||/^bot\.turn_/.test(n);});}
@@ -3830,7 +3831,7 @@ renderClub();
   "Current mission: "+plain(l.name+". "+l.mission)+"\nRobot type: "+k+"\n\n"+
   "STRICT RULES (the program is compiled by a small teaching compiler, so anything else fails):\n"+
   "- Only these commands, one per line: "+allowed().join(", ")+"\n"+
-  "- Command arguments must be plain numbers or a quoted string (no variables, no maths). Distances in cm, turns in degrees, sleep in seconds. bot.led(\"red\"), bot.beep(0.3), bot.pump(1.2) are allowed where listed.\n"+
+  scnPrompt()+"- Command arguments must be plain numbers or a quoted string (no variables, no maths). Distances in cm, turns in degrees, sleep in seconds. bot.led(\"red\"), bot.beep(0.3), bot.pump(1.2) are allowed where listed.\n"+
   "- Loops: `for _ in range(N):` with a number, or `while True:`\n"+
   "- Decisions: `if CONDITION:` / `elif CONDITION:` / `else:` using ONLY conditions like these: "+PyX.CMDS[k].filter(function(c){return / < | > | == |^bot\\.line|^belt\\.box/.test(c);}).join(" ; ")+"\n"+
   "  (distance sensors accept \"front\", \"left\" or \"right\"; line sensors \"left\" or \"right\")\n"+
@@ -3839,6 +3840,8 @@ renderClub();
   "- If the request is impossible for this robot, write the closest safe program and say so in the explanation.\n\n"+
   "Learner's request: \""+extra.req+"\"\n"+(extra.err?"\nYour previous program had these problems, fix them:\n"+extra.err+"\nPrevious program:\n"+extra.prev+"\n":"")+
   "\nReturn ONLY JSON: {\"python\": \"<the program, with \\n for new lines>\", \"explain\": \"<2-3 short sentences in Mila's friendly voice: what the robot will do and one idea they just used (like a loop or an if)>\"}";}
+ function scnPrompt(){var m=C.scnMeta&&C.scnMeta();if(!m)return "";var s="- Mission commands (use exactly these names): "+m.actions.map(function(a){return 'mission.do("'+a.id+'"'+(a.p?", NUMBER":"")+")  # "+a.label;}).join(" ; ")+"\n";
+  s+="- Mission sensor conditions (only these forms): "+m.sensors.map(function(x){return x.type==="bool"?'mission.sense("'+x.id+'")':x.type==="enum"?'mission.sense("'+x.id+'") == "'+x.opts[0]+'" (options: '+x.opts.join("/")+")":'mission.sense("'+x.id+'") '+(x.gt?">":"<")+" NUMBER";}).join(" ; ")+"\n";return s;}
  function errText(r){return r.errors.slice(0,4).map(function(e){return "Line "+e.line+": "+e.msg;}).join("\n");}
  function show(py,exp,r){last={py:py,prog:r.prog};window.MM.setProg(r.prog);window.MM_py.setCode(py);
   $("vibeRes").style.display="block";$("vibeExp").textContent="🤖 Mila: "+exp;$("vibeCode").textContent=py;
@@ -3867,7 +3870,9 @@ renderClub();
   function localFallback(why){var py=offline(req);
    if(py){var r=PyX.compile(py);if(!r.errors.length){show(py,"I could not reach my AI brain ("+why+"), so I wrote this from simple keywords. Try short steps like 'forward 50, turn right 90'.",r);return done();}}
    $("vibeRes").style.display="none";say("Mila's AI is not available here ("+why+"). Try short steps like “forward 50, turn right 90, beep”.","err");done();}
-  USE("sample").then(function(sample){
+  function proxySample(){return {json:function(p){return fetch("/api/mila",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({prompt:p})}).then(function(r){return r.json().catch(function(){return {};}).then(function(j){if(!r.ok||j.error){var er=new Error(j.error||("Mila server error "+r.status));er.code=r.status===429?"rate_limited":"proxy";throw er;}return j;});});}};}
+  function getSample(){return USE("sample").then(function(s){if(s)return s;return /^https?:$/.test(location.protocol)?proxySample():null;});}
+  getSample().then(function(sample){
    if(!sample)return localFallback("AI is not enabled in this view");
    function go(extra){
     sample.json(prompt(extra),{modelTier:"default",cache:false}).then(function(v){
