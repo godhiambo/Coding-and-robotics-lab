@@ -581,6 +581,19 @@ function sense(name,arg){switch(name){
  throw new Error("Unknown sensor "+name);}
 
 // ---- Manual driving (joystick / keyboard / tilt) ----
+function* droneManualGen(){while(true){var dt=st.dt,d=st.drone,m=st.man||{f:0,w:0,u:0},g=L().gate;
+ if(m.u>0.05&&!d.flying)d.flying=true;
+ if(d.flying){var nz=d.z+m.u*DR.VZ*dt;if(nz>DR.MAXZ)droneCrash("The drone flew too high and lost signal. The limit is "+DR.MAXZ+" cm.");
+  if(nz<=0.05&&m.u<0){d.z=0;d.flying=false;finish(true,"★ Landed safely! (Practice flight: build a program to earn stars.)");return;}
+  d.z=Math.max(0,nz);d.maxZ=Math.max(d.maxZ,d.z);
+  st.robot.a=((st.robot.a+m.w*DR.YAW*dt)%360+360)%360;
+  var step=m.f*DR.VH*dt;
+  if(Math.abs(step)>1e-4){var a=st.robot.a*Math.PI/180,nx=st.robot.x+Math.cos(a)*step,ny=st.robot.y+Math.sin(a)*step;
+   if(g){var gx=g[0],cross=(st.robot.x<gx&&nx>=gx)||(st.robot.x>gx&&nx<=gx);if(cross){var ok=Math.abs(ny-g[1])<=g[2]/2-DR.R*0.7&&d.z>=g[3]+4&&d.z<=g[4]-4;if(ok)d.gate=true;else droneCrash("The drone hit the gate frame. Line up with the opening and fly at the right height.");}}
+   if(droneHitsWall(nx,ny,d.z))droneCrash("The drone crashed into the wall. Climb higher before flying over it.");
+   st.robot.x=nx;st.robot.y=ny;}
+ }
+ yield;}}
 function* manualGen(){while(true){var dt=st.dt,vmx=CH().vmax,acc=CH().acc,sc=vmx/40,wmx=WMAX*sc,wac=WACC*sc,m=st.man||{f:0,w:0};
  st.v+=clamp(m.f*vmx-st.v,-acc*2*dt,acc*dt);st.w+=clamp(m.w*wmx-st.w,-wac*2*dt,wac*dt);
  st.robot.a=((st.robot.a+st.w*dt)%360+360)%360;
@@ -590,10 +603,10 @@ function* manualGen(){while(true){var dt=st.dt,vmx=CH().vmax,acc=CH().acc,sc=vmx
  if(st.touching>0)st.touching-=dt;
  if(L().goal&&inGoal()){finish(true,"★ You drove to the goal by hand! (Practice run: build a program to earn stars.)");}
  yield;}}
-function startManual(){if(L().drone||L().arm){st.msg="Hand driving works on wheeled missions.";return false;}
+function startManual(){if(L().arm){st.msg="Use the joystick in the Teach pendant for the arm.";return false;}
  var v=validate();if(!v.ok){st.status="lose";st.msg="Robot not ready: "+v.errors[0];return false;}
- reset();st.man={f:0,w:0};st.gen=manualGen();st.status="run";return true;}
-function manual(f,w){st.man={f:Math.max(-1,Math.min(1,+f||0)),w:Math.max(-1,Math.min(1,+w||0))};}
+ reset();if(L().drone){st.man={f:0,w:0,u:0};st.gen=droneManualGen();}else{st.man={f:0,w:0};st.gen=manualGen();}st.status="run";return true;}
+function manual(f,w,u){var cl=function(v){return Math.max(-1,Math.min(1,+v||0));};st.man={f:cl(f),w:cl(w),u:cl(u)};}
 function start(prog){
  var v=validate();if(!v.ok){st.status="lose";st.msg="Robot not ready: "+v.errors[0];return false;}
  reset();st.gen=main(prog);st.status="run";return true;

@@ -272,12 +272,12 @@ renderClub();
   if(e.key===" "||e.code==="Space"){e.preventDefault();$("run").click();}else if(e.key==="Escape"&&C.st.status==="run"){$("run").click();}});
  // hand driving
  var man=$("manCard");if(!man)return;
- var f=0,w=0,keys={},joy={x:0,y:0},tilt={f:0,w:0},gp={f:0,w:0},tiltOn=false,base=null,driving=false;
+ var f=0,w=0,alt=0,keys={},joy={x:0,y:0},tilt={f:0,w:0},gp={f:0,w:0,u:0},tiltOn=false,base=null,driving=false;
  function push(){var kf=(keys.up?1:0)-(keys.down?1:0),kw=(keys.right?1:0)-(keys.left?1:0);
-  var ff=kf||(-joy.y)||tilt.f||gp.f,ww=kw||joy.x||tilt.w||gp.w;if(driving&&C.st.status==="run")C.manual(ff,ww);}
+  var ff=kf||(-joy.y)||tilt.f||gp.f,ww=kw||joy.x||tilt.w||gp.w;var uu=((keys.up2?1:0)-(keys.down2?1:0))||alt||gp.u;if(driving&&C.st.status==="run")C.manual(ff,ww,uu);}
  function say(t,c){$("manMsg").textContent=t;$("manMsg").className="sub "+(c||"");}
  $("manGo").onclick=function(){if(window.MM.startManual()){driving=true;say("Driving. Use the stick, arrow keys / WASD, or tilt.","ok");}else{driving=false;say(C.st.msg||"Cannot drive here.","err");}};
- var K={ArrowUp:"up",w:"up",W:"up",ArrowDown:"down",s:"down",S:"down",ArrowLeft:"left",a:"left",A:"left",ArrowRight:"right",d:"right",D:"right"};
+ var K={ArrowUp:"up",w:"up",W:"up",ArrowDown:"down",s:"down",S:"down",ArrowLeft:"left",a:"left",A:"left",ArrowRight:"right",d:"right",D:"right",e:"up2",E:"up2",PageUp:"up2",q:"down2",Q:"down2",PageDown:"down2"};
  document.addEventListener("keydown",function(e){var k=K[e.key];if(!k||!driving)return;var t=e.target&&e.target.tagName;if(t==="INPUT"||t==="TEXTAREA"||t==="SELECT")return;keys[k]=true;e.preventDefault();push();});
  document.addEventListener("keyup",function(e){var k=K[e.key];if(!k)return;keys[k]=false;push();});
 
@@ -288,9 +288,9 @@ renderClub();
   function dz(v){return Math.abs(v)<0.15?0:v;}
   var x=dz(p.axes[0]||0),y=dz(p.axes[1]||0);if(p.buttons[12]&&p.buttons[12].pressed)y=-1;if(p.buttons[13]&&p.buttons[13].pressed)y=1;if(p.buttons[14]&&p.buttons[14].pressed)x=-1;if(p.buttons[15]&&p.buttons[15].pressed)x=1;
   var a=p.buttons[0]&&p.buttons[0].pressed;if(a&&!gpLast){if(C.st.status==="run"){$("run").click();}else{$("manGo").click();}}gpLast=!!a;
-  gp.f=-y;gp.w=x;push();}
+  gp.f=-y;gp.w=x;gp.u=-dz(p.axes[3]||0);push();}
  window.addEventListener("gamepadconnected",function(e){say("Controller connected: "+e.gamepad.id.slice(0,40)+". Stick to drive, A button to start/stop.","ok");if(!gpTimer)gpTimer=setInterval(gpPoll,50);});
- window.addEventListener("gamepaddisconnected",function(){gp.f=gp.w=0;push();});
+ window.addEventListener("gamepaddisconnected",function(){gp.f=gp.w=gp.u=0;push();});
  // joystick
  var J=$("joy"),KN=$("joyK"),act=false;
  function jm(e){var r=J.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,dx=(e.clientX-cx)/(r.width/2),dy=(e.clientY-cy)/(r.height/2),m=Math.hypot(dx,dy);if(m>1){dx/=m;dy/=m;}
@@ -298,6 +298,8 @@ renderClub();
  function jr(){act=false;joy.x=joy.y=0;KN.style.left="55px";KN.style.top="55px";push();}
  J.addEventListener("pointerdown",function(e){act=true;try{J.setPointerCapture(e.pointerId);}catch(x){}if(!driving)$("manGo").click();jm(e);});
  J.addEventListener("pointermove",function(e){if(act)jm(e);});J.addEventListener("pointerup",jr);J.addEventListener("pointercancel",jr);
+ // altitude buttons (drone)
+ [["altUp",1],["altDn",-1]].forEach(function(q){var b=$(q[0]);if(!b)return;b.addEventListener("pointerdown",function(ev){ev.preventDefault();alt=q[1];if(!driving)$("manGo").click();push();});["pointerup","pointercancel","pointerleave"].forEach(function(n){b.addEventListener(n,function(){alt=0;push();});});});
  // tilt
  function onOri(e){if(e.beta==null)return;if(!base)base={b:e.beta,g:e.gamma||0};var g=(e.gamma||0)-base.g,b=e.beta-base.b;
   tilt.w=Math.abs(g)<6?0:Math.max(-1,Math.min(1,g/30));tilt.f=Math.abs(b)<6?0:Math.max(-1,Math.min(1,-b/30));push();}
@@ -308,7 +310,7 @@ renderClub();
   if(typeof DeviceOrientationEvent.requestPermission==="function"){DeviceOrientationEvent.requestPermission().then(function(r){if(r==="granted")tiltStart();else say("Tilt permission was not given.","err");}).catch(function(){say("Tilt is not available here.","err");});}
   else{var got=false;function probe(e){if(e.beta!=null)got=true;}window.addEventListener("deviceorientation",probe);setTimeout(function(){window.removeEventListener("deviceorientation",probe);if(got)tiltStart();else say("No tilt data from this device (laptops usually have none). Use the stick or arrow keys.","err");},600);}};
  // hide on drone/arm missions; stop driving when run ends
- setInterval(function(){var l=C.LEVELS[C.st.lvl];man.style.display=(l.drone||l.arm)?"none":"";if(C.st.status!=="run"&&driving){driving=false;if(tiltOn)tiltStop();}},400);
+ setInterval(function(){var l=C.LEVELS[C.st.lvl];man.style.display=l.arm?"none":"";var ar=$("altRow");if(ar)ar.style.display=l.drone?"":"none";if(C.st.status!=="run"&&driving){driving=false;if(tiltOn)tiltStop();}},400);
  // camera light sensor
  var stream=null,vid=null,cv=document.createElement("canvas"),tm=null;cv.width=16;cv.height=12;
  function cm(t,c){$("camMsg").textContent=t;$("camMsg").className="sub "+(c||"");}
