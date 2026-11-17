@@ -272,9 +272,9 @@ renderClub();
   if(e.key===" "||e.code==="Space"){e.preventDefault();$("run").click();}else if(e.key==="Escape"&&C.st.status==="run"){$("run").click();}});
  // hand driving
  var man=$("manCard");if(!man)return;
- var f=0,w=0,alt=0,keys={},joy={x:0,y:0},tilt={f:0,w:0},gp={f:0,w:0,u:0},tiltOn=false,base=null,driving=false;
+ var cmd={f:0,w:0,u:0},f=0,w=0,alt=0,keys={},joy={x:0,y:0},tilt={f:0,w:0},gp={f:0,w:0,u:0},tiltOn=false,base=null,driving=false;
  function push(){var kf=(keys.up?1:0)-(keys.down?1:0),kw=(keys.right?1:0)-(keys.left?1:0);
-  var ff=kf||(-joy.y)||tilt.f||gp.f,ww=kw||joy.x||tilt.w||gp.w;var uu=((keys.up2?1:0)-(keys.down2?1:0))||alt||gp.u;if(driving&&C.st.status==="run")C.manual(ff,ww,uu);}
+  var ff=kf||(-joy.y)||tilt.f||gp.f,ww=kw||joy.x||tilt.w||gp.w;var uu=((keys.up2?1:0)-(keys.down2?1:0))||alt||gp.u;cmd={f:ff,w:ww,u:uu};if(driving&&C.st.status==="run")C.manual(ff,ww,uu);}
  function say(t,c){$("manMsg").textContent=t;$("manMsg").className="sub "+(c||"");}
  $("manGo").onclick=function(){if(window.MM.startManual()){driving=true;say("Driving. Use the stick, arrow keys / WASD, or tilt.","ok");}else{driving=false;say(C.st.msg||"Cannot drive here.","err");}};
  var K={ArrowUp:"up",w:"up",W:"up",ArrowDown:"down",s:"down",S:"down",ArrowLeft:"left",a:"left",A:"left",ArrowRight:"right",d:"right",D:"right",e:"up2",E:"up2",PageUp:"up2",q:"down2",Q:"down2",PageDown:"down2"};
@@ -301,6 +301,28 @@ renderClub();
  // altitude buttons (drone)
  [["altUp",1],["altDn",-1]].forEach(function(q){var b=$(q[0]);if(!b)return;b.addEventListener("pointerdown",function(ev){ev.preventDefault();alt=q[1];if(!driving)$("manGo").click();push();});["pointerup","pointercancel","pointerleave"].forEach(function(n){b.addEventListener(n,function(){alt=0;push();});});});
  // tilt
+
+ // record hand driving as blocks
+ (function(){var rec=false,seg=null,last=null,zRec=0,wasFly=false,btn=$("manRec");if(!btn)return;
+  function sg(v){return Math.abs(v)<0.3?0:(v>0?1:-1);}
+  function add(b){var p=window.MM.prog();p.push(b);}
+  function flush(){if(!seg)return;var s=seg;seg=null;var d=C.LEVELS[C.st.lvl].drone,out=false,r=Math.round;
+   if(Math.abs(s.da)>=3){add({t:s.da>0?"right":"left",v:r(Math.abs(s.da))});out=true;}
+   if(Math.abs(s.dd)>=3){add({t:s.dd>0?"fwd":"back",v:r(Math.abs(s.dd))});out=true;}
+   if(d){var dz=C.st.drone.z-zRec;if(Math.abs(dz)>=3){add({t:dz>0?"up":"down",v:r(Math.abs(dz))});zRec=C.st.drone.z;out=true;}}
+   if(out)window.MM.setProg(window.MM.prog());}
+  btn.onclick=function(){rec=!rec;btn.classList.toggle("on",rec);btn.textContent=rec?"⏹ Stop recording":"⏺ Record my moves as blocks";if(rec){seg=null;last=null;wasFly=false;zRec=0;say("Recording: drive, and your moves are added to the program.","ok");}else{flush();say("Recording stopped. Press Run to replay it.","ok");}};
+  setInterval(function(){if(!rec)return;var s=C.st,drn=C.LEVELS[s.lvl].drone;
+   if(!driving||s.status!=="run"){if(seg||last){flush();if(drn&&wasFly){add({t:"land",v:0});window.MM.setProg(window.MM.prog());}last=null;wasFly=false;}return;}
+   var cur={x:s.robot.x,y:s.robot.y,a:s.robot.a};
+   if(drn&&s.drone.flying&&!wasFly){flush();add({t:"takeoff",v:0});window.MM.setProg(window.MM.prog());wasFly=true;zRec=60;}
+   if(drn&&!s.drone.flying&&wasFly){flush();add({t:"land",v:0});window.MM.setProg(window.MM.prog());wasFly=false;}
+   if(last){var ar=cur.a*Math.PI/180,dd=(cur.x-last.x)*Math.cos(ar)+(cur.y-last.y)*Math.sin(ar),da=((cur.a-last.a+540)%360)-180;
+    var key=sg(cmd.f)+","+sg(cmd.w)+","+(drn?sg(cmd.u):0);
+    if(!seg||seg.key!==key){flush();seg={key:key,dd:0,da:0};}
+    seg.dd+=dd;seg.da+=da;}
+   last=cur;},40);
+ })();
  function onOri(e){if(e.beta==null)return;if(!base)base={b:e.beta,g:e.gamma||0};var g=(e.gamma||0)-base.g,b=e.beta-base.b;
   tilt.w=Math.abs(g)<6?0:Math.max(-1,Math.min(1,g/30));tilt.f=Math.abs(b)<6?0:Math.max(-1,Math.min(1,-b/30));push();}
  function tiltStart(){window.addEventListener("deviceorientation",onOri);tiltOn=true;base=null;$("manTilt").textContent="📱 Tilt: on";say("Hold the phone like a steering board. The position now is neutral; tilt left/right to steer, forward/back to drive.","ok");if(!driving)$("manGo").click();}
