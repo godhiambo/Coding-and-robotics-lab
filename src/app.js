@@ -613,7 +613,7 @@ $("mHint").onclick=function(){var k=st.lvl,n=hintN[k]||0,r=Mila.hint(prog,C,n);h
 $("mExplain").onclick=function(){if(!prog.length){milaSay("tip","Your program is empty.",["Tap a block above to add your first step."]);return;}milaSay("ok","Here's what your robot will do, step by step:",null,Mila.explain(prog).join("\n"));};
 var WONK="mm_won",won={};try{won=JSON.parse(localStorage.getItem(WONK)||"{}");}catch(e){}
 function markWon(i){var id=LEVELS[i].id;if(id==="sandbox"||won[id])return;won[id]=true;try{localStorage.setItem(WONK,JSON.stringify(won));}catch(e){}paintLevels();}
-function paintLevels(){var n=0,tot=LEVELS.filter(function(l){return l.id!=="sandbox";}).length;
+function paintLevels(){window.applyTier&&window.applyTier();var n=0,tot=LEVELS.filter(function(l){return l.id!=="sandbox";}).length;
  [].forEach.call($("levels").children,function(c,k){var id=LEVELS[k].id,w=!!won[id];if(w)n++;c.className=(k===st.lvl?"on":"")+(w?" won":"");c.textContent=(w?"✓ ":"")+LEVELS[k].name;if(k===st.lvl&&c.scrollIntoView)try{$("picker").scrollTo({left:Math.max(0,c.offsetLeft-60),behavior:"smooth"});}catch(e){}});
  $("progtxt").textContent=n+" / "+tot;$("progbar").style.width=Math.round(100*n/tot)+"%";
  var l=LEVELS[st.lvl];$("mnum").textContent=l.id==="sandbox"?"Free lab":"Mission "+(st.lvl+1)+" of "+tot;}
@@ -666,7 +666,12 @@ function setLevel(i){try{$("nextM").style.display="none";}catch(e){}
  syncPendant();mfeed.innerHTML="";$("mission").innerHTML=LEVELS[i].mission;$("hint").innerHTML=LEVELS[i].hint;
  prog=[];selected=null;msg("");$("run").textContent="▶ Run";$("run").className="p";buildLevel();partsChanged();
 }
-LEVELS.forEach(function(l,i){var b=document.createElement("button");b.textContent=l.name;b.onclick=function(){setLevel(i);};$("levels").appendChild(b);});
+var TCOL={Beginner:"#22c55e",Intermediate:"#38bdf8",Advanced:"#f59e0b",Expert:"#ef4444",Open:"#a78bfa"},tierSel="All";
+LEVELS.forEach(function(l,i){var b=document.createElement("button");b.textContent=l.name;b.dataset.tier=l.tier||"Open";b.style.boxShadow="inset 0 -3px "+(TCOL[l.tier]||TCOL.Open);b.onclick=function(){setLevel(i);};$("levels").appendChild(b);});
+(function(){var bar=document.createElement("div");bar.id="tierBar";bar.style.cssText="display:flex;gap:6px;overflow-x:auto;padding:4px 2px;font-size:12px";
+ ["All","Beginner","Intermediate","Advanced","Expert"].forEach(function(t){var b=document.createElement("button");b.textContent=t;b.dataset.t=t;b.style.cssText="padding:4px 10px;border-radius:14px;white-space:nowrap;"+(t==="All"?"":"border-bottom:3px solid "+TCOL[t]);b.onclick=function(){tierSel=t;applyTier();};bar.appendChild(b);});
+ $("picker").parentNode.insertBefore(bar,$("picker"));
+ window.applyTier=function(){[].forEach.call($("levels").children,function(c,k){c.style.display=(tierSel==="All"||c.dataset.tier===tierSel||c.dataset.tier==="Open"||k===st.lvl)?"":"none";});[].forEach.call(bar.children,function(b){b.style.opacity=b.dataset.t===tierSel?"1":".6";b.style.fontWeight=b.dataset.t===tierSel?"700":"400";});};applyTier();})();
 [].forEach.call($("views").children,function(b){b.onclick=function(){setView(b.dataset.v);};});
 paintLevels();
 var cn=navigator.connection||{};var lowEnd=((navigator.hardwareConcurrency||4)<=4&&/Android/i.test(navigator.userAgent))||(navigator.deviceMemory&&navigator.deviceMemory<=2)||cn.saveData===true||/^(slow-2g|2g)$/.test(cn.effectiveType||"");

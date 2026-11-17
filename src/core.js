@@ -108,6 +108,31 @@ var LEVELS=[
  {id:"sandbox",name:"Free Lab",floor:"workshop",mission:"<b>Free lab.</b> Swap the controller, add any sensors, and watch the readings. Colour tiles, a shaded area, a hot zone, a soil plot and a cube are waiting.",hint:"Try: Raspberry Pi + MCP3008 for analog sensors, or add the colour sensor and see the pin limit.",start:{x:20,y:100,a:0},goal:null,walls:[[200,125,50,8]],tiles:[[30,25,40,35,"red"],[30,75,40,35,"green"],[30,125,40,35,"blue"]],shade:[[110,20,60,70]],hot:[[205,20,80,70,38]],plots:[[110,110,60,60]],cube:{x:270,y:160},kit:["pi4","adc","l298n","gear","bank","shifter","us@front","dht","soil","ldr","imu","led","lcd"]}
 ];
 if(typeof SCN!=="undefined"){var sbx=LEVELS.map(function(l){return l.id;}).indexOf("sandbox");SCN.levels.forEach(function(l,k){LEVELS.splice(sbx+k,0,l);});SCN.bind({st:function(){return st;},wait:function(s){return wait(s);},hitsWall:function(x,y){return hitsWall(x,y);},armTo:function(k,t){return armTo(k,t);}});}
+
+// ---- more missions: variants of the existing mechanics, then difficulty tiers ----
+(function(){
+ function sharp(){var p=[],x;for(x=25;x<=292;x+=3)p.push([x,100+42*Math.sin((x-25)/26)]);return p;}
+ function V(base,o){var b=LEVELS.filter(function(l){return l.id===base;})[0],n={};for(var k in b)n[k]=b[k];for(k in o)n[k]=o[k];n.kind=b.kind||b.id;return n;}
+ var NEW=[
+  V("drive",{id:"hop",name:"35 Short Hop",mission:"A quick warm-up: drive the robot into the <b>green zone</b>, only about 120 cm away.",hint:"Hint: one Forward block with a smaller number than mission 1.",goal:[135,80,45,40]}),
+  V("detour",{id:"twowalls",name:"36 Two Walls",mission:"Two walls block the way. Weave around both and reach the <b>green zone</b>.",hint:"Hint: go up past the first wall, come down past the second, then straight on. Plan the turns on paper first.",start:{x:20,y:100,a:0},goal:[258,150,34,40],walls:[[90,0,10,130],[185,70,10,130]]}),
+  V("sensor",{id:"stopnear",name:"37 Stop in time",mission:"Stop inside the <b>green zone</b> without touching the wall. The wall is closer this time.",hint:"Hint: Forever → If front distance &lt; 25 then Stop, else Forward 2.",goal:[150,70,36,60],walls:[[195,40,10,120]]}),
+  V("maze",{id:"avoider",name:"38 Obstacle Avoider",mission:"Several walls block the arena. Use your distance sensors to steer around them automatically and reach the <b>green zone</b>.",hint:"Hint: Forever → If front &lt; 20 then (turn towards the side with more space) else Forward 2.",start:{x:20,y:100,a:0},goal:[262,20,38,45],walls:[[80,0,10,140],[170,60,10,140]]}),
+  V("line",{id:"sharpline",name:"39 Sharp Curves",mission:"Follow the <b>tape</b> through the tight bends to the green zone. Your robot must react faster!",hint:"Hint: same line-following idea, but turn by bigger steps: Turn left 8 / Turn right 8.",track:sharp(),start:{x:25,y:100,a:0},goal:[262,95,36,36]}),
+  V("boda",{id:"schoolrun",name:"40 School Run",mission:"Deliver the learning materials through the <b>busy school corridor</b> to the green zone without touching anything.",hint:"Hint: three obstacles this time. A front distance check keeps you safe.",start:{x:20,y:100,a:0},goal:[255,20,40,45],walls:[[70,50,12,150],[140,0,12,140],[210,60,12,140]]}),
+  V("cargo",{id:"farshelf",name:"41 Far Shelf",mission:"Pick up the <b>wooden cube</b> and carry it a long way to the <b>green zone</b> at the far corner.",hint:"Hint: Forward → Grip close → Turn → Forward → Grip open. Measure each distance.",start:{x:25,y:170,a:0},cube:{x:90,y:170},goal:[240,15,55,60]}),
+  V("maze",{id:"mastermaze",name:"42 Maze Master",mission:"A long four-lane maze. Find the exits in each wall and reach the <b>green zone</b>.",hint:"Hint: Use the wall-following idea: keep a wall on one side and turn at gaps.",start:{x:15,y:20,a:0},goal:[262,165,34,30],walls:[[0,45,240,10],[60,100,240,10],[0,150,240,10]]}),
+  V("dronegate",{id:"slalom",name:"43 Drone: Tight gate",mission:"Fly <b>through the narrow gate</b> (opening 50 to 90 cm high) and land on the far pad.",hint:"Hint: Take off puts you at 60 cm, which fits. Don't climb before the gate.",gate:[130,100,60,50,90],pad:[262,100,24]}),
+  V("dronewall",{id:"tallwall",name:"44 Drone: Tall wall",mission:"A <b>110 cm wall</b> blocks the way. Climb high enough, cross it and land on the pad.",hint:"Hint: You need more than 115 cm. Take off gives 60, so Fly up about 70.",walls:[[135,0,12,200]],wallH:110}),
+  V("armpick",{id:"armfar",name:"45 Arm: Far reach",mission:"The cube is on the <b>far right</b> side. Reach it with the robot arm and drop it into the <b>bin</b> on the left.",hint:"Hint: stretch the shoulder and elbow to reach. Use the Teach pendant to find the angles.",cubes:[[215,130,"orange"]]})
+ ];
+ var sb=LEVELS.map(function(l){return l.id;}).indexOf("sandbox");NEW.forEach(function(l,k){LEVELS.splice(sb+k,0,l);});
+ var T={Beginner:["drive","detour","sensor","line","farm","hop","twowalls","stopnear"],
+  Intermediate:["maze","cargo","greenhouse","solar","boda","homeeyes","beacon","compass","dronefirst","armpick","wetdry","handwash","cloth","irrigate","avoider","sharpline","schoolrun","farshelf"],
+  Advanced:["armstack","armsort","dronegate","dronewall","escarp","armbelt","wastetype","lake","dam","pothole","tomato","mastermaze","slalom","tallwall","armfar"],
+  Expert:["armbelt2","dronenight","fire","cropmon"]};
+ LEVELS.forEach(function(l){l.tier="Open";for(var t in T)if(T[t].indexOf(l.id)>=0)l.tier=t;});
+})();
 // ================= STATE =================
 var st={drone:{z:0,flying:false,bat:100,maxZ:0,gate:false,landedOk:false,spin:0},arm:{b:90,s:90,e:0,g:false,held:null},cubes:[],unlocked:{},hands:false,chassis:"standard",lvl:0,robot:{x:0,y:0,a:0},bumps:0,dt:0.02,v:0,w:0,wl:0,wr:0,pump:false,dryWatered:false,wasted:0,status:"idle",msg:"",gen:null,plots:[],zones:[],seed:12345,parts:[],uid:1,odo:0,touching:0,cube:null,gripClosed:false,relay:false,fanHot:false,fanWrong:0,led:"off",lcd:"",beeps:0};
 function L(){return LEVELS[st.lvl];}
@@ -378,8 +403,8 @@ function armReset(l){
  st.arm={b:90,s:90,e:0,g:false,held:null};st.cubes=[];st.belt={on:false,t:0};
  if(!l.arm)return;
  var cs=(l.cubes||[]).map(function(q){return {x:q[0],y:q[1],z:6,c:q[2],held:false,vz:0};});
- if(l.id==="armsort"){var cols=["red","blue","red","blue"].slice(0,3);if(Math.random()<0.5)cols=["blue","red","blue"];if(Math.random()<0.34)cols=["red","red","blue"];cs.forEach(function(q,i){q.c=cols[i];});}
- if(l.id==="armbelt2"){var c2=[["red","blue","red"],["blue","red","blue"],["red","red","blue"],["blue","blue","red"]][Math.floor(Math.random()*4)];cs.forEach(function(q,i){q.c=c2[i];});}
+ if((l.kind||l.id)==="armsort"){var cols=["red","blue","red","blue"].slice(0,3);if(Math.random()<0.5)cols=["blue","red","blue"];if(Math.random()<0.34)cols=["red","red","blue"];cs.forEach(function(q,i){q.c=cols[i];});}
+ if((l.kind||l.id)==="armbelt2"){var c2=[["red","blue","red"],["blue","red","blue"],["red","red","blue"],["blue","blue","red"]][Math.floor(Math.random()*4)];cs.forEach(function(q,i){q.c=c2[i];});}
  st.cubes=cs;
 }
 function cubeRest(c){var z=6;st.cubes.forEach(function(o){if(o!==c&&!o.held&&Math.abs(o.x-c.x)<9&&Math.abs(o.y-c.y)<9&&o.z<c.z-3)z=Math.max(z,o.z+12);});return z;}
@@ -525,18 +550,18 @@ function end(){
   var dd=st.drone;if(dd.flying)return finish(false,"The drone is still in the air. Add a Land block at the end.");
   var pad=l.pad,onpad=Math.hypot(st.robot.x-pad[0],st.robot.y-pad[1])<=pad[2];
   if(l.id==="dronenight"){var lp=l.pads[dd.lit],okp=Math.hypot(st.robot.x-lp[0],st.robot.y-lp[1])<=lp[2];if(okp)return finish(true,"★ Found the lit pad in the dark! Battery left: "+Math.round(dd.bat)+"%.");var other=l.pads.some(function(q){return Math.hypot(st.robot.x-q[0],st.robot.y-q[1])<=q[2];});return finish(false,other?"You landed on a dark pad. Check the light sensor before landing.":"You landed away from the lit pad ("+Math.round(Math.hypot(st.robot.x-lp[0],st.robot.y-lp[1]))+" cm). Search the three pads.");}
-  if(l.id==="dronefirst"){if(dd.maxZ<100)return finish(false,"The drone only reached "+Math.round(dd.maxZ)+" cm. Climb to at least 100 cm.");return onpad?finish(true,"★ Great first flight! You climbed to "+Math.round(dd.maxZ)+" cm and landed on the pad."):finish(false,"You landed "+Math.round(Math.hypot(st.robot.x-pad[0],st.robot.y-pad[1]))+" cm from the pad. Land on the orange circle.");}
-  if(l.id==="dronegate"){if(!dd.gate)return finish(false,"The drone never flew through the gate.");return onpad?finish(true,"★ Through the gate and landed on the pad!"):finish(false,"You passed the gate but landed "+Math.round(Math.hypot(st.robot.x-pad[0],st.robot.y-pad[1]))+" cm from the pad.");}
+  if((l.kind||l.id)==="dronefirst"){if(dd.maxZ<100)return finish(false,"The drone only reached "+Math.round(dd.maxZ)+" cm. Climb to at least 100 cm.");return onpad?finish(true,"★ Great first flight! You climbed to "+Math.round(dd.maxZ)+" cm and landed on the pad."):finish(false,"You landed "+Math.round(Math.hypot(st.robot.x-pad[0],st.robot.y-pad[1]))+" cm from the pad. Land on the orange circle.");}
+  if((l.kind||l.id)==="dronegate"){if(!dd.gate)return finish(false,"The drone never flew through the gate.");return onpad?finish(true,"★ Through the gate and landed on the pad!"):finish(false,"You passed the gate but landed "+Math.round(Math.hypot(st.robot.x-pad[0],st.robot.y-pad[1]))+" cm from the pad.");}
   if((l.kind||l.id)==="dronewall")return onpad?finish(true,"★ Over the wall and landed on the pad!"):finish(false,"The drone isn't on the landing pad ("+Math.round(Math.hypot(st.robot.x-pad[0],st.robot.y-pad[1]))+" cm away).");
  }
  if(l.arm){
   var bins=l.bins||[],held=st.arm.held;
   if(held)return finish(false,"The cube is still in the gripper. Open it above the target.");
-  if(l.id==="armpick"){var c0=st.cubes[0];return inBin(c0,bins[0])?finish(true,"★ Cube is in the bin!"):finish(false,"The cube isn't in the bin yet.");}
-  if(l.id==="armstack"){var b=st.cubes[0],r=st.cubes[1];return Math.abs(b.x-r.x)<8&&Math.abs(b.y-r.y)<8&&r.z>14?finish(true,"★ Stacked! The red cube sits on the blue one."):finish(false,"The red cube isn't resting on the blue cube.");}
-  if(l.id==="armbelt"){var inb=st.cubes.filter(function(q){return inBin(q,bins[0]);}).length;return inb===st.cubes.length?finish(true,"★ All 3 boxes are in the bin!"):finish(false,inb+" of 3 boxes are in the bin.");}
-  if(l.id==="armbelt2"){var bad2=0,ok2=0;st.cubes.forEach(function(q){var right=bins.filter(function(bn){return bn[4]===q.c;})[0];if(right&&inBin(q,right))ok2++;else bad2++;});return bad2===0?finish(true,"★ All boxes sorted by colour!"):finish(false,ok2+" of 3 boxes are in the right bin. Check each colour before moving it.");}
-  if(l.id==="armsort"){var bad=0,ok=0;st.cubes.forEach(function(q){var right=bins.filter(function(bn){return bn[4]===q.c;})[0];if(right&&inBin(q,right))ok++;else bad++;});return bad===0?finish(true,"★ All cubes sorted!"):finish(false,ok+" of 3 cubes are in the right bin. Check each colour before moving it.");}
+  if((l.kind||l.id)==="armpick"){var c0=st.cubes[0];return inBin(c0,bins[0])?finish(true,"★ Cube is in the bin!"):finish(false,"The cube isn't in the bin yet.");}
+  if((l.kind||l.id)==="armstack"){var b=st.cubes[0],r=st.cubes[1];return Math.abs(b.x-r.x)<8&&Math.abs(b.y-r.y)<8&&r.z>14?finish(true,"★ Stacked! The red cube sits on the blue one."):finish(false,"The red cube isn't resting on the blue cube.");}
+  if((l.kind||l.id)==="armbelt"){var inb=st.cubes.filter(function(q){return inBin(q,bins[0]);}).length;return inb===st.cubes.length?finish(true,"★ All 3 boxes are in the bin!"):finish(false,inb+" of 3 boxes are in the bin.");}
+  if((l.kind||l.id)==="armbelt2"){var bad2=0,ok2=0;st.cubes.forEach(function(q){var right=bins.filter(function(bn){return bn[4]===q.c;})[0];if(right&&inBin(q,right))ok2++;else bad2++;});return bad2===0?finish(true,"★ All boxes sorted by colour!"):finish(false,ok2+" of 3 boxes are in the right bin. Check each colour before moving it.");}
+  if((l.kind||l.id)==="armsort"){var bad=0,ok=0;st.cubes.forEach(function(q){var right=bins.filter(function(bn){return bn[4]===q.c;})[0];if(right&&inBin(q,right))ok++;else bad++;});return bad===0?finish(true,"★ All cubes sorted!"):finish(false,ok+" of 3 cubes are in the right bin. Check each colour before moving it.");}
  }
  if((l.kind||l.id)==="farm"){
   if(st.wasted>0)return finish(false,"Water wasted: a pump run was not on the dry plot. Use the soil sensor.");
@@ -546,7 +571,7 @@ function end(){
   if(st.fanWrong>0)return finish(false,"The fan was switched on where it wasn't needed. Check the temperature first.");
   return st.fanHot?finish(true,"★ The hot bay is cooling and no energy was wasted!"):finish(false,"The overheating bay was not cooled. Switch the fan on there.");
  }
- if(l.id==="cargo"){
+ if((l.kind||l.id)==="cargo"){
   var g=l.goal,c=st.cube;
   if(c&&!c.held&&c.x>=g[0]&&c.x<=g[0]+g[2]&&c.y>=g[1]&&c.y<=g[1]+g[3])return finish(true,"★ Cargo delivered!");
   return finish(false,c&&c.held?"The cube is still in the gripper. Release it in the zone.":"The cube is not in the green zone.");

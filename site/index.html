@@ -258,7 +258,7 @@ img.logo{width:38px;height:38px;border-radius:10px;background:#fff;object-fit:co
 .cwrap h2{margin:0 0 6px}.cwrap h3{margin:0 0 8px;font-size:16px}.cwrap input,.cwrap select{width:100%;margin:4px 0 8px;padding:10px;border-radius:10px;border:1px solid #334155;background:#0b1322;color:#e2e8f0;font-size:15px;box-sizing:border-box}.cwrap label{font-size:12.5px;color:#94a3b8;display:block}
 .cwrap .tg label{display:flex;gap:8px;align-items:center;font-size:14px;color:#e2e8f0;margin:4px 0}.cwrap .tg input{width:auto;margin:0}.cwrap .two{display:flex;gap:10px}.cwrap .two>div{flex:1}
 .cbadge{display:inline-block;padding:3px 9px;border-radius:999px;background:#1e293b;color:#cbd5e1;font-size:12px;margin:2px 4px 2px 0}.cbadge.on{background:#14532d;color:#bbf7d0}.cbadge.off{background:#7f1d1d;color:#fecaca}
-.cst{font-size:12px;font-weight:700;letter-spacing:.5px;color:#94a3b8}.cst.live{color:#22c55e}.cst.paused{color:#f59e0b}.big{font-size:34px;font-weight:800;margin:8px 0;font-variant-numeric:tabular-nums}.codebox{font-size:16px;margin:6px 0}.codebox b{font-size:28px;letter-spacing:4px;color:#fbbf24}.mpick{max-height:190px;overflow:auto;border:1px solid #334155;border-radius:10px;padding:6px 10px;margin:4px 0}.mpick label{display:block;padding:5px 0;font-size:14px}
+.cst{font-size:12px;font-weight:700;letter-spacing:.5px;color:#94a3b8}.cst.live{color:#22c55e}.cst.paused{color:#f59e0b}.big{font-size:34px;font-weight:800;margin:8px 0;font-variant-numeric:tabular-nums}.codebox{font-size:16px;margin:6px 0}.codebox b{font-size:28px;letter-spacing:4px;color:#fbbf24}.mpick{max-height:190px;overflow:auto;border:1px solid #334155;border-radius:10px;padding:6px 10px;margin:4px 0}.mtier{margin-top:8px;font-size:12px;color:#94a3b8}.mtier a{margin-left:8px}.mpick label{display:block;padding:5px 0;font-size:14px}
 .ct{width:100%;border-collapse:collapse;font-size:13.5px;margin:6px 0}.ct td,.ct th{padding:5px 6px;border-bottom:1px solid #243049;text-align:left}.ct td:last-child,.ct th:last-child{text-align:right}.ct tr.me td{background:#1e3a8a33}.ct tr.att td{font-size:12px;color:#94a3b8}
 .lrow{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #243049}.lrow button{min-height:30px;padding:2px 10px;font-size:12px;margin-left:6px}.log{font-size:12px;color:#94a3b8;max-height:180px;overflow:auto}.res{margin:8px 0;font-size:15px}
 #compBar{position:sticky;top:0;z-index:60;background:#0f172a;border-bottom:2px solid #f59e0b;padding:6px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}#compBar .cbt{display:flex;gap:12px;align-items:center}#compBar #cbTime{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;color:#fbbf24}#compBar #cbTime.warn{color:#ef4444}#compBar .cbs{display:flex;gap:12px;align-items:center;font-size:14px}#compBar button{min-height:34px;padding:4px 14px}
@@ -920,6 +920,31 @@ var LEVELS=[
  {id:"sandbox",name:"Free Lab",floor:"workshop",mission:"<b>Free lab.</b> Swap the controller, add any sensors, and watch the readings. Colour tiles, a shaded area, a hot zone, a soil plot and a cube are waiting.",hint:"Try: Raspberry Pi + MCP3008 for analog sensors, or add the colour sensor and see the pin limit.",start:{x:20,y:100,a:0},goal:null,walls:[[200,125,50,8]],tiles:[[30,25,40,35,"red"],[30,75,40,35,"green"],[30,125,40,35,"blue"]],shade:[[110,20,60,70]],hot:[[205,20,80,70,38]],plots:[[110,110,60,60]],cube:{x:270,y:160},kit:["pi4","adc","l298n","gear","bank","shifter","us@front","dht","soil","ldr","imu","led","lcd"]}
 ];
 if(typeof SCN!=="undefined"){var sbx=LEVELS.map(function(l){return l.id;}).indexOf("sandbox");SCN.levels.forEach(function(l,k){LEVELS.splice(sbx+k,0,l);});SCN.bind({st:function(){return st;},wait:function(s){return wait(s);},hitsWall:function(x,y){return hitsWall(x,y);},armTo:function(k,t){return armTo(k,t);}});}
+
+// ---- more missions: variants of the existing mechanics, then difficulty tiers ----
+(function(){
+ function sharp(){var p=[],x;for(x=25;x<=292;x+=3)p.push([x,100+42*Math.sin((x-25)/26)]);return p;}
+ function V(base,o){var b=LEVELS.filter(function(l){return l.id===base;})[0],n={};for(var k in b)n[k]=b[k];for(k in o)n[k]=o[k];n.kind=b.kind||b.id;return n;}
+ var NEW=[
+  V("drive",{id:"hop",name:"35 Short Hop",mission:"A quick warm-up: drive the robot into the <b>green zone</b>, only about 120 cm away.",hint:"Hint: one Forward block with a smaller number than mission 1.",goal:[135,80,45,40]}),
+  V("detour",{id:"twowalls",name:"36 Two Walls",mission:"Two walls block the way. Weave around both and reach the <b>green zone</b>.",hint:"Hint: go up past the first wall, come down past the second, then straight on. Plan the turns on paper first.",start:{x:20,y:100,a:0},goal:[258,150,34,40],walls:[[90,0,10,130],[185,70,10,130]]}),
+  V("sensor",{id:"stopnear",name:"37 Stop in time",mission:"Stop inside the <b>green zone</b> without touching the wall. The wall is closer this time.",hint:"Hint: Forever → If front distance &lt; 25 then Stop, else Forward 2.",goal:[150,70,36,60],walls:[[195,40,10,120]]}),
+  V("maze",{id:"avoider",name:"38 Obstacle Avoider",mission:"Several walls block the arena. Use your distance sensors to steer around them automatically and reach the <b>green zone</b>.",hint:"Hint: Forever → If front &lt; 20 then (turn towards the side with more space) else Forward 2.",start:{x:20,y:100,a:0},goal:[262,20,38,45],walls:[[80,0,10,140],[170,60,10,140]]}),
+  V("line",{id:"sharpline",name:"39 Sharp Curves",mission:"Follow the <b>tape</b> through the tight bends to the green zone. Your robot must react faster!",hint:"Hint: same line-following idea, but turn by bigger steps: Turn left 8 / Turn right 8.",track:sharp(),start:{x:25,y:100,a:0},goal:[262,95,36,36]}),
+  V("boda",{id:"schoolrun",name:"40 School Run",mission:"Deliver the learning materials through the <b>busy school corridor</b> to the green zone without touching anything.",hint:"Hint: three obstacles this time. A front distance check keeps you safe.",start:{x:20,y:100,a:0},goal:[255,20,40,45],walls:[[70,50,12,150],[140,0,12,140],[210,60,12,140]]}),
+  V("cargo",{id:"farshelf",name:"41 Far Shelf",mission:"Pick up the <b>wooden cube</b> and carry it a long way to the <b>green zone</b> at the far corner.",hint:"Hint: Forward → Grip close → Turn → Forward → Grip open. Measure each distance.",start:{x:25,y:170,a:0},cube:{x:90,y:170},goal:[240,15,55,60]}),
+  V("maze",{id:"mastermaze",name:"42 Maze Master",mission:"A long four-lane maze. Find the exits in each wall and reach the <b>green zone</b>.",hint:"Hint: Use the wall-following idea: keep a wall on one side and turn at gaps.",start:{x:15,y:20,a:0},goal:[262,165,34,30],walls:[[0,45,240,10],[60,100,240,10],[0,150,240,10]]}),
+  V("dronegate",{id:"slalom",name:"43 Drone: Tight gate",mission:"Fly <b>through the narrow gate</b> (opening 50 to 90 cm high) and land on the far pad.",hint:"Hint: Take off puts you at 60 cm, which fits. Don't climb before the gate.",gate:[130,100,60,50,90],pad:[262,100,24]}),
+  V("dronewall",{id:"tallwall",name:"44 Drone: Tall wall",mission:"A <b>110 cm wall</b> blocks the way. Climb high enough, cross it and land on the pad.",hint:"Hint: You need more than 115 cm. Take off gives 60, so Fly up about 70.",walls:[[135,0,12,200]],wallH:110}),
+  V("armpick",{id:"armfar",name:"45 Arm: Far reach",mission:"The cube is on the <b>far right</b> side. Reach it with the robot arm and drop it into the <b>bin</b> on the left.",hint:"Hint: stretch the shoulder and elbow to reach. Use the Teach pendant to find the angles.",cubes:[[215,130,"orange"]]})
+ ];
+ var sb=LEVELS.map(function(l){return l.id;}).indexOf("sandbox");NEW.forEach(function(l,k){LEVELS.splice(sb+k,0,l);});
+ var T={Beginner:["drive","detour","sensor","line","farm","hop","twowalls","stopnear"],
+  Intermediate:["maze","cargo","greenhouse","solar","boda","homeeyes","beacon","compass","dronefirst","armpick","wetdry","handwash","cloth","irrigate","avoider","sharpline","schoolrun","farshelf"],
+  Advanced:["armstack","armsort","dronegate","dronewall","escarp","armbelt","wastetype","lake","dam","pothole","tomato","mastermaze","slalom","tallwall","armfar"],
+  Expert:["armbelt2","dronenight","fire","cropmon"]};
+ LEVELS.forEach(function(l){l.tier="Open";for(var t in T)if(T[t].indexOf(l.id)>=0)l.tier=t;});
+})();
 // ================= STATE =================
 var st={drone:{z:0,flying:false,bat:100,maxZ:0,gate:false,landedOk:false,spin:0},arm:{b:90,s:90,e:0,g:false,held:null},cubes:[],unlocked:{},hands:false,chassis:"standard",lvl:0,robot:{x:0,y:0,a:0},bumps:0,dt:0.02,v:0,w:0,wl:0,wr:0,pump:false,dryWatered:false,wasted:0,status:"idle",msg:"",gen:null,plots:[],zones:[],seed:12345,parts:[],uid:1,odo:0,touching:0,cube:null,gripClosed:false,relay:false,fanHot:false,fanWrong:0,led:"off",lcd:"",beeps:0};
 function L(){return LEVELS[st.lvl];}
@@ -1190,8 +1215,8 @@ function armReset(l){
  st.arm={b:90,s:90,e:0,g:false,held:null};st.cubes=[];st.belt={on:false,t:0};
  if(!l.arm)return;
  var cs=(l.cubes||[]).map(function(q){return {x:q[0],y:q[1],z:6,c:q[2],held:false,vz:0};});
- if(l.id==="armsort"){var cols=["red","blue","red","blue"].slice(0,3);if(Math.random()<0.5)cols=["blue","red","blue"];if(Math.random()<0.34)cols=["red","red","blue"];cs.forEach(function(q,i){q.c=cols[i];});}
- if(l.id==="armbelt2"){var c2=[["red","blue","red"],["blue","red","blue"],["red","red","blue"],["blue","blue","red"]][Math.floor(Math.random()*4)];cs.forEach(function(q,i){q.c=c2[i];});}
+ if((l.kind||l.id)==="armsort"){var cols=["red","blue","red","blue"].slice(0,3);if(Math.random()<0.5)cols=["blue","red","blue"];if(Math.random()<0.34)cols=["red","red","blue"];cs.forEach(function(q,i){q.c=cols[i];});}
+ if((l.kind||l.id)==="armbelt2"){var c2=[["red","blue","red"],["blue","red","blue"],["red","red","blue"],["blue","blue","red"]][Math.floor(Math.random()*4)];cs.forEach(function(q,i){q.c=c2[i];});}
  st.cubes=cs;
 }
 function cubeRest(c){var z=6;st.cubes.forEach(function(o){if(o!==c&&!o.held&&Math.abs(o.x-c.x)<9&&Math.abs(o.y-c.y)<9&&o.z<c.z-3)z=Math.max(z,o.z+12);});return z;}
@@ -1337,18 +1362,18 @@ function end(){
   var dd=st.drone;if(dd.flying)return finish(false,"The drone is still in the air. Add a Land block at the end.");
   var pad=l.pad,onpad=Math.hypot(st.robot.x-pad[0],st.robot.y-pad[1])<=pad[2];
   if(l.id==="dronenight"){var lp=l.pads[dd.lit],okp=Math.hypot(st.robot.x-lp[0],st.robot.y-lp[1])<=lp[2];if(okp)return finish(true,"★ Found the lit pad in the dark! Battery left: "+Math.round(dd.bat)+"%.");var other=l.pads.some(function(q){return Math.hypot(st.robot.x-q[0],st.robot.y-q[1])<=q[2];});return finish(false,other?"You landed on a dark pad. Check the light sensor before landing.":"You landed away from the lit pad ("+Math.round(Math.hypot(st.robot.x-lp[0],st.robot.y-lp[1]))+" cm). Search the three pads.");}
-  if(l.id==="dronefirst"){if(dd.maxZ<100)return finish(false,"The drone only reached "+Math.round(dd.maxZ)+" cm. Climb to at least 100 cm.");return onpad?finish(true,"★ Great first flight! You climbed to "+Math.round(dd.maxZ)+" cm and landed on the pad."):finish(false,"You landed "+Math.round(Math.hypot(st.robot.x-pad[0],st.robot.y-pad[1]))+" cm from the pad. Land on the orange circle.");}
-  if(l.id==="dronegate"){if(!dd.gate)return finish(false,"The drone never flew through the gate.");return onpad?finish(true,"★ Through the gate and landed on the pad!"):finish(false,"You passed the gate but landed "+Math.round(Math.hypot(st.robot.x-pad[0],st.robot.y-pad[1]))+" cm from the pad.");}
+  if((l.kind||l.id)==="dronefirst"){if(dd.maxZ<100)return finish(false,"The drone only reached "+Math.round(dd.maxZ)+" cm. Climb to at least 100 cm.");return onpad?finish(true,"★ Great first flight! You climbed to "+Math.round(dd.maxZ)+" cm and landed on the pad."):finish(false,"You landed "+Math.round(Math.hypot(st.robot.x-pad[0],st.robot.y-pad[1]))+" cm from the pad. Land on the orange circle.");}
+  if((l.kind||l.id)==="dronegate"){if(!dd.gate)return finish(false,"The drone never flew through the gate.");return onpad?finish(true,"★ Through the gate and landed on the pad!"):finish(false,"You passed the gate but landed "+Math.round(Math.hypot(st.robot.x-pad[0],st.robot.y-pad[1]))+" cm from the pad.");}
   if((l.kind||l.id)==="dronewall")return onpad?finish(true,"★ Over the wall and landed on the pad!"):finish(false,"The drone isn't on the landing pad ("+Math.round(Math.hypot(st.robot.x-pad[0],st.robot.y-pad[1]))+" cm away).");
  }
  if(l.arm){
   var bins=l.bins||[],held=st.arm.held;
   if(held)return finish(false,"The cube is still in the gripper. Open it above the target.");
-  if(l.id==="armpick"){var c0=st.cubes[0];return inBin(c0,bins[0])?finish(true,"★ Cube is in the bin!"):finish(false,"The cube isn't in the bin yet.");}
-  if(l.id==="armstack"){var b=st.cubes[0],r=st.cubes[1];return Math.abs(b.x-r.x)<8&&Math.abs(b.y-r.y)<8&&r.z>14?finish(true,"★ Stacked! The red cube sits on the blue one."):finish(false,"The red cube isn't resting on the blue cube.");}
-  if(l.id==="armbelt"){var inb=st.cubes.filter(function(q){return inBin(q,bins[0]);}).length;return inb===st.cubes.length?finish(true,"★ All 3 boxes are in the bin!"):finish(false,inb+" of 3 boxes are in the bin.");}
-  if(l.id==="armbelt2"){var bad2=0,ok2=0;st.cubes.forEach(function(q){var right=bins.filter(function(bn){return bn[4]===q.c;})[0];if(right&&inBin(q,right))ok2++;else bad2++;});return bad2===0?finish(true,"★ All boxes sorted by colour!"):finish(false,ok2+" of 3 boxes are in the right bin. Check each colour before moving it.");}
-  if(l.id==="armsort"){var bad=0,ok=0;st.cubes.forEach(function(q){var right=bins.filter(function(bn){return bn[4]===q.c;})[0];if(right&&inBin(q,right))ok++;else bad++;});return bad===0?finish(true,"★ All cubes sorted!"):finish(false,ok+" of 3 cubes are in the right bin. Check each colour before moving it.");}
+  if((l.kind||l.id)==="armpick"){var c0=st.cubes[0];return inBin(c0,bins[0])?finish(true,"★ Cube is in the bin!"):finish(false,"The cube isn't in the bin yet.");}
+  if((l.kind||l.id)==="armstack"){var b=st.cubes[0],r=st.cubes[1];return Math.abs(b.x-r.x)<8&&Math.abs(b.y-r.y)<8&&r.z>14?finish(true,"★ Stacked! The red cube sits on the blue one."):finish(false,"The red cube isn't resting on the blue cube.");}
+  if((l.kind||l.id)==="armbelt"){var inb=st.cubes.filter(function(q){return inBin(q,bins[0]);}).length;return inb===st.cubes.length?finish(true,"★ All 3 boxes are in the bin!"):finish(false,inb+" of 3 boxes are in the bin.");}
+  if((l.kind||l.id)==="armbelt2"){var bad2=0,ok2=0;st.cubes.forEach(function(q){var right=bins.filter(function(bn){return bn[4]===q.c;})[0];if(right&&inBin(q,right))ok2++;else bad2++;});return bad2===0?finish(true,"★ All boxes sorted by colour!"):finish(false,ok2+" of 3 boxes are in the right bin. Check each colour before moving it.");}
+  if((l.kind||l.id)==="armsort"){var bad=0,ok=0;st.cubes.forEach(function(q){var right=bins.filter(function(bn){return bn[4]===q.c;})[0];if(right&&inBin(q,right))ok++;else bad++;});return bad===0?finish(true,"★ All cubes sorted!"):finish(false,ok+" of 3 cubes are in the right bin. Check each colour before moving it.");}
  }
  if((l.kind||l.id)==="farm"){
   if(st.wasted>0)return finish(false,"Water wasted: a pump run was not on the dry plot. Use the soil sensor.");
@@ -1358,7 +1383,7 @@ function end(){
   if(st.fanWrong>0)return finish(false,"The fan was switched on where it wasn't needed. Check the temperature first.");
   return st.fanHot?finish(true,"★ The hot bay is cooling and no energy was wasted!"):finish(false,"The overheating bay was not cooled. Switch the fan on there.");
  }
- if(l.id==="cargo"){
+ if((l.kind||l.id)==="cargo"){
   var g=l.goal,c=st.cube;
   if(c&&!c.held&&c.x>=g[0]&&c.x<=g[0]+g[2]&&c.y>=g[1]&&c.y<=g[1]+g[3])return finish(true,"★ Cargo delivered!");
   return finish(false,c&&c.held?"The cube is still in the gripper. Release it in the zone.":"The cube is not in the green zone.");
@@ -3201,7 +3226,7 @@ $("mHint").onclick=function(){var k=st.lvl,n=hintN[k]||0,r=Mila.hint(prog,C,n);h
 $("mExplain").onclick=function(){if(!prog.length){milaSay("tip","Your program is empty.",["Tap a block above to add your first step."]);return;}milaSay("ok","Here's what your robot will do, step by step:",null,Mila.explain(prog).join("\n"));};
 var WONK="mm_won",won={};try{won=JSON.parse(localStorage.getItem(WONK)||"{}");}catch(e){}
 function markWon(i){var id=LEVELS[i].id;if(id==="sandbox"||won[id])return;won[id]=true;try{localStorage.setItem(WONK,JSON.stringify(won));}catch(e){}paintLevels();}
-function paintLevels(){var n=0,tot=LEVELS.filter(function(l){return l.id!=="sandbox";}).length;
+function paintLevels(){window.applyTier&&window.applyTier();var n=0,tot=LEVELS.filter(function(l){return l.id!=="sandbox";}).length;
  [].forEach.call($("levels").children,function(c,k){var id=LEVELS[k].id,w=!!won[id];if(w)n++;c.className=(k===st.lvl?"on":"")+(w?" won":"");c.textContent=(w?"✓ ":"")+LEVELS[k].name;if(k===st.lvl&&c.scrollIntoView)try{$("picker").scrollTo({left:Math.max(0,c.offsetLeft-60),behavior:"smooth"});}catch(e){}});
  $("progtxt").textContent=n+" / "+tot;$("progbar").style.width=Math.round(100*n/tot)+"%";
  var l=LEVELS[st.lvl];$("mnum").textContent=l.id==="sandbox"?"Free lab":"Mission "+(st.lvl+1)+" of "+tot;}
@@ -3254,7 +3279,12 @@ function setLevel(i){try{$("nextM").style.display="none";}catch(e){}
  syncPendant();mfeed.innerHTML="";$("mission").innerHTML=LEVELS[i].mission;$("hint").innerHTML=LEVELS[i].hint;
  prog=[];selected=null;msg("");$("run").textContent="▶ Run";$("run").className="p";buildLevel();partsChanged();
 }
-LEVELS.forEach(function(l,i){var b=document.createElement("button");b.textContent=l.name;b.onclick=function(){setLevel(i);};$("levels").appendChild(b);});
+var TCOL={Beginner:"#22c55e",Intermediate:"#38bdf8",Advanced:"#f59e0b",Expert:"#ef4444",Open:"#a78bfa"},tierSel="All";
+LEVELS.forEach(function(l,i){var b=document.createElement("button");b.textContent=l.name;b.dataset.tier=l.tier||"Open";b.style.boxShadow="inset 0 -3px "+(TCOL[l.tier]||TCOL.Open);b.onclick=function(){setLevel(i);};$("levels").appendChild(b);});
+(function(){var bar=document.createElement("div");bar.id="tierBar";bar.style.cssText="display:flex;gap:6px;overflow-x:auto;padding:4px 2px;font-size:12px";
+ ["All","Beginner","Intermediate","Advanced","Expert"].forEach(function(t){var b=document.createElement("button");b.textContent=t;b.dataset.t=t;b.style.cssText="padding:4px 10px;border-radius:14px;white-space:nowrap;"+(t==="All"?"":"border-bottom:3px solid "+TCOL[t]);b.onclick=function(){tierSel=t;applyTier();};bar.appendChild(b);});
+ $("picker").parentNode.insertBefore(bar,$("picker"));
+ window.applyTier=function(){[].forEach.call($("levels").children,function(c,k){c.style.display=(tierSel==="All"||c.dataset.tier===tierSel||c.dataset.tier==="Open"||k===st.lvl)?"":"none";});[].forEach.call(bar.children,function(b){b.style.opacity=b.dataset.t===tierSel?"1":".6";b.style.fontWeight=b.dataset.t===tierSel?"700":"400";});};applyTier();})();
 [].forEach.call($("views").children,function(b){b.onclick=function(){setView(b.dataset.v);};});
 paintLevels();
 var cn=navigator.connection||{};var lowEnd=((navigator.hardwareConcurrency||4)<=4&&/Android/i.test(navigator.userAgent))||(navigator.deviceMemory&&navigator.deviceMemory<=2)||cn.saveData===true||/^(slow-2g|2g)$/.test(cn.effectiveType||"");
@@ -4007,7 +4037,7 @@ var C=Core,$=function(id){return document.getElementById(id);};
 var LSS="mm_scores",LSP="mm_player",LSF="mm_club";
 function jget(k,d){try{var v=JSON.parse(localStorage.getItem(k)||"null");return v===null?d:v;}catch(e){return d;}}
 function jset(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
-var PAR={drive:1,detour:5,sensor:4,line:7,maze:7,farm:5,cargo:4,greenhouse:5,beacon:8,compass:8,homeeyes:7,armpick:12,armstack:20,armsort:25,armbelt:14,armbelt2:22,dronefirst:4,dronegate:4,dronewall:6,dronenight:9,boda:11,solar:5,escarp:6};
+var PAR={drive:1,detour:5,sensor:4,line:7,maze:7,farm:5,cargo:4,greenhouse:5,beacon:8,compass:8,homeeyes:7,armpick:12,armstack:20,armsort:25,armbelt:14,armbelt2:22,dronefirst:4,dronegate:4,dronewall:6,dronenight:9,boda:11,solar:5,escarp:6,hop:1,twowalls:7,stopnear:4,avoider:9,sharpline:7,schoolrun:12,farshelf:6,mastermaze:12,slalom:4,tallwall:6,armfar:12};
 function countBlocks(p){var n=0;(p||[]).forEach(function(b){n++;if(b.c)n+=countBlocks(b.c);if(b.e)n+=countBlocks(b.e);});return n;}
 function starsFor(id,blocks){var par=PAR[id];if(!par)return 1;return blocks<=par?3:blocks<=Math.ceil(par*1.5)?2:1;}
 function starStr(n){return "★★★".slice(0,n)+"☆☆☆".slice(0,3-n);}
@@ -4491,7 +4521,7 @@ function teacherHTML(){if(!dash)return "<p class='sub'>Loading your class…</p>
  var d=dash,h="<h2>👩‍🏫 "+esc(d.cls.name)+"</h2><div class='codebox'>Class code <b>"+esc(d.cls.code)+"</b> <button data-act='copy' data-v='"+esc(d.cls.code)+"'>Copy</button></div><p class='sub'>Learners join with this code. <a href='#' data-act='tOut'>Sign out</a> · <a href='#' data-act='copyKey'>Copy teacher key</a></p>";
  h+="<details class='card fold'><summary><b>Learners ("+d.learners.length+")</b></summary>"+(d.learners.length?d.learners.map(function(l){return "<div class='lrow'><span>"+esc(l.name)+(l.extra_s?" <small>(+"+l.extra_s/60+" min)</small>":"")+"</span><span><button data-act='extra' data-id='"+l.id+"'>＋time</button><button data-act='rm' data-id='"+l.id+"'>Remove</button></span></div>";}).join(""):"<p class='sub'>No learners yet.</p>")+"</details>";
  h+="<details class='card fold' "+(d.comps.length?"":"open")+"><summary><b>＋ New competition</b></summary>"+
-  "<label>Missions <small>(tick one or more)</small></label><div class='mpick'>"+C.LEVELS.filter(function(l){return l.id!=="sandbox";}).map(function(l){return "<label><input type='checkbox' class='nLv' value='"+l.id+"'> "+esc(l.name)+"</label>";}).join("")+"</div><div class='sub'><a href='#' data-act='lvAll'>Select all</a> · <a href='#' data-act='lvNone'>Clear</a></div>"+
+  "<label>Missions <small>(tick one or more)</small></label><div class='mpick'>"+["Beginner","Intermediate","Advanced","Expert"].map(function(t){var g=C.LEVELS.filter(function(l){return l.tier===t;});return g.length?"<div class='mtier'><b>"+t+"</b> <a href='#' data-act='lvTier' data-id='"+t+"'>tick all</a></div>"+g.map(function(l){return "<label><input type='checkbox' class='nLv' data-t='"+t+"' value='"+l.id+"'> "+esc(l.name)+"</label>";}).join(""):"";}).join("")+"</div><div class='sub'><a href='#' data-act='lvAll'>Select all</a> · <a href='#' data-act='lvNone'>Clear</a></div>"+
   "<label>Title</label><input id='nTitle' placeholder='e.g. The Great Maze Escape'>"+
   "<label>Type</label><select id='nPre'><option value='assess'>Assessment (Mila OFF, Hints OFF)</option><option value='practice'>Independent practice (Mila OFF, Hints ON)</option><option value='guided'>Guided learning (Mila ON, Hints ON)</option><option value='open'>Open exploration (Mila ON, Hints OFF)</option></select>"+
   "<div class='tg'><label><input type='checkbox' id='nMila'> Mila AI</label><label><input type='checkbox' id='nHints'> Hints</label><label><input type='checkbox' id='nSug'> Code suggestions (Check)</label></div>"+
@@ -4523,6 +4553,7 @@ root.addEventListener("click",function(e){var t=e.target.closest?e.target.closes
  else if(a==="copy"||a==="copyKey"){var v=a==="copy"?t.getAttribute("data-v"):T.key;try{navigator.clipboard.writeText(v);say("Copied.");}catch(x){prompt("Copy this:",v);}}
  else if(a==="extra"){var m=prompt("Extra minutes for this learner (accommodation):","5");if(m===null)return;api("class/learner",{code:T.code,key:T.key,learnerId:id,action:"extra",minutes:+m}).then(loadDash).catch(function(x){say(errMsg(x));});}
  else if(a==="rm"){if(!confirm("Remove this learner from the class?"))return;api("class/learner",{code:T.code,key:T.key,learnerId:id,action:"remove"}).then(loadDash).catch(function(x){say(errMsg(x));});}
+ else if(a==="lvTier"){[].forEach.call(document.querySelectorAll(".nLv[data-t=\""+id+"\"]"),function(x){x.checked=true;});}
  else if(a==="lvAll"||a==="lvNone"){e.preventDefault();[].forEach.call(document.querySelectorAll(".nLv"),function(x){x.checked=a==="lvAll";});}
  else if(a==="cCreate"){if(!document.querySelector(".nLv:checked")){say("Tick at least one mission.");return;}var rules={mila:$("nMila").checked,hints:$("nHints").checked,suggest:$("nSug").checked,duration:+val("nDur"),attempts:+val("nAtt"),speed:$("nSpeed").checked,board:$("nBoardLive").checked?"live":"after",targetTime:+val("nTT"),parBlocks:+val("nPar")};
   api("comp/create",{code:T.code,key:T.key,levels:[].slice.call(document.querySelectorAll(".nLv:checked")).map(function(x){return x.value;}),title:val("nTitle")||"Robotics challenge",rules:rules}).then(function(){notice="Competition created. Press Start when everyone is ready.";loadDash();}).catch(function(x){say(errMsg(x));});}
