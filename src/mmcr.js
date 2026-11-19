@@ -4,7 +4,7 @@ var MMCR=(function(){
 var $=function(i){return document.getElementById(i);};
 var SVC="6e400001-b5a0-f393-e0a9-e50e24dcca9e",RXU="6e400002-b5a0-f393-e0a9-e50e24dcca9e",TXU="6e400003-b5a0-f393-e0a9-e50e24dcca9e";
 var mode="virtual",jx=0,jy=0,thr=0.7,tilt=false,estop=false,dev=null,rxc=null,ble=false,pdist=null,lastEvt=0,evt="",sent="",lastSend=0,enc=new TextEncoder(),dec=new TextDecoder(),dragging=false;
-var veh="robot",sx=0,sy=0,D={x:160,y:260,z:0,vx:0,vy:0,vz:0,yaw:-90,armed:false,bat:100,msg:"",fs:false,crash:0},rf=[0,0,0,0],remote={m:[0,0],at:0,on:false},pc=null,dc=null,role="",pcode="",R={x:160,y:260,a:-90,l:0,r:0,trail:[],hit:0,dist:999};
+var rtype="esp",LSVC="00001623-1212-efde-1623-785feabcd123",LCH="00001624-1212-efde-1623-785feabcd123",lastL=[null,null],veh="robot",sx=0,sy=0,D={x:160,y:260,z:0,vx:0,vy:0,vz:0,yaw:-90,armed:false,bat:100,msg:"",fs:false,crash:0},rf=[0,0,0,0],remote={m:[0,0],at:0,on:false},pc=null,dc=null,role="",pcode="",R={x:160,y:260,a:-90,l:0,r:0,trail:[],hit:0,dist:999};
 var WALLS=[[0,0,320,6],[0,314,320,6],[0,0,6,320],[314,0,6,320],[90,120,110,10],[200,190,10,80],[40,200,70,10]];
 function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
 function mix(){if(estop)return [0,0];var y=jy,x=jx;return [Math.round(clamp(y+x,-1,1)*thr*100),Math.round(clamp(y-x,-1,1)*thr*100)];}
@@ -46,7 +46,8 @@ function draw(){var c=$("mmcrCv");if(!c)return;var g=c.getContext("2d");g.clearR
  var a=R.a*Math.PI/180;g.strokeStyle="rgba(250,204,21,.5)";g.lineWidth=1;g.beginPath();g.moveTo(R.x,R.y);g.lineTo(R.x+Math.cos(a)*R.dist,R.y+Math.sin(a)*R.dist);g.stroke();
  g.save();g.translate(R.x,R.y);g.rotate(a);g.fillStyle=R.hit>0?"#ef4444":"#22c55e";g.fillRect(-9,-7,18,14);g.fillStyle="#fff";g.fillRect(4,-4,5,8);g.restore();
  if(Date.now()-lastEvt<1500){g.fillStyle="#f59e0b";g.font="bold 14px sans-serif";g.fillText("⚠ "+evt,10,24);}}
-function send(s){if(!rxc)return;try{rxc.writeValueWithoutResponse(enc.encode(s+"\n")).catch(function(){});}catch(e){}}
+function lego(port,p){p=Math.round(clamp(p,-100,100));var ch=port===0?0:1;if(lastL[ch]===p&&!lego.f)return;lastL[ch]=p;var v=new Uint8Array([8,0,0x81,port,0x11,0x51,0,p&255]);try{rxc.writeValueWithoutResponse(v).catch(function(){});}catch(e){}}
+function send(s){if(!rxc)return;if(rtype==="lego"){var l=0,r=0;if(s.indexOf("M,")===0){var q=s.split(",");l=+q[1]||0;r=+q[2]||0;}if($("mmcrRev")&&$("mmcrRev").checked)r=-r;lego.f=s==="S";lego(0,l);lego(1,r);lego.f=false;return;}try{rxc.writeValueWithoutResponse(enc.encode(s+"\n")).catch(function(){});}catch(e){}}
 function cmd(){if(remote.on){if(performance.now()-remote.at>500)return [0,0];return estop?[0,0]:remote.m;}return mix();}
 function out(){if(veh==="drone"){var f=[Math.round(jx*100),Math.round(jy*100),Math.round(sy*100),Math.round(sx*100)],s2="F,"+f.join(","),nw=performance.now();if(role==="phone"&&dc&&dc.readyState==="open"&&(s2!==sentP||nw-lastP>100)){dc.send(estop?"F,0,0,0,0":s2);sentP=s2;lastP=nw;}var st0=$("mmcrStat");if(st0)st0.textContent="roll "+f[0]+" pitch "+f[1]+" thr "+f[2]+" yaw "+f[3];return;}var m=cmd(),s=(m[0]===0&&m[1]===0)?"S":"M,"+m[0]+","+m[1],now=performance.now();
  if(mode!=="physical"){R.l=m[0];R.r=m[1];}
@@ -57,9 +58,9 @@ function onTel(t){t.split("\n").forEach(function(l){if(l.indexOf("D,")===0){pdis
  if(pdist<20&&Date.now()-lastEvt>1500){lastEvt=Date.now();evt="Physical robot: obstacle "+pdist+" cm";if(mode==="hybrid"){R.hit=0.4;}}}});}
 function setConn(t,ok){var e=$("mmcrConn");if(e){e.textContent=t;e.className=ok?"ok":"";}}
 function connect(){if(!navigator.bluetooth){setConn("This browser has no Web Bluetooth. Use Chrome on Android or a computer.",false);return;}
- navigator.bluetooth.requestDevice({filters:[{services:[SVC]}],optionalServices:[SVC]}).then(function(d){dev=d;d.addEventListener("gattserverdisconnected",function(){ble=false;rxc=null;setConn("Disconnected. Robot stops by itself.",false);});setConn("Connecting…",false);return d.gatt.connect();})
- .then(function(s){return s.getPrimaryService(SVC);}).then(function(svc){return Promise.all([svc.getCharacteristic(RXU),svc.getCharacteristic(TXU)]);})
- .then(function(c){rxc=c[0];return c[1].startNotifications().then(function(){c[1].addEventListener("characteristicvaluechanged",function(e){onTel(dec.decode(e.target.value));});ble=true;setConn("Connected to "+(dev.name||"robot"),true);});})
+ navigator.bluetooth.requestDevice(rtype==="lego"?{filters:[{services:[LSVC]}],optionalServices:[LSVC]}:{filters:[{services:[SVC]}],optionalServices:[SVC]}).then(function(d){dev=d;d.addEventListener("gattserverdisconnected",function(){ble=false;rxc=null;setConn("Disconnected. Robot stops by itself.",false);});setConn("Connecting…",false);return d.gatt.connect();})
+ .then(function(s){return s.getPrimaryService(rtype==="lego"?LSVC:SVC);}).then(function(svc){return rtype==="lego"?svc.getCharacteristic(LCH).then(function(c){return [c,c];}):Promise.all([svc.getCharacteristic(RXU),svc.getCharacteristic(TXU)]);})
+ .then(function(c){rxc=c[0];return (rtype==="lego"?Promise.resolve():c[1].startNotifications().then(function(){c[1].addEventListener("characteristicvaluechanged",function(e){onTel(dec.decode(e.target.value));});})).then(function(){ble=true;setConn("Connected to "+(dev.name||"robot"),true);});})
  .catch(function(e){setConn("Could not connect: "+(e&&e.message||e),false);});}
 function disconnect(){send("S");try{if(dev&&dev.gatt.connected)dev.gatt.disconnect();}catch(e){}}
 function setMode(m){mode=m;[].forEach.call(document.querySelectorAll("#mmcrMode button"),function(b){b.className=b.dataset.m===m?"on":"";});
@@ -100,7 +101,9 @@ function init(){if(!$("mmcrPad"))return;pad();pad2();[].forEach.call(document.qu
  $("mmcrHost").onclick=hostPair;$("mmcrJoin").onclick=phonePair;$("mmcrReset").onclick=function(){R.x=160;R.y=260;R.a=-90;R.trail=[];};
  document.addEventListener("keydown",function(e){if(!$("mmcr").classList.contains("on"))return;var k=e.key;if(k==="ArrowUp"||k==="w")jy=1;if(k==="ArrowDown"||k==="s")jy=-1;if(k==="ArrowLeft"||k==="a")jx=-1;if(k==="ArrowRight"||k==="d")jx=1;if(k===" "){stop();e.preventDefault();}});
  document.addEventListener("keyup",function(e){var k=e.key;if(/Arrow|^[wasd]$/.test(k)){jx=jy=0;}});
+ document.addEventListener("visibilitychange",function(){if(document.hidden){jx=jy=sx=sy=0;send("S");}});
+ [].forEach.call(document.querySelectorAll("#mmcrType button"),function(b){b.onclick=function(){if(ble)disconnect();rtype=b.dataset.t;[].forEach.call(document.querySelectorAll("#mmcrType button"),function(x){x.className=x.dataset.t===rtype?"on":"";});$("mmcrLegoNote").style.display=rtype==="lego"?"block":"none";$("mmcrSketch").style.display=$("mmcrWifi").style.display=rtype==="lego"?"none":"";};});
  setMode("virtual");requestAnimationFrame(loop);}
 window.addEventListener("load",init);
-return {remote:remote,drone:function(){return D;},setSticks:function(a,b,c,d){jx=a;jy=b;sx=d;sy=c;},arm:arm,setVeh:setVeh,mix:mix,setMode:setMode,state:function(){return {R:R,mode:mode,ble:ble};},setJoy:function(x,y){jx=x;jy=y;},stop:stop,tel:onTel,msg:onMsg,cmd:cmd};
+return {setRx:function(o){rxc=o;},setType:function(t){rtype=t;},lego:lego,remote:remote,drone:function(){return D;},setSticks:function(a,b,c,d){jx=a;jy=b;sx=d;sy=c;},arm:arm,setVeh:setVeh,mix:mix,setMode:setMode,state:function(){return {R:R,mode:mode,ble:ble};},setJoy:function(x,y){jx=x;jy=y;},stop:stop,tel:onTel,msg:onMsg,cmd:cmd};
 })();
