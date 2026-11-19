@@ -420,6 +420,39 @@ register({id:"dustbin",name:"51 Automatic Dustbin",floor:"workshop",station:true
  info:function(S){return [["Lid",Math.round(S.lid)+"%"],["Rubbish thrown",S.thrown+" / 4"]];}});
 function db1(S){return S.thrown<4?{win:false,msg:S.thrown+" of 4 people could throw rubbish. The lid must be open while a hand is over the bin."}:{win:true,msg:"★ Clean and touch-free! All 4 people used the bin."};}
 
+// ============================ 52: Wi-Fi light controller (ESP32) ============================
+register({id:"wifilight",name:"52 Wi-Fi Light Controller",floor:"workshop",station:true,dur:60,start:{x:150,y:100,a:0},
+ mission:"Your <b>ESP32</b> receives commands from a phone over <b>Wi-Fi</b>. Make the room light obey: <b>on</b> → light on within 3 s, <b>off</b> → light off within 3 s, <b>blink</b> → toggle the light at least 4 times. Six commands will arrive.",
+ hint:"Hint: Forever → If command = on then Light on. If command = off then Light off. If command = blink then Light on, Wait 0.5, Light off, Wait 0.5, repeated.",
+ kit:["esp32","bank","led"],
+ actions:[{id:"light_on",label:"Light ON",need:"led"},{id:"light_off",label:"Light OFF",need:"led"}],
+ sensors:[{id:"wifi_cmd",label:"Phone command is",type:"enum",opts:["none","on","off","blink"]}],
+ init:function(S){S.t=0;S.led=false;S.bad=null;S.cmd="none";S.cs=[];var k=["on","off","blink"],last="",t=4;for(var i=0;i<6;i++){var c;do{c=k[Math.floor(R(0,3))%3];}while(c===last||(i===0&&c==="off"));last=c;S.cs.push({k:c,s:t,hit:-1,tog:0,done:false,started:false});t+=9;}S.ok=0;S.tog=0;},
+ step:function(S,dt){S.t+=dt;S.cs.forEach(function(c,i){var u=S.t-c.s;if(u<0)return;if(u>=0&&u<9){if(!c.started){c.started=true;S.cmd=c.k;S.curI=i;c.tog=0;}
+   if((c.k==="on"&&S.led)||(c.k==="off"&&!S.led)){if(c.hit<0)c.hit=u;}}
+  if(u>=8.9&&!c.done){c.done=true;var good=c.k==="blink"?c.tog>=4:(c.hit>=0&&c.hit<=3&&((c.k==="on")===S.led));if(good)S.ok++;else if(!S.bad)S.bad="Command "+(i+1)+" ("+c.k.toUpperCase()+") was not obeyed"+(c.k==="blink"?": the light toggled only "+c.tog+" times.":(c.hit<0?": the light never reached that state.":c.hit>3?": it took "+c.hit.toFixed(1)+" s (max 3 s).":": the light was changed again."));}});},
+ act:function*(S,id){var w=id==="light_on";if(S.led!==w){S.led=w;if(S.curI!=null&&S.cs[S.curI]&&!S.cs[S.curI].done)S.cs[S.curI].tog++;}yield* api.wait(0.1);},
+ sense:function(S,id){return S.cmd;},
+ check:function(S){if(S.bad)return {win:false,msg:S.bad};if(S.t>=this.dur)return wl2(S);return null;},end:function(S){return S.bad?{win:false,msg:S.bad}:(S.t>=this.dur-1?wl2(S):{win:false,msg:"Program ended early. Use Forever so the ESP32 keeps listening."});},
+ info:function(S){return [["Command",S.cmd.toUpperCase()],["Light",S.led?"ON":"off"],["Obeyed",S.ok+" / 6"]];}});
+function wl2(S){return S.ok>=6?{win:true,msg:"★ All 6 Wi-Fi commands obeyed. Your smart light works!"}:{win:false,msg:S.ok+" of 6 commands obeyed."};}
+
+// ============================ 53: weather station (ESP32) ============================
+register({id:"weatherstn",name:"53 Weather Station",floor:"farm",station:true,dur:60,start:{x:150,y:100,a:0},
+ mission:"Build an <b>ESP32 weather station</b> for a school. Turn on the <b>HEAT alert LED</b> while the temperature is above <b>32 °C</b> and the <b>RAIN alert LED</b> while it rains. Switch each alert off when the danger passes. Alerts may lag by at most 4 s.",
+ hint:"Hint: Forever → If temperature &gt; 32 then Heat alert on, else Heat alert off. If rain then Rain alert on, else Rain alert off.",
+ kit:["esp32","bank","dht","rain","led"],
+ actions:[{id:"heat_on",label:"Heat alert ON",need:"led"},{id:"heat_off",label:"Heat alert OFF",need:"led"},{id:"rain_on",label:"Rain alert ON",need:"led"},{id:"rain_off",label:"Rain alert OFF",need:"led"}],
+ sensors:[{id:"temperature",label:"Temperature >",unit:"°C",type:"num",gt:true,need:"dht"},{id:"rain_now",label:"It is raining",type:"bool",need:"rain"}],
+ init:function(S){S.t=0;S.temp=24;S.rain=false;S.heat=false;S.ra=false;S.mH=0;S.mR=0;S.wrong=0;S.bad=null;S.rs=R(26,32);S.re=S.rs+R(12,16);},
+ step:function(S,dt){S.t+=dt;var t=S.t;S.temp=t<10?24:t<25?24+(t-10)*0.8:t<40?36:Math.max(26,36-(t-40)*0.7);S.rain=t>=S.rs&&t<S.re;
+  var dh=S.temp>32,mh=dh!==S.heat,mr=S.rain!==S.ra;S.mH=mh?S.mH+dt:0;S.mR=mr?S.mR+dt:0;if(S.mH>4||S.mR>4)S.wrong+=dt;if(S.wrong>6&&!S.bad)S.bad=S.mH>4?"The HEAT alert was wrong for too long. It must be ON above 32 °C and OFF below.":"The RAIN alert was wrong for too long. It must be ON only while it rains.";},
+ act:function*(S,id){if(id==="heat_on")S.heat=true;else if(id==="heat_off")S.heat=false;else if(id==="rain_on")S.ra=true;else if(id==="rain_off")S.ra=false;yield* api.wait(0.1);},
+ sense:function(S,id){return id==="rain_now"?S.rain:Math.round((S.temp+noise(0.25))*10)/10;},
+ check:function(S){if(S.bad)return {win:false,msg:S.bad};if(S.t>=this.dur)return ws3(S);return null;},end:function(S){return S.bad?{win:false,msg:S.bad}:(S.t>=this.dur-1?ws3(S):{win:false,msg:"Program ended early. Use Forever so the station keeps measuring."});},
+ info:function(S){return [["Temp",S.temp.toFixed(1)+" °C"],["Rain",S.rain?"YES":"no"],["Heat LED",S.heat?"ON":"off"],["Rain LED",S.ra?"ON":"off"]];}});
+function ws3(S){return {win:true,msg:"★ Accurate weather alerts all day! Heat and rain warnings followed the real conditions."};}
+
 
 return {def:def,levels:levels,bind:bind};
 })();

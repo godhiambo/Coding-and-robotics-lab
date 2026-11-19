@@ -4,7 +4,7 @@ var C=Core,$=function(id){return document.getElementById(id);};
 var LSS="mm_scores",LSP="mm_player",LSF="mm_club";
 function jget(k,d){try{var v=JSON.parse(localStorage.getItem(k)||"null");return v===null?d:v;}catch(e){return d;}}
 function jset(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
-var PAR={drive:1,detour:5,sensor:4,line:7,maze:7,farm:5,cargo:4,greenhouse:5,beacon:8,compass:8,homeeyes:7,armpick:12,armstack:20,armsort:25,armbelt:14,armbelt2:22,dronefirst:4,dronegate:4,dronewall:6,dronenight:9,boda:11,solar:5,escarp:6,hop:1,trafficsmart:6,trafficled:8,autodoor:6,parking:7,pedcross:9,dustbin:6,twowalls:7,stopnear:4,avoider:9,sharpline:7,schoolrun:12,farshelf:6,mastermaze:12,slalom:4,tallwall:6,armfar:12};
+var PAR={drive:1,detour:5,sensor:4,line:7,maze:7,farm:5,cargo:4,greenhouse:5,beacon:8,compass:8,homeeyes:7,armpick:12,armstack:20,armsort:25,armbelt:14,armbelt2:22,dronefirst:4,dronegate:4,dronewall:6,dronenight:9,boda:11,solar:5,escarp:6,hop:1,trafficsmart:6,trafficled:8,autodoor:6,parking:7,wifilight:8,weatherstn:8,pedcross:9,dustbin:6,twowalls:7,stopnear:4,avoider:9,sharpline:7,schoolrun:12,farshelf:6,mastermaze:12,slalom:4,tallwall:6,armfar:12};
 function countBlocks(p){var n=0;(p||[]).forEach(function(b){n++;if(b.c)n+=countBlocks(b.c);if(b.e)n+=countBlocks(b.e);});return n;}
 function starsFor(id,blocks){var par=PAR[id];if(!par)return 1;return blocks<=par?3:blocks<=Math.ceil(par*1.5)?2:1;}
 function starStr(n){return "★★★".slice(0,n)+"☆☆☆".slice(0,3-n);}

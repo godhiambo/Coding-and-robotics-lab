@@ -293,6 +293,23 @@ function dustbin(G,l,S){var t=T();box(G,300,1,200,MM(0xcdbfa5,0.9),150,0.5,100);
  var hand=[];for(var i=0;i<4;i++){var h=new t.Group();sph(h,5,MM([0xf1c27d,0x8d5524,0xc68642,0xe0ac69][i],0.7),0,0,0);box(h,5,5,26,MM([0x1e88e5,0xe53935,0x43a047,0xf9a825][i],0.8),0,0,-16);h.visible=false;G.add(h);hand.push(h);}
  return function(tm){lid.rotation.z=S.lid/100*1.5;S.h.forEach(function(h,i){var o=hand[i];o.visible=h.d<240;if(o.visible){o.position.set(150+Math.min(h.d,100)*0.5,58+Math.min(h.d,100)*0.2,100);o.rotation.y=-Math.PI/2;}});};}
 B.dustbin=dustbin;
+function wifilight(G,l,S){var t=T();box(G,300,1,200,MM(0xcdbfa5,0.9),150,0.5,100);box(G,300,60,4,MM(0xe8e4d8,0.9),150,30,10);
+ box(G,6,40,6,MM(0x777),150,20,70);var bulb=new t.Mesh(new t.SphereGeometry(14,20,16),new t.MeshStandardMaterial({color:0x888866,emissive:0xffe28a,emissiveIntensity:0}));bulb.position.set(150,52,70);G.add(bulb);
+ var pl=new t.PointLight(0xffe28a,0,260);pl.position.set(150,52,70);G.add(pl);
+ box(G,18,3,30,MM(0x222,0.4),60,2,130);box(G,14,0.5,22,MM(0x1e88e5,0.3),60,3.8,130);var wl=lab("ESP32 Wi-Fi",36,7,"#0d2b2b","#37d6c6");wl.position.set(150,86,70);G.add(wl);
+ var rings=[1,2,3].map(function(i){var m=new t.Mesh(new t.TorusGeometry(10*i,0.8,6,28,Math.PI),new t.MeshBasicMaterial({color:0x37d6c6,transparent:true,opacity:0.6}));m.position.set(60,24,130);m.rotation.set(0,0,Math.PI/2);G.add(m);return m;});
+ return function(tm){var on=S.led;bulb.material.emissiveIntensity=on?2.4:0;pl.intensity=on?1.4:0;rings.forEach(function(r,i){r.visible=S.cmd!=="none"&&((tm*3+i)%3)<2;});};}
+B.wifilight=wifilight;
+function weatherstn(G,l,S){var t=T();box(G,300,1,200,MM(0x6fae4f,0.95),150,0.5,100);cyl(G,2.5,70,MM(0x888),150,35,100);box(G,26,10,16,MM(0xeeeeee,0.6),150,74,100);
+ var hl=new t.Mesh(new t.SphereGeometry(5,14,10),new t.MeshStandardMaterial({color:0x331100,emissive:0xff4400,emissiveIntensity:0}));hl.position.set(142,80,108);G.add(hl);var rl=new t.Mesh(new t.SphereGeometry(5,14,10),new t.MeshStandardMaterial({color:0x001133,emissive:0x2288ff,emissiveIntensity:0}));rl.position.set(158,80,108);G.add(rl);
+ var sl=lab("ESP32 WEATHER STATION",60,8,"#0d2b2b","#37d6c6");sl.position.set(150,96,100);G.add(sl);
+ var sun=new t.Mesh(new t.SphereGeometry(14,20,16),new t.MeshBasicMaterial({color:0xffd24a}));sun.position.set(40,140,20);G.add(sun);
+ var cloud=new t.Group();[[0,0],[12,4],[-12,3],[6,-3]].forEach(function(p){sph(cloud,12,new t.MeshLambertMaterial({color:0x7a8794}),p[0],p[1],0);});cloud.position.set(150,120,100);G.add(cloud);
+ var drops=[];for(var i=0;i<30;i++){var d=box(G,0.8,6,0.8,MM(0x4aa3ff,0.3),130+Math.random()*40,60,90+Math.random()*20);d.visible=false;drops.push(d);}
+ return function(tm){hl.material.emissiveIntensity=S.heat?2.4:0;rl.material.emissiveIntensity=S.ra?2.4:0;cloud.visible=S.rain;sun.scale.setScalar(S.temp>32?1.4:0.9);sun.material.color.setHex(S.temp>32?0xff8a2a:0xffd24a);
+  drops.forEach(function(d,i){d.visible=S.rain;if(S.rain)d.position.y=118-(((tm*60)+i*13)%112);});};}
+B.weatherstn=weatherstn;
+
 
 
 // =============================== phone app overlay ===============================

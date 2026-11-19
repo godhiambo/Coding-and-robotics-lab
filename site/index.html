@@ -926,6 +926,39 @@ register({id:"dustbin",name:"51 Automatic Dustbin",floor:"workshop",station:true
  info:function(S){return [["Lid",Math.round(S.lid)+"%"],["Rubbish thrown",S.thrown+" / 4"]];}});
 function db1(S){return S.thrown<4?{win:false,msg:S.thrown+" of 4 people could throw rubbish. The lid must be open while a hand is over the bin."}:{win:true,msg:"★ Clean and touch-free! All 4 people used the bin."};}
 
+// ============================ 52: Wi-Fi light controller (ESP32) ============================
+register({id:"wifilight",name:"52 Wi-Fi Light Controller",floor:"workshop",station:true,dur:60,start:{x:150,y:100,a:0},
+ mission:"Your <b>ESP32</b> receives commands from a phone over <b>Wi-Fi</b>. Make the room light obey: <b>on</b> → light on within 3 s, <b>off</b> → light off within 3 s, <b>blink</b> → toggle the light at least 4 times. Six commands will arrive.",
+ hint:"Hint: Forever → If command = on then Light on. If command = off then Light off. If command = blink then Light on, Wait 0.5, Light off, Wait 0.5, repeated.",
+ kit:["esp32","bank","led"],
+ actions:[{id:"light_on",label:"Light ON",need:"led"},{id:"light_off",label:"Light OFF",need:"led"}],
+ sensors:[{id:"wifi_cmd",label:"Phone command is",type:"enum",opts:["none","on","off","blink"]}],
+ init:function(S){S.t=0;S.led=false;S.bad=null;S.cmd="none";S.cs=[];var k=["on","off","blink"],last="",t=4;for(var i=0;i<6;i++){var c;do{c=k[Math.floor(R(0,3))%3];}while(c===last||(i===0&&c==="off"));last=c;S.cs.push({k:c,s:t,hit:-1,tog:0,done:false,started:false});t+=9;}S.ok=0;S.tog=0;},
+ step:function(S,dt){S.t+=dt;S.cs.forEach(function(c,i){var u=S.t-c.s;if(u<0)return;if(u>=0&&u<9){if(!c.started){c.started=true;S.cmd=c.k;S.curI=i;c.tog=0;}
+   if((c.k==="on"&&S.led)||(c.k==="off"&&!S.led)){if(c.hit<0)c.hit=u;}}
+  if(u>=8.9&&!c.done){c.done=true;var good=c.k==="blink"?c.tog>=4:(c.hit>=0&&c.hit<=3&&((c.k==="on")===S.led));if(good)S.ok++;else if(!S.bad)S.bad="Command "+(i+1)+" ("+c.k.toUpperCase()+") was not obeyed"+(c.k==="blink"?": the light toggled only "+c.tog+" times.":(c.hit<0?": the light never reached that state.":c.hit>3?": it took "+c.hit.toFixed(1)+" s (max 3 s).":": the light was changed again."));}});},
+ act:function*(S,id){var w=id==="light_on";if(S.led!==w){S.led=w;if(S.curI!=null&&S.cs[S.curI]&&!S.cs[S.curI].done)S.cs[S.curI].tog++;}yield* api.wait(0.1);},
+ sense:function(S,id){return S.cmd;},
+ check:function(S){if(S.bad)return {win:false,msg:S.bad};if(S.t>=this.dur)return wl2(S);return null;},end:function(S){return S.bad?{win:false,msg:S.bad}:(S.t>=this.dur-1?wl2(S):{win:false,msg:"Program ended early. Use Forever so the ESP32 keeps listening."});},
+ info:function(S){return [["Command",S.cmd.toUpperCase()],["Light",S.led?"ON":"off"],["Obeyed",S.ok+" / 6"]];}});
+function wl2(S){return S.ok>=6?{win:true,msg:"★ All 6 Wi-Fi commands obeyed. Your smart light works!"}:{win:false,msg:S.ok+" of 6 commands obeyed."};}
+
+// ============================ 53: weather station (ESP32) ============================
+register({id:"weatherstn",name:"53 Weather Station",floor:"farm",station:true,dur:60,start:{x:150,y:100,a:0},
+ mission:"Build an <b>ESP32 weather station</b> for a school. Turn on the <b>HEAT alert LED</b> while the temperature is above <b>32 °C</b> and the <b>RAIN alert LED</b> while it rains. Switch each alert off when the danger passes. Alerts may lag by at most 4 s.",
+ hint:"Hint: Forever → If temperature &gt; 32 then Heat alert on, else Heat alert off. If rain then Rain alert on, else Rain alert off.",
+ kit:["esp32","bank","dht","rain","led"],
+ actions:[{id:"heat_on",label:"Heat alert ON",need:"led"},{id:"heat_off",label:"Heat alert OFF",need:"led"},{id:"rain_on",label:"Rain alert ON",need:"led"},{id:"rain_off",label:"Rain alert OFF",need:"led"}],
+ sensors:[{id:"temperature",label:"Temperature >",unit:"°C",type:"num",gt:true,need:"dht"},{id:"rain_now",label:"It is raining",type:"bool",need:"rain"}],
+ init:function(S){S.t=0;S.temp=24;S.rain=false;S.heat=false;S.ra=false;S.mH=0;S.mR=0;S.wrong=0;S.bad=null;S.rs=R(26,32);S.re=S.rs+R(12,16);},
+ step:function(S,dt){S.t+=dt;var t=S.t;S.temp=t<10?24:t<25?24+(t-10)*0.8:t<40?36:Math.max(26,36-(t-40)*0.7);S.rain=t>=S.rs&&t<S.re;
+  var dh=S.temp>32,mh=dh!==S.heat,mr=S.rain!==S.ra;S.mH=mh?S.mH+dt:0;S.mR=mr?S.mR+dt:0;if(S.mH>4||S.mR>4)S.wrong+=dt;if(S.wrong>6&&!S.bad)S.bad=S.mH>4?"The HEAT alert was wrong for too long. It must be ON above 32 °C and OFF below.":"The RAIN alert was wrong for too long. It must be ON only while it rains.";},
+ act:function*(S,id){if(id==="heat_on")S.heat=true;else if(id==="heat_off")S.heat=false;else if(id==="rain_on")S.ra=true;else if(id==="rain_off")S.ra=false;yield* api.wait(0.1);},
+ sense:function(S,id){return id==="rain_now"?S.rain:Math.round((S.temp+noise(0.25))*10)/10;},
+ check:function(S){if(S.bad)return {win:false,msg:S.bad};if(S.t>=this.dur)return ws3(S);return null;},end:function(S){return S.bad?{win:false,msg:S.bad}:(S.t>=this.dur-1?ws3(S):{win:false,msg:"Program ended early. Use Forever so the station keeps measuring."});},
+ info:function(S){return [["Temp",S.temp.toFixed(1)+" °C"],["Rain",S.rain?"YES":"no"],["Heat LED",S.heat?"ON":"off"],["Rain LED",S.ra?"ON":"off"]];}});
+function ws3(S){return {win:true,msg:"★ Accurate weather alerts all day! Heat and rain warnings followed the real conditions."};}
+
 
 return {def:def,levels:levels,bind:bind};
 })();
@@ -1063,7 +1096,7 @@ if(typeof SCN!=="undefined"){var sbx=LEVELS.map(function(l){return l.id;}).index
  ];
  var sb=LEVELS.map(function(l){return l.id;}).indexOf("sandbox");NEW.forEach(function(l,k){LEVELS.splice(sb+k,0,l);});
  var T={Beginner:["trafficled","drive","detour","sensor","line","farm","hop","twowalls","stopnear"],
-  Intermediate:["trafficsmart","autodoor","parking","dustbin","pedcross","maze","cargo","greenhouse","solar","boda","homeeyes","beacon","compass","dronefirst","armpick","wetdry","handwash","cloth","irrigate","avoider","sharpline","schoolrun","farshelf"],
+  Intermediate:["trafficsmart","autodoor","parking","dustbin","pedcross","wifilight","weatherstn","maze","cargo","greenhouse","solar","boda","homeeyes","beacon","compass","dronefirst","armpick","wetdry","handwash","cloth","irrigate","avoider","sharpline","schoolrun","farshelf"],
   Advanced:["armstack","armsort","dronegate","dronewall","escarp","armbelt","wastetype","lake","dam","pothole","tomato","mastermaze","slalom","tallwall","armfar"],
   Expert:["armbelt2","dronenight","fire","cropmon"]};
  LEVELS.forEach(function(l){l.tier="Open";for(var t in T)if(T[t].indexOf(l.id)>=0)l.tier=t;});
@@ -1722,6 +1755,8 @@ var TIPS={
  parking:[["Which distances matter: when to start beeping and when to turn red?","Beep under 80 cm, red under 30 cm, green otherwise."],["Forever → If distance < 30 then Red LED else Green LED. If distance < 80 then Beep, Wait 0.4.","The beep must repeat while the car gets closer, so keep it inside Forever."]],
  pedcross:[["What must happen before the WALK signal turns on?","The cars must be stopped (red) first, otherwise pedestrians are in danger."],["Forever → If button pressed then Cars red, Walk on, Wait 6, Walk off, Cars green.","Always release the cars again after the crossing."]],
  dustbin:[["Which sensor tells the bin a hand is near, and how close?","The ultrasonic sensor. Open when the distance is under 30 cm."],["Forever → If hand closer than 30 then Open lid, Wait 3, else Close lid.","The hand stays over the bin for a few seconds, so wait before closing."]],
+ wifilight:[["What does the ESP32 receive from the phone, and what must the light do for each word?","on → light on, off → light off, blink → switch on and off repeatedly."],["Forever → If command = on then Light on. If command = off then Light off. If command = blink then Light on, Wait 0.5, Light off, Wait 0.5.","Blink needs at least 4 switches before the next command arrives."]],
+ weatherstn:[["Which two readings does the station need, and when is each alert on?","Temperature above 32 gives the heat alert. Rain sensor true gives the rain alert."],["Forever → If temperature > 32 then Heat on else Heat off. If rain then Rain on else Rain off.","Turn each alert OFF in the else part, or it stays on after the danger has passed."]],
  autodoor:[["When should the door open, and when should it close?","Open when a person is close, stay open while they are in the doorway, close once nobody is near."],["Forever → If person closer than 100 then Open door, else Close door.","The sensor keeps seeing the person while they are in the doorway, so the door will not close on them."]],
  solar:[["Which sensor tells the robot a row is too hot?","The temperature sensor. Read it in an If block before you switch the fan on."],["Forward 70, If temperature > 30 then Fan on, Forward 95, then check again for the second row.","The fan should stay off in the cool row to save power."]],
  escarp:[["The cliff is 140 cm tall. How high must the drone be to clear it?","More than 145 cm. Take off gives 60 cm, so you need to fly up about 100 cm."],["Take off, Fly up 100, Forward 100, Forward 100, Fly down 100, Land.","Higher flight uses more battery, so do not wait in the air."]],
@@ -2561,6 +2596,23 @@ function dustbin(G,l,S){var t=T();box(G,300,1,200,MM(0xcdbfa5,0.9),150,0.5,100);
  var hand=[];for(var i=0;i<4;i++){var h=new t.Group();sph(h,5,MM([0xf1c27d,0x8d5524,0xc68642,0xe0ac69][i],0.7),0,0,0);box(h,5,5,26,MM([0x1e88e5,0xe53935,0x43a047,0xf9a825][i],0.8),0,0,-16);h.visible=false;G.add(h);hand.push(h);}
  return function(tm){lid.rotation.z=S.lid/100*1.5;S.h.forEach(function(h,i){var o=hand[i];o.visible=h.d<240;if(o.visible){o.position.set(150+Math.min(h.d,100)*0.5,58+Math.min(h.d,100)*0.2,100);o.rotation.y=-Math.PI/2;}});};}
 B.dustbin=dustbin;
+function wifilight(G,l,S){var t=T();box(G,300,1,200,MM(0xcdbfa5,0.9),150,0.5,100);box(G,300,60,4,MM(0xe8e4d8,0.9),150,30,10);
+ box(G,6,40,6,MM(0x777),150,20,70);var bulb=new t.Mesh(new t.SphereGeometry(14,20,16),new t.MeshStandardMaterial({color:0x888866,emissive:0xffe28a,emissiveIntensity:0}));bulb.position.set(150,52,70);G.add(bulb);
+ var pl=new t.PointLight(0xffe28a,0,260);pl.position.set(150,52,70);G.add(pl);
+ box(G,18,3,30,MM(0x222,0.4),60,2,130);box(G,14,0.5,22,MM(0x1e88e5,0.3),60,3.8,130);var wl=lab("ESP32 Wi-Fi",36,7,"#0d2b2b","#37d6c6");wl.position.set(150,86,70);G.add(wl);
+ var rings=[1,2,3].map(function(i){var m=new t.Mesh(new t.TorusGeometry(10*i,0.8,6,28,Math.PI),new t.MeshBasicMaterial({color:0x37d6c6,transparent:true,opacity:0.6}));m.position.set(60,24,130);m.rotation.set(0,0,Math.PI/2);G.add(m);return m;});
+ return function(tm){var on=S.led;bulb.material.emissiveIntensity=on?2.4:0;pl.intensity=on?1.4:0;rings.forEach(function(r,i){r.visible=S.cmd!=="none"&&((tm*3+i)%3)<2;});};}
+B.wifilight=wifilight;
+function weatherstn(G,l,S){var t=T();box(G,300,1,200,MM(0x6fae4f,0.95),150,0.5,100);cyl(G,2.5,70,MM(0x888),150,35,100);box(G,26,10,16,MM(0xeeeeee,0.6),150,74,100);
+ var hl=new t.Mesh(new t.SphereGeometry(5,14,10),new t.MeshStandardMaterial({color:0x331100,emissive:0xff4400,emissiveIntensity:0}));hl.position.set(142,80,108);G.add(hl);var rl=new t.Mesh(new t.SphereGeometry(5,14,10),new t.MeshStandardMaterial({color:0x001133,emissive:0x2288ff,emissiveIntensity:0}));rl.position.set(158,80,108);G.add(rl);
+ var sl=lab("ESP32 WEATHER STATION",60,8,"#0d2b2b","#37d6c6");sl.position.set(150,96,100);G.add(sl);
+ var sun=new t.Mesh(new t.SphereGeometry(14,20,16),new t.MeshBasicMaterial({color:0xffd24a}));sun.position.set(40,140,20);G.add(sun);
+ var cloud=new t.Group();[[0,0],[12,4],[-12,3],[6,-3]].forEach(function(p){sph(cloud,12,new t.MeshLambertMaterial({color:0x7a8794}),p[0],p[1],0);});cloud.position.set(150,120,100);G.add(cloud);
+ var drops=[];for(var i=0;i<30;i++){var d=box(G,0.8,6,0.8,MM(0x4aa3ff,0.3),130+Math.random()*40,60,90+Math.random()*20);d.visible=false;drops.push(d);}
+ return function(tm){hl.material.emissiveIntensity=S.heat?2.4:0;rl.material.emissiveIntensity=S.ra?2.4:0;cloud.visible=S.rain;sun.scale.setScalar(S.temp>32?1.4:0.9);sun.material.color.setHex(S.temp>32?0xff8a2a:0xffd24a);
+  drops.forEach(function(d,i){d.visible=S.rain;if(S.rain)d.position.y=118-(((tm*60)+i*13)%112);});};}
+B.weatherstn=weatherstn;
+
 
 
 // =============================== phone app overlay ===============================
@@ -4222,7 +4274,7 @@ var C=Core,$=function(id){return document.getElementById(id);};
 var LSS="mm_scores",LSP="mm_player",LSF="mm_club";
 function jget(k,d){try{var v=JSON.parse(localStorage.getItem(k)||"null");return v===null?d:v;}catch(e){return d;}}
 function jset(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
-var PAR={drive:1,detour:5,sensor:4,line:7,maze:7,farm:5,cargo:4,greenhouse:5,beacon:8,compass:8,homeeyes:7,armpick:12,armstack:20,armsort:25,armbelt:14,armbelt2:22,dronefirst:4,dronegate:4,dronewall:6,dronenight:9,boda:11,solar:5,escarp:6,hop:1,trafficsmart:6,trafficled:8,autodoor:6,parking:7,pedcross:9,dustbin:6,twowalls:7,stopnear:4,avoider:9,sharpline:7,schoolrun:12,farshelf:6,mastermaze:12,slalom:4,tallwall:6,armfar:12};
+var PAR={drive:1,detour:5,sensor:4,line:7,maze:7,farm:5,cargo:4,greenhouse:5,beacon:8,compass:8,homeeyes:7,armpick:12,armstack:20,armsort:25,armbelt:14,armbelt2:22,dronefirst:4,dronegate:4,dronewall:6,dronenight:9,boda:11,solar:5,escarp:6,hop:1,trafficsmart:6,trafficled:8,autodoor:6,parking:7,wifilight:8,weatherstn:8,pedcross:9,dustbin:6,twowalls:7,stopnear:4,avoider:9,sharpline:7,schoolrun:12,farshelf:6,mastermaze:12,slalom:4,tallwall:6,armfar:12};
 function countBlocks(p){var n=0;(p||[]).forEach(function(b){n++;if(b.c)n+=countBlocks(b.c);if(b.e)n+=countBlocks(b.e);});return n;}
 function starsFor(id,blocks){var par=PAR[id];if(!par)return 1;return blocks<=par?3:blocks<=Math.ceil(par*1.5)?2:1;}
 function starStr(n){return "★★★".slice(0,n)+"☆☆☆".slice(0,3-n);}
