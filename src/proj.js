@@ -53,19 +53,34 @@ function save(kind){
 function publish(p){
   var A=auth();if(!me()){say("Join your class in the Class tab (as a learner) to publish.",false);return;}
   say("Publishing…");
-  api("proj/publish",{lt:me().lt,title:p.title,about:p.about,kind:p.kind,data:p.data}).then(function(){p.pub=true;jset(KEY,list().map(function(x){return x.title===p.title&&x.kind===p.kind?p:x;}));renderList();say("Published to your class gallery.",true);loadGallery();}).catch(function(e){say(e.message,false);});
+  api("proj/publish",{lt:me().lt,title:p.title,about:p.about,kind:p.kind,data:p.data,chal:($("prChal")||{}).value||""}).then(function(){p.pub=true;jset(KEY,list().map(function(x){return x.title===p.title&&x.kind===p.kind?p:x;}));renderList();say("Published to your class gallery.",true);loadGallery();}).catch(function(e){say(e.message,false);});
 }
 
 // ---- class gallery ----
-var gal=[],galKey="";
+var gal=[],chs=[],galKey="",chKey="";
 function loadGallery(){
   var A=auth(),el=$("prGal");if(!el)return;
-  if(!A){el.textContent="Join a class in the Class tab to see projects from your classmates.";return;}
-  api("proj/list",A).then(function(j){gal=j.projects||[];renderGallery();}).catch(function(){});
+  if(!A){el.textContent="Join a class in the Class tab to see projects from your classmates.";renderChal();return;}
+  api("proj/list",A).then(function(j){gal=j.projects||[];chs=j.challenges||[];renderGallery();renderChal();}).catch(function(){});
 }
+function chTitle(id){var c=chs.filter(function(x){return x.id===id;})[0];return c?c.title:"challenge";}
+function renderChal(){
+  var T=!!tch(),A=auth(),card=$("prChCard"),sel=$("prChal");if(!card)return;
+  card.style.display=A?"block":"none";$("prChNew").style.display=T?"block":"none";
+  var open=chs.filter(function(c){return c.open;});
+  var h=chs.length?chs.map(function(c){var n=gal.filter(function(p){return p.chal===c.id;}).length;return "<div style='padding:8px 0;border-bottom:1px solid #1e293b'><b>"+esc(c.title)+"</b> <span class='sub'>"+(c.kind?KINDS[c.kind]+" · ":"")+(c.open?"open":"closed")+" · "+n+" entr"+(n===1?"y":"ies")+"</span>"+(c.brief?"<div class='sub'>"+esc(c.brief)+"</div>":"")+(T?"<div class='row2' style='margin-top:6px'><button data-ch='close' data-id='"+esc(c.id)+"' data-open='"+(c.open?0:1)+"'>"+(c.open?"Close":"Reopen")+"</button><button data-ch='del' data-id='"+esc(c.id)+"'>🗑 Delete</button></div>":"")+"</div>";}).join(""):"No challenges yet."+(T?" Post one below.":"");
+  if(h!==chKey){chKey=h;$("prChList").innerHTML=h;}
+  if(sel){var keep=sel.value,o="<option value=''>Publish without a challenge</option>"+open.map(function(c){return "<option value='"+esc(c.id)+"'>🎯 For: "+esc(c.title)+"</option>";}).join("");if(sel.dataset.k!==o){sel.dataset.k=o;sel.innerHTML=o;sel.value=keep;}sel.style.display=(me()&&!T&&open.length)?"block":"none";}
+}
+function onChal(e){
+  var b=e.target.closest("button[data-ch]"),A=auth();if(!b||!A)return;var id=b.dataset.id;
+  if(b.dataset.ch==="close")api("pchal/act",Object.assign({action:"close",id:id,open:b.dataset.open==="1"},A)).then(loadGallery).catch(function(x){say(x.message,false);});
+  else if(b.dataset.ch==="del"){if(!confirm("Delete this challenge? Entries stay in the gallery."))return;api("pchal/act",Object.assign({action:"delete",id:id},A)).then(loadGallery).catch(function(x){say(x.message,false);});}
+}
+function postChal(){var A=auth();if(!A||!tch())return;api("pchal/act",Object.assign({action:"create",title:$("prChT").value,brief:$("prChB").value,kind:$("prChK").value},A)).then(function(){$("prChT").value="";$("prChB").value="";say("Challenge posted. Learners will see it in their Projects tab.",true);loadGallery();}).catch(function(x){say(x.message,false);});}
 function renderGallery(){
   var el=$("prGal"),T=!!tch();if(!el)return;
-  var h=gal.length?gal.map(function(p){return "<div style='padding:8px 0;border-bottom:1px solid #1e293b'>"+(p.feat?"⭐ ":"")+"<b>"+esc(p.title)+"</b> <span class='sub'>"+KINDS[p.kind]+" · "+esc(p.author)+" · "+ago(p.at)+"</span>"+(p.about?"<div class='sub'>"+esc(p.about)+"</div>":"")+(p.note?"<div class='sub' style='color:#fde68a'>Teacher: "+esc(p.note)+"</div>":"")+
+  var h=gal.length?gal.map(function(p){return "<div style='padding:8px 0;border-bottom:1px solid #1e293b'>"+(p.feat?"⭐ ":"")+"<b>"+esc(p.title)+"</b> <span class='sub'>"+KINDS[p.kind]+(p.chal?" · 🎯 "+esc(chTitle(p.chal)):"")+" · "+esc(p.author)+" · "+ago(p.at)+"</span>"+(p.about?"<div class='sub'>"+esc(p.about)+"</div>":"")+(p.note?"<div class='sub' style='color:#fde68a'>Teacher: "+esc(p.note)+"</div>":"")+
     "<div class='row2' style='margin-top:6px'><button data-ga='open' data-id='"+esc(p.id)+"'>Open my copy</button>"+(T?"<button data-ga='feat' data-id='"+esc(p.id)+"'>"+(p.feat?"Unstar":"⭐ Star")+"</button><button data-ga='note' data-id='"+esc(p.id)+"'>💬 Note</button>":"")+((T||p.mine)?"<button data-ga='rm' data-id='"+esc(p.id)+"'>🗑 Remove</button>":"")+"</div></div>";}).join(""):"No projects published yet. Be the first!";
   if(h!==galKey){galKey=h;el.innerHTML=h;}
 }
@@ -91,7 +106,7 @@ function importCode(){
 function init(){
   if(!$("projects"))return;
   $("prSaveR").onclick=function(){save("robot");};$("prSaveC").onclick=function(){save("circuit");};$("prSaveP").onclick=function(){save("python");};
-  $("prList").addEventListener("click",onList);$("prGal").addEventListener("click",onGal);$("prImport").onclick=importCode;
+  $("prList").addEventListener("click",onList);$("prGal").addEventListener("click",onGal);$("prImport").onclick=importCode;$("prChList").addEventListener("click",onChal);$("prChGo").onclick=postChal;
   renderList();
   var nav=document.querySelector("[data-tab=projects]");if(nav)nav.addEventListener("click",loadGallery);
   setInterval(function(){if($("projects").classList.contains("on")&&!document.hidden)loadGallery();},15000);

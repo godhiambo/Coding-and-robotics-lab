@@ -491,7 +491,9 @@ body.comp #picker,body.comp #nextM,body.comp nav [data-tab=club]{display:none!im
 <textarea id="prAbout" rows="2" maxlength="300" placeholder="What problem does it solve? (optional)"></textarea>
 <div class="row2"><button id="prSaveR">🤖 Save my robot + blocks</button><button id="prSaveC">⚡ Save my circuit</button></div>
 <div class="row2"><button id="prSaveP">🐍 Save my Python</button></div>
+<select id="prChal" style="display:none;width:100%;margin:6px 0"></select>
 <div id="prMsg" class="sub"></div></div>
+<div class="card" id="prChCard" style="display:none"><h3>🎯 Class challenges</h3><div id="prChList" class="sub"></div><div id="prChNew" style="display:none"><input id="prChT" maxlength="80" placeholder="New challenge title (e.g. Fix a problem in our community)"><textarea id="prChB" rows="3" maxlength="600" placeholder="What should learners build? Add any rules or ideas."></textarea><select id="prChK" style="width:100%"><option value="">Any project type</option><option value="robot">Robot + blocks</option><option value="circuit">Circuit</option><option value="python">Python</option></select><button id="prChGo" class="p">➕ Post challenge</button></div></div>
 <div class="card"><h3>📁 Saved on this device</h3><div id="prList" class="sub">Nothing saved yet.</div>
 <details style="margin-top:8px"><summary class="sub">Share by code</summary><textarea id="prCode" rows="3" placeholder="Paste a project code here, or press Copy on a project"></textarea><button id="prImport">📥 Add this project</button></details></div>
 <div class="card"><h3>🏫 Class gallery</h3><div id="prGal" class="sub">Join a class in the Class tab to see projects from your classmates.</div></div>

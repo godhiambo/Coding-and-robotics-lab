@@ -21,6 +21,7 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS payments(id TEXT PRIMARY KEY, class_id TEXT, plan TEXT, amount INTEGER, phone TEXT, checkout_id TEXT UNIQUE, status TEXT, receipt TEXT UNIQUE, note TEXT, created INTEGER, paid_at INTEGER)`,
   `CREATE TABLE IF NOT EXISTS pairs(code TEXT PRIMARY KEY, offer TEXT, answer TEXT, ts INTEGER)`,
   `CREATE TABLE IF NOT EXISTS sigs(id TEXT PRIMARY KEY, data TEXT)`,
+  `CREATE TABLE IF NOT EXISTS pchal(id TEXT PRIMARY KEY, class_id TEXT, title TEXT, brief TEXT, kind TEXT, open INTEGER DEFAULT 1, created INTEGER)`,
   `CREATE TABLE IF NOT EXISTS projects(id TEXT PRIMARY KEY, class_id TEXT, learner_id TEXT, title TEXT, about TEXT, kind TEXT, data TEXT, feat INTEGER DEFAULT 0, note TEXT, created INTEGER)`,
   `CREATE TABLE IF NOT EXISTS settings(k TEXT PRIMARY KEY, v TEXT)`,
   `CREATE TABLE IF NOT EXISTS counters(k TEXT PRIMARY KEY, n INTEGER)`,
@@ -37,7 +38,7 @@ function planOf(c) {
   return { plan: raw, label: PLANS[raw].label, effective: eff, expired, until, learners: PLANS[eff].learners, comps: PLANS[eff].comps };
 }
 
-async function init(db) { if (ready) return; await db.batch(SCHEMA.map((s) => db.prepare(s))); for (const q of ["ALTER TABLE attempts ADD COLUMN level TEXT", "ALTER TABLE classes ADD COLUMN t_name TEXT", "ALTER TABLE classes ADD COLUMN t_title TEXT", "ALTER TABLE classes ADD COLUMN t_school TEXT", "ALTER TABLE classes ADD COLUMN t_sig TEXT", "ALTER TABLE classes ADD COLUMN t_status TEXT", "ALTER TABLE classes ADD COLUMN t_auth INTEGER DEFAULT 0", "ALTER TABLE classes ADD COLUMN plan TEXT", "ALTER TABLE classes ADD COLUMN plan_until INTEGER DEFAULT 0"]) { try { await db.prepare(q).run(); } catch (e) {} } ready = true; }
+async function init(db) { if (ready) return; await db.batch(SCHEMA.map((s) => db.prepare(s))); for (const q of ["ALTER TABLE attempts ADD COLUMN level TEXT", "ALTER TABLE classes ADD COLUMN t_name TEXT", "ALTER TABLE classes ADD COLUMN t_title TEXT", "ALTER TABLE classes ADD COLUMN t_school TEXT", "ALTER TABLE classes ADD COLUMN t_sig TEXT", "ALTER TABLE classes ADD COLUMN t_status TEXT", "ALTER TABLE classes ADD COLUMN t_auth INTEGER DEFAULT 0", "ALTER TABLE projects ADD COLUMN chal TEXT", "ALTER TABLE classes ADD COLUMN plan TEXT", "ALTER TABLE classes ADD COLUMN plan_until INTEGER DEFAULT 0", "ALTER TABLE projects ADD COLUMN chal TEXT"]) { try { await db.prepare(q).run(); } catch (e) {} } ready = true; }
 
 const hex = (b) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
 const sha = async (s) => hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(s))));
@@ -263,19 +264,35 @@ R["proj/publish"] = async (db, b) => {
   if (!title) return bad("Give your project a name.");
   if (PKINDS.indexOf(kind) < 0) return bad("Unknown project type.");
   if (!data || data.length > PMAX) return bad("This project is too big to publish.");
+  let chal = null;
+  if (b.chal) { const ch = await db.prepare("SELECT id,open FROM pchal WHERE id=? AND class_id=?").bind(str(b.chal, 40), l.class_id).first(); if (!ch) return bad("That challenge was not found.", 404); if (!ch.open) return bad("That challenge is closed.", 403); chal = ch.id; }
   const old = await db.prepare("SELECT id FROM projects WHERE learner_id=? AND title=? AND kind=?").bind(l.id, title, kind).first();
-  if (old) { await db.prepare("UPDATE projects SET about=?, data=?, created=? WHERE id=?").bind(about, data, Date.now(), old.id).run(); return J({ id: old.id, updated: true }); }
+  if (old) { await db.prepare("UPDATE projects SET about=?, data=?, created=?, chal=? WHERE id=?").bind(about, data, Date.now(), chal, old.id).run(); return J({ id: old.id, updated: true }); }
   const n = (await db.prepare("SELECT COUNT(*) AS n FROM projects WHERE learner_id=?").bind(l.id).first()).n;
   if (n >= PPER) return bad("You have published " + PPER + " projects. Delete one in the gallery to add another.", 403);
   const id = uid();
-  await db.prepare("INSERT INTO projects(id,class_id,learner_id,title,about,kind,data,feat,created) VALUES(?,?,?,?,?,?,?,0,?)").bind(id, l.class_id, l.id, title, about, kind, data, Date.now()).run();
+  await db.prepare("INSERT INTO projects(id,class_id,learner_id,title,about,kind,data,feat,created,chal) VALUES(?,?,?,?,?,?,?,0,?,?)").bind(id, l.class_id, l.id, title, about, kind, data, Date.now(), chal).run();
   await ev(db, null, l.id, "project_published", { title, kind });
   return J({ id });
 };
 R["proj/list"] = async (db, b) => {
   const w = await projWho(db, b); if (!w) return bad("Not allowed.", 401);
-  const rows = (await db.prepare("SELECT p.id,p.title,p.about,p.kind,p.feat,p.note,p.created,p.learner_id,l.name AS author FROM projects p LEFT JOIN learners l ON l.id=p.learner_id WHERE p.class_id=? ORDER BY p.feat DESC, p.created DESC LIMIT 200").bind(w.c.id).all()).results || [];
-  return J({ projects: rows.map((r) => ({ id: r.id, title: r.title, about: r.about, kind: r.kind, feat: !!r.feat, note: r.note || "", at: r.created, author: r.author || "Learner", mine: !!(w.l && w.l.id === r.learner_id) })) });
+  const rows = (await db.prepare("SELECT p.id,p.title,p.about,p.kind,p.feat,p.note,p.created,p.chal,p.learner_id,l.name AS author FROM projects p LEFT JOIN learners l ON l.id=p.learner_id WHERE p.class_id=? ORDER BY p.feat DESC, p.created DESC LIMIT 200").bind(w.c.id).all()).results || [];
+  const chs = ((await db.prepare("SELECT id,title,brief,kind,open,created FROM pchal WHERE class_id=? ORDER BY open DESC, created DESC LIMIT 30").bind(w.c.id).all()).results || []).map((x) => ({ id: x.id, title: x.title, brief: x.brief, kind: x.kind || "", open: !!x.open, at: x.created }));
+  return J({ challenges: chs, projects: rows.map((r) => ({ id: r.id, title: r.title, about: r.about, kind: r.kind, feat: !!r.feat, note: r.note || "", chal: r.chal || "", at: r.created, author: r.author || "Learner", mine: !!(w.l && w.l.id === r.learner_id) })) });
+};
+R["pchal/act"] = async (db, b) => {
+  const c = await teacher(db, b); if (!c) return bad("Only the teacher can do that.", 401);
+  if (b.action === "create") {
+    const title = str(b.title, 80), brief = str(b.brief, 600), kind = PKINDS.indexOf(str(b.kind, 10)) >= 0 ? str(b.kind, 10) : "";
+    if (!title) return bad("Give the challenge a title.");
+    const n = (await db.prepare("SELECT COUNT(*) AS n FROM pchal WHERE class_id=?").bind(c.id).first()).n; if (n >= 30) return bad("Delete an old challenge first.", 403);
+    const id = uid(); await db.prepare("INSERT INTO pchal(id,class_id,title,brief,kind,open,created) VALUES(?,?,?,?,?,1,?)").bind(id, c.id, title, brief, kind, Date.now()).run(); return J({ id });
+  }
+  const ch = await db.prepare("SELECT id FROM pchal WHERE id=? AND class_id=?").bind(str(b.id, 40), c.id).first(); if (!ch) return bad("Challenge not found.", 404);
+  if (b.action === "close") { await db.prepare("UPDATE pchal SET open=? WHERE id=?").bind(b.open ? 1 : 0, ch.id).run(); return J({ ok: true }); }
+  if (b.action === "delete") { await db.prepare("DELETE FROM pchal WHERE id=?").bind(ch.id).run(); await db.prepare("UPDATE projects SET chal=NULL WHERE chal=?").bind(ch.id).run(); return J({ ok: true }); }
+  return bad("Unknown action.");
 };
 R["proj/get"] = async (db, b) => {
   const w = await projWho(db, b); if (!w) return bad("Not allowed.", 401);
