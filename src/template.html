@@ -486,8 +486,9 @@ body.comp #picker,body.comp #nextM,body.comp nav [data-tab=club]{display:none!im
 <section id="classroom" class="view"></section>
 <section id="mmcr" class="view"><div class="card"><h2>📡 Connected Robotics</h2><p class="sub">Drive a virtual robot, a real ESP32 robot, or both at once, with your phone as the controller.</p>
 <div class="row" id="mmcrMode"><button data-m="virtual" class="on">🖥 Virtual</button><button data-m="physical">🤖 Physical</button><button data-m="hybrid">🔀 Hybrid</button></div>
-<div id="mmcrBle" style="display:none;margin:8px 0"><div class="row"><button id="mmcrConnect">🔗 Connect robot (Bluetooth)</button><button id="mmcrDisc">Disconnect</button></div><div id="mmcrConn">Not connected.</div><div>Robot distance: <b id="mmcrPd">–</b> <button id="mmcrSketch" style="margin-left:8px">⬇ Robot code (ESP32)</button></div></div>
+<div id="mmcrBle" style="display:none;margin:8px 0"><div class="row"><button id="mmcrConnect">🔗 Connect robot (Bluetooth)</button><button id="mmcrDisc">Disconnect</button></div><div id="mmcrConn">Not connected.</div><div>Robot distance: <b id="mmcrPd">–</b> <button id="mmcrSketch" style="margin-left:8px">⬇ Bluetooth robot code</button></div></div>
 <canvas id="mmcrCv" width="320" height="320" style="width:100%;max-width:340px;border-radius:12px;display:block;margin:8px auto;border:1px solid var(--line)"></canvas>
+<div class="row"><button id="mmcrWifi">⬇ Wi-Fi robot code (no internet needed)</button></div>
 <div id="mmcrStat" style="text-align:center;font-weight:600">L 0  R 0</div>
 <div id="mmcrPad"><div id="mmcrKnob"></div></div>
 <div class="row"><label style="flex:1">Speed <input id="mmcrThr" type="range" min="20" max="100" value="70" style="width:100%"> <b id="mmcrThrV">70%</b></label></div>

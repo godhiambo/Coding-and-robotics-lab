@@ -64,10 +64,10 @@ function phonePair(){if(!window.RTCPeerConnection){pst("This browser cannot pair
  api("pair/join",{code:code}).then(function(j){return pc.setRemoteDescription(JSON.parse(j.sdp));}).then(function(){return pc.createAnswer();}).then(function(a){return pc.setLocalDescription(a);}).then(function(){return gathered(pc);}).then(function(){return api("pair/answer",{code:code,sdp:JSON.stringify(pc.localDescription)});})
  .catch(function(e){pst("Pairing failed: "+e.message,false);});}
 var last=0;function loop(ts){requestAnimationFrame(loop);var v=$("mmcr");if(!v||!v.classList.contains("on")){last=ts;return;}var dt=Math.min(.05,(ts-last)/1000||.016);last=ts;out();step(dt);draw();}
-function sketch(){fetch("esp32/mmcr_robot.ino").then(function(r){return r.text();}).then(function(t){var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([t],{type:"text/plain"}));a.download="mmcr_robot.ino";a.click();});}
+function sketch(f){fetch("esp32/"+(typeof f==="string"?f:"mmcr_robot.ino")).then(function(r){return r.text();}).then(function(t){var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([t],{type:"text/plain"}));a.download=(typeof f==="string"?f:"mmcr_robot.ino");a.click();});}
 function init(){if(!$("mmcrPad"))return;pad();
  [].forEach.call(document.querySelectorAll("#mmcrMode button"),function(b){b.onclick=function(){setMode(b.dataset.m);};});
- $("mmcrConnect").onclick=connect;$("mmcrDisc").onclick=disconnect;$("mmcrTilt").onclick=toggleTilt;$("mmcrStop").onclick=function(){stop();};$("mmcrSketch").onclick=sketch;
+ $("mmcrConnect").onclick=connect;$("mmcrDisc").onclick=disconnect;$("mmcrTilt").onclick=toggleTilt;$("mmcrStop").onclick=function(){stop();};$("mmcrSketch").onclick=function(){sketch();};$("mmcrWifi").onclick=function(){sketch("mmcr_wifi.ino");};
  $("mmcrThr").oninput=function(){thr=this.value/100;$("mmcrThrV").textContent=this.value+"%";};
  $("mmcrHost").onclick=hostPair;$("mmcrJoin").onclick=phonePair;$("mmcrReset").onclick=function(){R.x=160;R.y=260;R.a=-90;R.trail=[];};
  document.addEventListener("keydown",function(e){if(!$("mmcr").classList.contains("on"))return;var k=e.key;if(k==="ArrowUp"||k==="w")jy=1;if(k==="ArrowDown"||k==="s")jy=-1;if(k==="ArrowLeft"||k==="a")jx=-1;if(k==="ArrowRight"||k==="d")jx=1;if(k===" "){stop();e.preventDefault();}});

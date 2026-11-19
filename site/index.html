@@ -486,8 +486,9 @@ body.comp #picker,body.comp #nextM,body.comp nav [data-tab=club]{display:none!im
 <section id="classroom" class="view"></section>
 <section id="mmcr" class="view"><div class="card"><h2>📡 Connected Robotics</h2><p class="sub">Drive a virtual robot, a real ESP32 robot, or both at once, with your phone as the controller.</p>
 <div class="row" id="mmcrMode"><button data-m="virtual" class="on">🖥 Virtual</button><button data-m="physical">🤖 Physical</button><button data-m="hybrid">🔀 Hybrid</button></div>
-<div id="mmcrBle" style="display:none;margin:8px 0"><div class="row"><button id="mmcrConnect">🔗 Connect robot (Bluetooth)</button><button id="mmcrDisc">Disconnect</button></div><div id="mmcrConn">Not connected.</div><div>Robot distance: <b id="mmcrPd">–</b> <button id="mmcrSketch" style="margin-left:8px">⬇ Robot code (ESP32)</button></div></div>
+<div id="mmcrBle" style="display:none;margin:8px 0"><div class="row"><button id="mmcrConnect">🔗 Connect robot (Bluetooth)</button><button id="mmcrDisc">Disconnect</button></div><div id="mmcrConn">Not connected.</div><div>Robot distance: <b id="mmcrPd">–</b> <button id="mmcrSketch" style="margin-left:8px">⬇ Bluetooth robot code</button></div></div>
 <canvas id="mmcrCv" width="320" height="320" style="width:100%;max-width:340px;border-radius:12px;display:block;margin:8px auto;border:1px solid var(--line)"></canvas>
+<div class="row"><button id="mmcrWifi">⬇ Wi-Fi robot code (no internet needed)</button></div>
 <div id="mmcrStat" style="text-align:center;font-weight:600">L 0  R 0</div>
 <div id="mmcrPad"><div id="mmcrKnob"></div></div>
 <div class="row"><label style="flex:1">Speed <input id="mmcrThr" type="range" min="20" max="100" value="70" style="width:100%"> <b id="mmcrThrV">70%</b></label></div>
@@ -5194,10 +5195,10 @@ function phonePair(){if(!window.RTCPeerConnection){pst("This browser cannot pair
  api("pair/join",{code:code}).then(function(j){return pc.setRemoteDescription(JSON.parse(j.sdp));}).then(function(){return pc.createAnswer();}).then(function(a){return pc.setLocalDescription(a);}).then(function(){return gathered(pc);}).then(function(){return api("pair/answer",{code:code,sdp:JSON.stringify(pc.localDescription)});})
  .catch(function(e){pst("Pairing failed: "+e.message,false);});}
 var last=0;function loop(ts){requestAnimationFrame(loop);var v=$("mmcr");if(!v||!v.classList.contains("on")){last=ts;return;}var dt=Math.min(.05,(ts-last)/1000||.016);last=ts;out();step(dt);draw();}
-function sketch(){fetch("esp32/mmcr_robot.ino").then(function(r){return r.text();}).then(function(t){var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([t],{type:"text/plain"}));a.download="mmcr_robot.ino";a.click();});}
+function sketch(f){fetch("esp32/"+(typeof f==="string"?f:"mmcr_robot.ino")).then(function(r){return r.text();}).then(function(t){var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([t],{type:"text/plain"}));a.download=(typeof f==="string"?f:"mmcr_robot.ino");a.click();});}
 function init(){if(!$("mmcrPad"))return;pad();
  [].forEach.call(document.querySelectorAll("#mmcrMode button"),function(b){b.onclick=function(){setMode(b.dataset.m);};});
- $("mmcrConnect").onclick=connect;$("mmcrDisc").onclick=disconnect;$("mmcrTilt").onclick=toggleTilt;$("mmcrStop").onclick=function(){stop();};$("mmcrSketch").onclick=sketch;
+ $("mmcrConnect").onclick=connect;$("mmcrDisc").onclick=disconnect;$("mmcrTilt").onclick=toggleTilt;$("mmcrStop").onclick=function(){stop();};$("mmcrSketch").onclick=function(){sketch();};$("mmcrWifi").onclick=function(){sketch("mmcr_wifi.ino");};
  $("mmcrThr").oninput=function(){thr=this.value/100;$("mmcrThrV").textContent=this.value+"%";};
  $("mmcrHost").onclick=hostPair;$("mmcrJoin").onclick=phonePair;$("mmcrReset").onclick=function(){R.x=160;R.y=260;R.a=-90;R.trail=[];};
  document.addEventListener("keydown",function(e){if(!$("mmcr").classList.contains("on"))return;var k=e.key;if(k==="ArrowUp"||k==="w")jy=1;if(k==="ArrowDown"||k==="s")jy=-1;if(k==="ArrowLeft"||k==="a")jx=-1;if(k==="ArrowRight"||k==="d")jx=1;if(k===" "){stop();e.preventDefault();}});
