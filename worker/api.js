@@ -171,7 +171,8 @@ function nairobiStamp() { const d = new Date(Date.now() + 3 * 3600000), p = (n) 
 function msisdn(v) { let p = String(v || "").replace(/[^\d]/g, ""); if (/^0[17]\d{8}$/.test(p)) p = "254" + p.slice(1); else if (/^[17]\d{8}$/.test(p)) p = "254" + p; return /^254[17]\d{8}$/.test(p) ? p : ""; }
 async function mpesaToken(env) {
   const r = await fetch(mpesaBase(env) + "/oauth/v1/generate?grant_type=client_credentials", { headers: { authorization: "Basic " + btoa(env.MPESA_CONSUMER_KEY + ":" + env.MPESA_CONSUMER_SECRET) } });
-  const j = await r.json().catch(() => ({})); if (!r.ok || !j.access_token) throw new Error("M-PESA sign-in failed");
+  const txt = await r.text().catch(() => ""); let j = {}; try { j = JSON.parse(txt); } catch {}
+  if (!r.ok || !j.access_token) throw new Error("M-PESA sign-in failed (" + (env.MPESA_ENV === "production" ? "live" : "sandbox, set MPESA_ENV=production for live") + ", HTTP " + r.status + (txt ? ": " + txt.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 90) : "") + ")");
   return j.access_token;
 }
 async function activatePlan(db, pay, receipt) {
