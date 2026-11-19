@@ -290,6 +290,7 @@ body.comp #picker,body.comp #nextM,body.comp nav [data-tab=club]{display:none!im
  <button data-tab="club"><span>🏆</span>Club</button>
  <button data-tab="classroom"><span>🏫</span>Class</button>
  <button data-tab="mmcr"><span>📡</span>Link</button>
+ <button data-tab="projects"><span>🧪</span>Projects</button>
 </nav>
 <main>
 <section id="play" class="view on">
@@ -484,6 +485,17 @@ body.comp #picker,body.comp #nextM,body.comp nav [data-tab=club]{display:none!im
  <div id="serMsg" class="sub"></div></div>
 </section>
 <section id="classroom" class="view"></section>
+<section id="projects" class="view"><div class="card"><h2>🧪 My Projects</h2>
+<p class="sub">Invent your own robot, circuit or program. Save it here, open it later, and show it to your class.</p>
+<input id="prName" maxlength="60" placeholder="Project name (e.g. Water pump alarm)">
+<textarea id="prAbout" rows="2" maxlength="300" placeholder="What problem does it solve? (optional)"></textarea>
+<div class="row2"><button id="prSaveR">🤖 Save my robot + blocks</button><button id="prSaveC">⚡ Save my circuit</button></div>
+<div class="row2"><button id="prSaveP">🐍 Save my Python</button></div>
+<div id="prMsg" class="sub"></div></div>
+<div class="card"><h3>📁 Saved on this device</h3><div id="prList" class="sub">Nothing saved yet.</div>
+<details style="margin-top:8px"><summary class="sub">Share by code</summary><textarea id="prCode" rows="3" placeholder="Paste a project code here, or press Copy on a project"></textarea><button id="prImport">📥 Add this project</button></details></div>
+<div class="card"><h3>🏫 Class gallery</h3><div id="prGal" class="sub">Join a class in the Class tab to see projects from your classmates.</div></div>
+</section>
 <section id="mmcr" class="view"><div class="card"><h2>📡 Connected Robotics</h2><p class="sub">Drive a virtual robot, a real ESP32 robot, or both at once, with your phone as the controller.</p>
 <details id="mmcrGuide" class="card" style="margin:8px 0"><summary><b>ℹ How the Link tab works</b></summary><ol class="sub" style="padding-left:18px"><li><b>Drive:</b> pick Robot or Drone, then use the joystick (or tilt, or the keyboard).</li><li><b>Mission:</b> choose an arena and tap Start mission. Reach the numbered stops in order. Your drive is recorded and checked.</li><li><b>Phone controller:</b> on the computer open "Use a phone as the controller", get a code, then enter it on the phone.</li><li><b>Real robot:</b> choose Physical or Hybrid, download the robot code for your ESP32 (or use a LEGO hub), and connect with Bluetooth.</li><li><b>Safety:</b> the red button stops everything. Real robots stop by themselves if the link drops.</li></ol><button id="mmcrGuideOk">Got it</button></details>
 <div class="row" id="mmcrVeh"><button data-v="robot" class="on">🚗 Robot</button><button data-v="drone">🚁 Drone</button></div>
@@ -565,6 +577,7 @@ __ECHO__
 __EXTRAS__
 __RESCUE__
 __MMCR__
+__PROJ__
 __REW__
 __BRIDGE__
 __GEAR__

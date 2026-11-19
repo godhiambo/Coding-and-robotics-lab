@@ -21,6 +21,7 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS payments(id TEXT PRIMARY KEY, class_id TEXT, plan TEXT, amount INTEGER, phone TEXT, checkout_id TEXT UNIQUE, status TEXT, receipt TEXT UNIQUE, note TEXT, created INTEGER, paid_at INTEGER)`,
   `CREATE TABLE IF NOT EXISTS pairs(code TEXT PRIMARY KEY, offer TEXT, answer TEXT, ts INTEGER)`,
   `CREATE TABLE IF NOT EXISTS sigs(id TEXT PRIMARY KEY, data TEXT)`,
+  `CREATE TABLE IF NOT EXISTS projects(id TEXT PRIMARY KEY, class_id TEXT, learner_id TEXT, title TEXT, about TEXT, kind TEXT, data TEXT, feat INTEGER DEFAULT 0, note TEXT, created INTEGER)`,
   `CREATE TABLE IF NOT EXISTS settings(k TEXT PRIMARY KEY, v TEXT)`,
   `CREATE TABLE IF NOT EXISTS counters(k TEXT PRIMARY KEY, n INTEGER)`,
   `CREATE INDEX IF NOT EXISTS ix_cert_comp ON certs(comp_id)`,
@@ -245,6 +246,53 @@ R["class/learner"] = async (db, b) => {
   else if (b.action === "extra") { const m = clamp(Math.round(+b.minutes || 0), 0, 120); await db.prepare("UPDATE learners SET extra_s=? WHERE id=?").bind(m * 60, l.id).run(); await ev(db, null, l.id, "accommodation", { minutes: m }); }
   else return bad("Unknown action.");
   return J({ ok: true });
+};
+
+
+// ---- learner projects: publish to the class gallery ----
+const PKINDS = ["robot", "circuit", "python"], PMAX = 40000, PPER = 12;
+async function projWho(db, b) {
+  const t = await teacher(db, b); if (t) return { c: t, l: null };
+  const l = await learner(db, b); if (!l) return null;
+  const c = await db.prepare("SELECT * FROM classes WHERE id=?").bind(l.class_id).first();
+  return c ? { c, l } : null;
+}
+R["proj/publish"] = async (db, b) => {
+  const l = await learner(db, b); if (!l) return bad("Join your class first.", 401);
+  const title = str(b.title, 60), about = str(b.about, 300), kind = str(b.kind, 10), data = typeof b.data === "string" ? b.data : "";
+  if (!title) return bad("Give your project a name.");
+  if (PKINDS.indexOf(kind) < 0) return bad("Unknown project type.");
+  if (!data || data.length > PMAX) return bad("This project is too big to publish.");
+  const old = await db.prepare("SELECT id FROM projects WHERE learner_id=? AND title=? AND kind=?").bind(l.id, title, kind).first();
+  if (old) { await db.prepare("UPDATE projects SET about=?, data=?, created=? WHERE id=?").bind(about, data, Date.now(), old.id).run(); return J({ id: old.id, updated: true }); }
+  const n = (await db.prepare("SELECT COUNT(*) AS n FROM projects WHERE learner_id=?").bind(l.id).first()).n;
+  if (n >= PPER) return bad("You have published " + PPER + " projects. Delete one in the gallery to add another.", 403);
+  const id = uid();
+  await db.prepare("INSERT INTO projects(id,class_id,learner_id,title,about,kind,data,feat,created) VALUES(?,?,?,?,?,?,?,0,?)").bind(id, l.class_id, l.id, title, about, kind, data, Date.now()).run();
+  await ev(db, null, l.id, "project_published", { title, kind });
+  return J({ id });
+};
+R["proj/list"] = async (db, b) => {
+  const w = await projWho(db, b); if (!w) return bad("Not allowed.", 401);
+  const rows = (await db.prepare("SELECT p.id,p.title,p.about,p.kind,p.feat,p.note,p.created,p.learner_id,l.name AS author FROM projects p LEFT JOIN learners l ON l.id=p.learner_id WHERE p.class_id=? ORDER BY p.feat DESC, p.created DESC LIMIT 200").bind(w.c.id).all()).results || [];
+  return J({ projects: rows.map((r) => ({ id: r.id, title: r.title, about: r.about, kind: r.kind, feat: !!r.feat, note: r.note || "", at: r.created, author: r.author || "Learner", mine: !!(w.l && w.l.id === r.learner_id) })) });
+};
+R["proj/get"] = async (db, b) => {
+  const w = await projWho(db, b); if (!w) return bad("Not allowed.", 401);
+  const r = await db.prepare("SELECT title,kind,data FROM projects WHERE id=? AND class_id=?").bind(str(b.id, 40), w.c.id).first();
+  if (!r) return bad("Project not found.", 404);
+  return J({ title: r.title, kind: r.kind, data: r.data });
+};
+R["proj/act"] = async (db, b) => {
+  const w = await projWho(db, b); if (!w) return bad("Not allowed.", 401);
+  const r = await db.prepare("SELECT id,learner_id FROM projects WHERE id=? AND class_id=?").bind(str(b.id, 40), w.c.id).first();
+  if (!r) return bad("Project not found.", 404);
+  const mine = w.l && w.l.id === r.learner_id;
+  if (b.action === "remove") { if (!w.l ? false : !mine) return bad("Only the owner or the teacher can remove this.", 403); await db.prepare("DELETE FROM projects WHERE id=?").bind(r.id).run(); return J({ ok: true }); }
+  if (w.l) return bad("Only the teacher can do that.", 403);
+  if (b.action === "feature") { await db.prepare("UPDATE projects SET feat=? WHERE id=?").bind(b.on ? 1 : 0, r.id).run(); return J({ ok: true }); }
+  if (b.action === "note") { await db.prepare("UPDATE projects SET note=? WHERE id=?").bind(str(b.note, 200), r.id).run(); return J({ ok: true }); }
+  return bad("Unknown action.");
 };
 
 R["comp/create"] = async (db, b) => {

@@ -290,6 +290,6 @@ $("mcuAddBtn").onclick=function(){var D=DEFP[curBoard()],k=$("mcuAdd").value,th=
 $("mcuClearProg").onclick=function(){prog.length=0;renderProg();changed();};
 window.LabMcu={setChallenge:function(id,lock){var c=MCU.CHALLENGES.filter(function(x){return x.id===id;})[0];if(!c)return;setMode(c.board==="esp32"?"esp":"mcu",true);for(var i=0;i<CH.length;i++)if(CH[i].id===id)chIdx=i;renderCh();$("bblab").querySelector("details")&&0;if(lock)document.body.classList.add("lockmcu");},
  getDesign:function(){var c=CH[chIdx];return {ch:c.id,board:curBoard(),comps:comps.map(function(q){var o={id:q.id,type:q.type,holes:q.holes.slice()};["value","color","closed","pos","light","temp","dist","board"].forEach(function(k){if(q[k]!==undefined)o[k]=q[k];});return o;}),prog:JSON.parse(JSON.stringify(prog))};}};
-window.MM_mcu={setMode:setMode,prog:function(){return prog;},setProg:function(p){prog=p;progs[mode]=p;renderProg();changed();},comps:function(){return comps;},setComps:function(c){comps=c;update();},run:function(){return startRun();},stop:stopRun};
+window.MM_mcu={mode:function(){return mode;},setMode:setMode,prog:function(){return prog;},setProg:function(p){prog=p;progs[mode]=p;renderProg();changed();},comps:function(){return comps;},setComps:function(c){comps=c;nid=1;c.forEach(function(q){if(typeof q.id==='number'&&q.id>=nid)nid=q.id+1;});selected=null;pending=null;update();},run:function(){return startRun();},stop:stopRun};
 renderCh();calc();update();
 })();
