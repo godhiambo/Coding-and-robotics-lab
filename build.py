@@ -28,6 +28,7 @@ t = t.replace('__COMP__', r('comp.js'))
 t = t.replace('__RESCUE__', r('rescue.js').replace('if(typeof module', '//if(typeof module'))
 t = t.replace('__MMCR__', r('mmcr.js'))
 t = t.replace('__PROJ__', r('proj.js'))
+t = t.replace('__TOUR__', r('tour.js'))
 t = t.replace('__EXTRAS__', r('extras.js').replace('__PYGLUE__', json.dumps(r('pyglue.py')).replace('</', '<\\/')))
 # use the bundled 3D engine instead of the CDN so the site works offline
 t = re.sub(r'https://cdnjs\.cloudflare\.com/[^"\']*three[^"\']*\.js', 'three.min.js', t)
