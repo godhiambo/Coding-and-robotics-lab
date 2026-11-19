@@ -15,53 +15,55 @@ function cname(c){
 var LABELS={battery:["+ lead (red)","− lead (black)"],resistor:["leg 1","leg 2"],led:["anode + (long leg)","cathode − (short leg)"],switch:["terminal 1","terminal 2"],pot:["end A","wiper (middle pin)","end B"],wire:["end 1","end 2"],ldr:["leg 1","leg 2"],ntc:["leg 1","leg 2"],npn:["collector (C)","base (B)","emitter (E)"]};
 function recompute(){sim=X.simulate(comps);}
 // ---------- drawing ----------
-function legLine(a,b,col){return "<line x1='"+a[0]+"' y1='"+a[1]+"' x2='"+b[0]+"' y2='"+b[1]+"' stroke='"+(col||"#9aa0a6")+"' stroke-width='2.2' stroke-linecap='round'/>";}
+function legLine(a,b,col){return "<line x1='"+a[0]+"' y1='"+(a[1]+1.4)+"' x2='"+b[0]+"' y2='"+(b[1]+1.4)+"' stroke='rgba(0,0,0,.28)' stroke-width='2.6' stroke-linecap='round'/><line x1='"+a[0]+"' y1='"+a[1]+"' x2='"+b[0]+"' y2='"+b[1]+"' stroke='"+(col||"url(#mmMetal)")+"' stroke-width='2.1' stroke-linecap='round'/><circle cx='"+a[0]+"' cy='"+a[1]+"' r='2.6' fill='#9ca3af'/>";}
+var DEFS="<defs><linearGradient id='mmBoard' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#f6f3ea'/><stop offset='1' stop-color='#d9d4c0'/></linearGradient><linearGradient id='mmMetal' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#f1f5f9'/><stop offset='.5' stop-color='#9aa3ad'/><stop offset='1' stop-color='#d8dee4'/></linearGradient><linearGradient id='mmRes' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#f3e6bd'/><stop offset='.45' stop-color='#dcc58b'/><stop offset='1' stop-color='#a98d52'/></linearGradient><linearGradient id='mmBlk' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#4b5563'/><stop offset='1' stop-color='#111827'/></linearGradient><linearGradient id='mmBlue' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#60a5fa'/><stop offset='1' stop-color='#1e3a8a'/></linearGradient><radialGradient id='mmKnob' cx='.35' cy='.3' r='.8'><stop offset='0' stop-color='#fff'/><stop offset='1' stop-color='#9ca3af'/></radialGradient><radialGradient id='mmHole' cx='.5' cy='.45' r='.6'><stop offset='0' stop-color='#111'/><stop offset='1' stop-color='#4a4a44'/></radialGradient><filter id='mmSh' x='-20%' y='-20%' width='140%' height='150%'><feDropShadow dx='0' dy='2' stdDeviation='2' flood-opacity='.35'/></filter><filter id='mmBlur'><feGaussianBlur stdDeviation='5'/></filter></defs>";
 function drawComp(c){
  var P=c.holes.map(pos),o=sim&&sim.comp[c.id]||{i:0,lit:0,burned:false},s="",sel=selected===c.id;
  var mx=(P[0][0]+P[P.length-1][0])/2,my=(P[0][1]+P[P.length-1][1])/2,hx=mx,hy=my;
  if(c.type==="wire"){
   var dx=P[1][0]-P[0][0],dy=P[1][1]-P[0][1],len=Math.hypot(dx,dy)||1,nx=-dy/len,ny=dx/len,bow=Math.min(30,len*0.25+8),cx=mx+nx*bow*-1,cy=my+ny*bow*-1;if(cy>my&&P[0][1]>150)cy=my+bow;
-  s+="<path d='M"+P[0][0]+" "+P[0][1]+" Q"+cx+" "+cy+" "+P[1][0]+" "+P[1][1]+"' stroke='"+WIRECOL[c.id%WIRECOL.length]+"' stroke-width='3.4' fill='none' stroke-linecap='round'/>";
+  var wd="M"+P[0][0]+" "+P[0][1]+" Q"+cx+" "+cy+" "+P[1][0]+" "+P[1][1];
+  s+="<path d='"+wd+"' transform='translate(0 2)' stroke='rgba(0,0,0,.25)' stroke-width='5' fill='none' stroke-linecap='round'/><path d='"+wd+"' stroke='"+WIRECOL[c.id%WIRECOL.length]+"' stroke-width='4' fill='none' stroke-linecap='round'/><path d='"+wd+"' stroke='rgba(255,255,255,.45)' stroke-width='1' fill='none' stroke-linecap='round' transform='translate(0 -1)'/><rect x='"+(P[0][0]-2.5)+"' y='"+(P[0][1]-2.5)+"' width='5' height='5' rx='1' fill='#cbd5e1'/><rect x='"+(P[1][0]-2.5)+"' y='"+(P[1][1]-2.5)+"' width='5' height='5' rx='1' fill='#cbd5e1'/>";
   hx=(P[0][0]+2*cx+P[1][0])/4;hy=(P[0][1]+2*cy+P[1][1])/4;
  }else if(c.type==="battery"){
   var top=Math.min(P[0][1],P[1][1]),by=top<100?top-24:top-22;if(by<2)by=2;var bx=mx;
   s+="<line x1='"+P[0][0]+"' y1='"+P[0][1]+"' x2='"+(bx-14)+"' y2='"+(by+18)+"' stroke='#e53935' stroke-width='2.6'/><line x1='"+P[1][0]+"' y1='"+P[1][1]+"' x2='"+(bx+14)+"' y2='"+(by+18)+"' stroke='#222' stroke-width='2.6'/>";
-  s+="<rect x='"+(bx-30)+"' y='"+by+"' width='60' height='20' rx='4' fill='#1f2937' stroke='#f59e0b' stroke-width='1.5'/><text x='"+bx+"' y='"+(by+14)+"' font-size='10' fill='#fde68a' text-anchor='middle' font-weight='bold'>+ "+c.value+"V −</text>";
+  s+="<g filter='url(#mmSh)'><rect x='"+(bx-30)+"' y='"+by+"' width='60' height='20' rx='4' fill='url(#mmBlk)' stroke='#f59e0b' stroke-width='1.5'/><rect x='"+(bx-30)+"' y='"+by+"' width='60' height='6' rx='3' fill='rgba(255,255,255,.18)'/><circle cx='"+(bx-14)+"' cy='"+(by+18)+"' r='2.4' fill='#e53935'/><circle cx='"+(bx+14)+"' cy='"+(by+18)+"' r='2.4' fill='#9ca3af'/></g><text x='"+bx+"' y='"+(by+14)+"' font-size='10' fill='#fde68a' text-anchor='middle' font-weight='bold'>+ "+c.value+"V −</text>";
   hx=bx;hy=by+10;
  }else{
   var dx2=P[P.length-1][0]-P[0][0],dy2=P[P.length-1][1]-P[0][1],len2=Math.hypot(dx2,dy2),ang=Math.atan2(dy2,dx2)*180/Math.PI;
   if(c.type==="resistor"){
    var sc=Math.min(1,len2/40),b3=X.bands(c.value);
    s+=P.map(function(p,k){return legLine(p,[mx,my]);}).join("");
-   s+="<g transform='translate("+mx+" "+my+") rotate("+ang+") scale("+sc+")'><rect x='-17' y='-6' width='34' height='12' rx='5' fill='#d9c79c' stroke='#8a7a52'/><rect x='-10' y='-6' width='3.4' height='12' fill='"+b3[0]+"'/><rect x='-4' y='-6' width='3.4' height='12' fill='"+b3[1]+"'/><rect x='2' y='-6' width='3.4' height='12' fill='"+b3[2]+"'/><rect x='10' y='-6' width='3' height='12' fill='#d4af37'/></g>";
+   s+="<g transform='translate("+mx+" "+my+") rotate("+ang+") scale("+sc+")' filter='url(#mmSh)'><path d='M-17 -3.5 Q-17 -7 -13 -7 L13 -7 Q17 -7 17 -3.5 L17 3.5 Q17 7 13 7 L-13 7 Q-17 7 -17 3.5 Z' fill='url(#mmRes)' stroke='#8a7a52' stroke-width='.8'/><rect x='-10' y='-7' width='3.4' height='14' fill='"+b3[0]+"'/><rect x='-4' y='-7' width='3.4' height='14' fill='"+b3[1]+"'/><rect x='2' y='-7' width='3.4' height='14' fill='"+b3[2]+"'/><rect x='10' y='-7' width='3' height='14' fill='#d4af37'/><rect x='-15' y='-5.5' width='30' height='2.2' rx='1.1' fill='rgba(255,255,255,.5)'/></g>";
    if(o.burned)s+="<text x='"+mx+"' y='"+(my-10)+"' font-size='14' text-anchor='middle'>💥</text>";
   }else if(c.type==="led"){
    var col=X.LEDS[c.color].col,lit=o.lit||0;
    s+=legLine(P[0],[mx,my])+legLine(P[1],[mx,my]);
-   if(lit>0)s+="<circle cx='"+mx+"' cy='"+my+"' r='"+(12+lit*16)+"' fill='"+col+"' opacity='"+(0.15+lit*0.45)+"'/>";
-   s+="<circle cx='"+mx+"' cy='"+my+"' r='8' fill='"+(o.burned?"#222":col)+"' fill-opacity='"+(o.burned?1:0.38+lit*0.62)+"' stroke='"+col+"' stroke-width='1.5'/>";
+   if(lit>0)s+="<circle cx='"+mx+"' cy='"+(my-4)+"' r='"+(14+lit*20)+"' fill='"+col+"' opacity='"+(0.2+lit*0.5)+"' filter='url(#mmBlur)'/>";
+   s+="<g filter='url(#mmSh)'><path d='M"+(mx-9)+" "+(my+6)+" L"+(mx-9)+" "+(my-6)+" A9 10 0 0 1 "+(mx+9)+" "+(my-6)+" L"+(mx+9)+" "+(my+6)+" Z' fill='"+(o.burned?"#222":col)+"' fill-opacity='"+(o.burned?1:0.42+lit*0.58)+"' stroke='"+col+"' stroke-width='1.2'/><rect x='"+(mx-11)+"' y='"+(my+5)+"' width='22' height='3.2' rx='1' fill='"+(o.burned?"#222":col)+"' fill-opacity='.8'/></g><path d='M"+(mx-3)+" "+(my+4)+" L"+(mx-3)+" "+(my-2)+" L"+(mx-5)+" "+(my-5)+" M"+(mx+3)+" "+(my+4)+" L"+(mx+3)+" "+(my-1)+" L"+(mx+5)+" "+(my-5)+"' stroke='rgba(255,255,255,.55)' fill='none' stroke-width='1.2'/><ellipse cx='"+(mx-4)+"' cy='"+(my-8)+"' rx='2.2' ry='3.2' fill='rgba(255,255,255,"+(0.5+lit*0.3)+")'/>";
    s+="<text x='"+(P[0][0]+(P[0][0]<=P[1][0]?-7:7))+"' y='"+(P[0][1]-6)+"' font-size='10' fill='#b91c1c' font-weight='bold' text-anchor='middle'>+</text>";
    if(o.burned)s+="<text x='"+mx+"' y='"+(my+4)+"' font-size='12' fill='#fff' text-anchor='middle'>×</text>";
   }else if(c.type==="ldr"){
    s+=legLine(P[0],[mx,my])+legLine(P[1],[mx,my]);
-   s+="<circle cx='"+mx+"' cy='"+my+"' r='9' fill='#c8860a' stroke='#7a4f00' stroke-width='1.5'/><path d='M"+(mx-5)+" "+(my-3)+" l3 -3 l3 6 l3 -6 l3 3 M"+(mx-5)+" "+(my+4)+" l3 -3 l3 6 l3 -6 l3 3' stroke='#4a2f00' fill='none' stroke-width='1.2'/><text x='"+(mx+1)+"' y='"+(my-13)+"' font-size='11' text-anchor='middle' opacity='"+(0.3+0.7*c.light)+"'>☀</text>";
+   s+="<g filter='url(#mmSh)'><circle cx='"+mx+"' cy='"+my+"' r='10' fill='#d99a1c' stroke='#7a4f00' stroke-width='1.3'/><circle cx='"+mx+"' cy='"+my+"' r='7.6' fill='#e8b04a'/></g><path d='M"+(mx-6)+" "+(my-4)+" h12 M"+(mx-6)+" "+(my-4)+" v3 h12 v3 h-12 v3 h12' stroke='#5b3a00' fill='none' stroke-width='1.3'/><text x='"+(mx+1)+"' y='"+(my-14)+"' font-size='11' text-anchor='middle' opacity='"+(0.3+0.7*c.light)+"'>☀</text>";
   }else if(c.type==="ntc"){
    s+=legLine(P[0],[mx,my])+legLine(P[1],[mx,my]);
-   s+="<circle cx='"+mx+"' cy='"+my+"' r='7' fill='#1a1a1a' stroke='#555'/><text x='"+mx+"' y='"+(my+3)+"' font-size='8' fill='#fca5a5' text-anchor='middle'>t°</text>";
+   s+="<g filter='url(#mmSh)'><path d='M"+(mx-6)+" "+(my+5)+" Q"+(mx-8)+" "+(my-9)+" "+mx+" "+(my-9)+" Q"+(mx+8)+" "+(my-9)+" "+(mx+6)+" "+(my+5)+" Z' fill='#c2410c' stroke='#7c2d12'/></g><ellipse cx='"+(mx-2.5)+"' cy='"+(my-4)+"' rx='1.8' ry='3' fill='rgba(255,255,255,.45)'/><text x='"+mx+"' y='"+(my+3)+"' font-size='7' fill='#fff7ed' text-anchor='middle'>t°</text>";
   }else if(c.type==="npn"){
    var qx=(P[0][0]+P[1][0]+P[2][0])/3,qy=(P[0][1]+P[1][1]+P[2][1])/3;
    s+=P.map(function(p){return legLine(p,[qx,qy]);}).join("");
    var st2=o&&o.state;
-   s+="<path d='M"+(qx-10)+" "+(qy+9)+" L"+(qx-10)+" "+(qy-3)+" A10 10 0 0 1 "+(qx+10)+" "+(qy-3)+" L"+(qx+10)+" "+(qy+9)+" Z' fill='#222' stroke='"+(st2&&st2!=="off"?"#4ade80":"#666")+"' stroke-width='1.6'/><text x='"+qx+"' y='"+(qy+5)+"' font-size='7' fill='#ddd' text-anchor='middle'>NPN</text>";
+   s+="<g filter='url(#mmSh)'><path d='M"+(qx-11)+" "+(qy+9)+" L"+(qx-11)+" "+(qy-3)+" A11 11 0 0 1 "+(qx+11)+" "+(qy-3)+" L"+(qx+11)+" "+(qy+9)+" Z' fill='url(#mmBlk)' stroke='"+(st2&&st2!=="off"?"#4ade80":"#6b7280")+"' stroke-width='1.4'/></g><path d='M"+(qx-8)+" "+(qy-4)+" A8 8 0 0 1 "+qx+" "+(qy-10)+"' stroke='rgba(255,255,255,.35)' fill='none' stroke-width='1.6'/><text x='"+qx+"' y='"+(qy+5)+"' font-size='6.5' fill='#d1d5db' text-anchor='middle'>2N2222</text>";
    hx=qx;hy=qy;
   }else if(c.type==="switch"){
    s+=legLine(P[0],[mx,my])+legLine(P[1],[mx,my]);
-   s+="<rect x='"+(mx-9)+"' y='"+(my-9)+"' width='18' height='18' rx='3' fill='#333' stroke='"+(c.closed?"#4ade80":"#777")+"' stroke-width='2'/><circle cx='"+mx+"' cy='"+(my+(c.closed?1.5:0))+"' r='5' fill='"+(c.closed?"#4ade80":"#9ca3af")+"'/>";
+   s+="<g filter='url(#mmSh)'><rect x='"+(mx-10)+"' y='"+(my-10)+"' width='20' height='20' rx='3' fill='url(#mmBlk)' stroke='"+(c.closed?"#4ade80":"#9ca3af")+"' stroke-width='1.6'/></g><circle cx='"+mx+"' cy='"+(my+(c.closed?1.5:0))+"' r='6.4' fill='"+(c.closed?"#16a34a":"#d1d5db")+"' stroke='#374151'/><circle cx='"+(mx-2)+"' cy='"+(my-2+(c.closed?1.5:0))+"' r='2' fill='rgba(255,255,255,.7)'/>";
   }else if(c.type==="pot"){
    var ex=(P[0][0]+P[2][0])/2,ey=(P[0][1]+P[2][1])/2;
    s+=P.map(function(p){return legLine(p,[ex,ey]);}).join("");
    var kang=-135+270*c.pos;
-   s+="<rect x='"+(ex-17)+"' y='"+(ey-13)+"' width='34' height='26' rx='5' fill='#1d4ed8' stroke='#93c5fd'/><g transform='translate("+ex+" "+ey+") rotate("+kang+")'><circle r='8' fill='#e5e7eb'/><line x1='0' y1='0' x2='0' y2='-8' stroke='#111' stroke-width='2'/></g>";
+   s+="<g filter='url(#mmSh)'><rect x='"+(ex-17)+"' y='"+(ey-13)+"' width='34' height='26' rx='5' fill='url(#mmBlue)' stroke='#93c5fd'/></g><g transform='translate("+ex+" "+ey+") rotate("+kang+")'><circle r='9' fill='url(#mmKnob)' stroke='#6b7280'/><line x1='0' y1='0' x2='0' y2='-8' stroke='#111' stroke-width='2.2' stroke-linecap='round'/></g>";
    hx=ex;hy=ey;
   }
   if(c.type!=="pot"&&c.type!=="npn"){hx=mx;hy=my;}
@@ -71,7 +73,7 @@ function drawComp(c){
 }
 function renderBoard(){
  var oc=occ(),s="<svg viewBox='0 0 600 345' width='100%' style='min-width:640px;touch-action:manipulation' data-x='1' xmlns='http://www.w3.org/2000/svg' font-family='sans-serif'>";
- s+="<rect x='8' y='14' width='584' height='322' rx='10' fill='#e7e3d6' stroke='#b9b39e'/>";
+ s+=DEFS+"<rect x='8' y='14' width='584' height='322' rx='10' fill='url(#mmBoard)' stroke='#b9b39e' filter='url(#mmSh)'/><rect x='12' y='18' width='576' height='8' rx='4' fill='rgba(255,255,255,.55)'/>";
  s+="<rect x='36' y='172' width='528' height='10' fill='#cfc9b4'/><text x='300' y='181' font-size='7.5' fill='#8a846e' text-anchor='middle'>CENTRE GAP</text>";
  // rail stripes
  [["tp","#e53935",34],["tn","#1e63d6",48],["bp","#e53935",304],["bn","#1e63d6",318]].forEach(function(r){s+="<line x1='36' y1='"+(r[2]-9)+"' x2='564' y2='"+(r[2]-9)+"' stroke='"+r[1]+"' stroke-width='1.2' opacity='.7'/><text x='20' y='"+(r[2]+3)+"' font-size='11' fill='"+r[1]+"' font-weight='bold' text-anchor='middle'>"+(r[0].charAt(1)==="p"?"+":"−")+"</text>";});
@@ -79,7 +81,7 @@ function renderBoard(){
  "abcdefghij".split("").forEach(function(l){s+="<text x='28' y='"+(ROWY[l]+3)+"' font-size='8.5' fill='#8a846e' text-anchor='middle'>"+l+"</text>";});
  // holes
  function hole(h,p){var used=oc[h]!==undefined,pend=pending&&pending.holes.indexOf(h)>=0,mt=meter&&meter.holes.indexOf(h)>=0;
-  return "<circle cx='"+p[0]+"' cy='"+p[1]+"' r='3.5' fill='"+(mt?"#7c3aed":pend?"#fbbf24":used?"#555":"#3a3a36")+"'/><circle cx='"+p[0]+"' cy='"+p[1]+"' r='8.2' fill='transparent' data-h='"+h+"' style='cursor:crosshair'/>";}
+  return "<rect x='"+(p[0]-3.6)+"' y='"+(p[1]-3.6)+"' width='7.2' height='7.2' rx='1.6' fill='"+(mt?"#7c3aed":pend?"#fbbf24":used?"#555":"url(#mmHole)")+"' stroke='rgba(0,0,0,.25)' stroke-width='.6'/><circle cx='"+p[0]+"' cy='"+p[1]+"' r='8.2' fill='transparent' data-h='"+h+"' style='cursor:crosshair'/>";}
  ["tp","tn","bp","bn"].forEach(function(r){for(var c=1;c<=30;c++){if(c%6===0)continue;var h=r+c;s+=hole(h,pos(h));}});
  "abcdefghij".split("").forEach(function(l){for(var c=1;c<=30;c++){var h=l+c;s+=hole(h,pos(h));}});
  comps.forEach(function(cp){s+=drawComp(cp);});
