@@ -491,6 +491,7 @@ body.comp #picker,body.comp #nextM,body.comp nav [data-tab=club]{display:none!im
 <div id="mmcrStat" style="text-align:center;font-weight:600">L 0  R 0</div>
 <div id="mmcrPad"><div id="mmcrKnob"></div></div>
 <div class="row"><label style="flex:1">Speed <input id="mmcrThr" type="range" min="20" max="100" value="70" style="width:100%"> <b id="mmcrThrV">70%</b></label></div>
+<details style="margin:8px 0"><summary>📲 Use a phone as the controller</summary><div class="row" style="margin-top:6px"><button id="mmcrHost">💻 This screen shows the robot: get pairing code</button></div><div class="row"><input id="mmcrCode" inputmode="numeric" maxlength="6" placeholder="6-digit code" style="flex:1"><button id="mmcrJoin">📱 Use this phone as controller</button></div><div id="mmcrPair">Both devices need internet. Same Wi-Fi works best.</div></details>
 <div class="row"><button id="mmcrTilt">📱 Tilt control: off</button><button id="mmcrReset">↺ Reset robot</button></div>
 <button id="mmcrStop" style="width:100%;margin-top:6px">⛔ EMERGENCY STOP</button>
 <p class="sub">Safety: the real robot stops by itself if the phone disconnects or no command arrives for half a second, and it will not drive forward closer than 15 cm to an obstacle. Keyboard: arrows or WASD, space = stop. Bluetooth needs Chrome on Android or a computer.</p></div></section>

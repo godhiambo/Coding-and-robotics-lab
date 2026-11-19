@@ -558,7 +558,7 @@ if(typeof module!=="undefined")module.exports=Circuit;
 // Program = list of blocks. Pure logic (no DOM) so it can be tested in Node and re-checked on a server.
 var MCU=(function(){
 "use strict";
-var C=(typeof Circuit!=="undefined")?Circuit:require("./circuit.js");
+var C=(typeof Circuit!=="undefined")?Circuit:null;
 var DPINS=[2,3,4,5,6,7,8,9,10,11,12,13],PWMP=[3,5,6,9,10,11],TICK=20;
 var BOARDS={uno:{name:"Arduino Uno",out:DPINS,inp:DPINS,pwm:PWMP,adc:[0,1,2,3,4,5],vh:5,thr:2.5,adcMax:1023,div:4,pre:"D",apre:"A"},
  esp32:{name:"ESP32",out:[2,4,5,12,13,14,15,16,17,18,19,21,22,23,25,26,27,32,33],inp:[2,4,5,12,13,14,15,16,17,18,19,21,22,23,25,26,27,32,33,34,35,36,39],pwm:[2,4,5,12,13,14,15,16,17,18,19,21,22,23,25,26,27,32,33],adc:[32,33,34,35,36,39],vh:3.3,thr:1.65,adcMax:4095,div:16,pre:"G",apre:"G"}};

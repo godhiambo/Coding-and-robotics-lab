@@ -17,6 +17,7 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY AUTOINCREMENT, comp_id TEXT, learner_id TEXT, type TEXT, data TEXT, at INTEGER)`,
   `CREATE INDEX IF NOT EXISTS ix_ev_comp ON events(comp_id)`,
   `CREATE TABLE IF NOT EXISTS certs(id TEXT PRIMARY KEY, comp_id TEXT, learner_id TEXT, class_id TEXT, kind TEXT, rank INTEGER, name TEXT, title TEXT, school TEXT, score INTEGER, issued INTEGER, revoked INTEGER DEFAULT 0, ver INTEGER DEFAULT 1, supersedes TEXT, replaced_by TEXT, f_name TEXT, f_title TEXT, f_sig TEXT, t_name TEXT, t_title TEXT, t_school TEXT, t_sig TEXT)`,
+  `CREATE TABLE IF NOT EXISTS pairs(code TEXT PRIMARY KEY, offer TEXT, answer TEXT, ts INTEGER)`,
   `CREATE TABLE IF NOT EXISTS sigs(id TEXT PRIMARY KEY, data TEXT)`,
   `CREATE TABLE IF NOT EXISTS settings(k TEXT PRIMARY KEY, v TEXT)`,
   `CREATE TABLE IF NOT EXISTS counters(k TEXT PRIMARY KEY, n INTEGER)`,
@@ -107,6 +108,30 @@ async function leaderboard(db, compId, withNames) {
 
 // ---------- routes ----------
 const R = {};
+
+// ---- phone <-> laptop pairing for Connected Robotics (WebRTC handshake only; control data never touches the server) ----
+const PCODE = /^\d{6}$/, SDP_MAX = 12000;
+R["pair/offer"] = async (db, b) => {
+  const code = String(b.code || ""), sdp = String(b.sdp || ""); if (!PCODE.test(code) || !sdp || sdp.length > SDP_MAX) return bad("Bad pairing request.");
+  const now = Date.now(); await db.prepare("DELETE FROM pairs WHERE ts<?").bind(now - 600000).run();
+  const ex = await db.prepare("SELECT ts FROM pairs WHERE code=?").bind(code).first(); if (ex) return bad("Try again.", 409);
+  await db.prepare("INSERT INTO pairs(code,offer,answer,ts) VALUES(?,?,NULL,?)").bind(code, sdp, now).run(); return J({ ok: true });
+};
+R["pair/join"] = async (db, b) => {
+  const code = String(b.code || ""); if (!PCODE.test(code)) return bad("Enter the 6-digit code.");
+  const r = await db.prepare("SELECT offer,ts FROM pairs WHERE code=?").bind(code).first();
+  if (!r || Date.now() - r.ts > 600000) return bad("Code not found or expired.", 404); return J({ sdp: r.offer });
+};
+R["pair/answer"] = async (db, b) => {
+  const code = String(b.code || ""), sdp = String(b.sdp || ""); if (!PCODE.test(code) || !sdp || sdp.length > SDP_MAX) return bad("Bad pairing request.");
+  const r = await db.prepare("UPDATE pairs SET answer=? WHERE code=? AND answer IS NULL").bind(sdp, code).run();
+  return r.meta && r.meta.changes ? J({ ok: true }) : bad("Code not found or already used.", 404);
+};
+R["pair/poll"] = async (db, b) => {
+  const code = String(b.code || ""); if (!PCODE.test(code)) return bad("Bad code.");
+  const r = await db.prepare("SELECT answer FROM pairs WHERE code=?").bind(code).first(); if (!r) return bad("Expired.", 404);
+  if (r.answer) await db.prepare("DELETE FROM pairs WHERE code=?").bind(code).run(); return J({ sdp: r.answer || null });
+};
 
 R["class/create"] = async (db, b) => {
   const name = str(b.name, 60); if (!name) return bad("Give the class a name.");
