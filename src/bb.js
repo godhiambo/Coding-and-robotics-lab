@@ -35,13 +35,14 @@ function drawComp(c){
   if(c.type==="resistor"){
    var sc=Math.min(1,len2/40),b3=X.bands(c.value);
    s+=P.map(function(p,k){return legLine(p,[mx,my]);}).join("");
-   s+="<g transform='translate("+mx+" "+my+") rotate("+ang+") scale("+sc+")' filter='url(#mmSh)'><path d='M-17 -3.5 Q-17 -7 -13 -7 L13 -7 Q17 -7 17 -3.5 L17 3.5 Q17 7 13 7 L-13 7 Q-17 7 -17 3.5 Z' fill='url(#mmRes)' stroke='#8a7a52' stroke-width='.8'/><rect x='-10' y='-7' width='3.4' height='14' fill='"+b3[0]+"'/><rect x='-4' y='-7' width='3.4' height='14' fill='"+b3[1]+"'/><rect x='2' y='-7' width='3.4' height='14' fill='"+b3[2]+"'/><rect x='10' y='-7' width='3' height='14' fill='#d4af37'/><rect x='-15' y='-5.5' width='30' height='2.2' rx='1.1' fill='rgba(255,255,255,.5)'/></g>";
+   s+="<g transform='translate("+mx+" "+my+") rotate("+ang+") scale("+sc+")' filter='url(#mmSh)'><path d='M-17 -5 Q-17 -8.5 -13 -8.5 L-11 -8.5 Q-9 -4.6 -4 -4.6 L4 -4.6 Q9 -4.6 11 -8.5 L13 -8.5 Q17 -8.5 17 -5 L17 5 Q17 8.5 13 8.5 L11 8.5 Q9 4.6 4 4.6 L-4 4.6 Q-9 4.6 -11 8.5 L-13 8.5 Q-17 8.5 -17 5 Z' fill='url(#mmRes)' stroke='#8a7a52' stroke-width='.8'/><rect x='-9' y='-4.6' width='3.4' height='9.2' fill='"+b3[0]+"'/><rect x='-3.5' y='-4.6' width='3.4' height='9.2' fill='"+b3[1]+"'/><rect x='2' y='-4.6' width='3.4' height='9.2' fill='"+b3[2]+"'/><rect x='8.5' y='-4.6' width='2.8' height='9.2' fill='#d4af37'/><rect x='-8' y='-4' width='16' height='1.8' rx='1.1' fill='rgba(255,255,255,.5)'/></g>";
    if(o.burned)s+="<text x='"+mx+"' y='"+(my-10)+"' font-size='14' text-anchor='middle'>💥</text>";
   }else if(c.type==="led"){
    var col=X.LEDS[c.color].col,lit=o.lit||0;
    s+=legLine(P[0],[mx,my])+legLine(P[1],[mx,my]);
    if(lit>0)s+="<circle cx='"+mx+"' cy='"+(my-4)+"' r='"+(14+lit*20)+"' fill='"+col+"' opacity='"+(0.2+lit*0.5)+"' filter='url(#mmBlur)'/>";
-   s+="<g filter='url(#mmSh)'><path d='M"+(mx-9)+" "+(my+6)+" L"+(mx-9)+" "+(my-6)+" A9 10 0 0 1 "+(mx+9)+" "+(my-6)+" L"+(mx+9)+" "+(my+6)+" Z' fill='"+(o.burned?"#222":col)+"' fill-opacity='"+(o.burned?1:0.42+lit*0.58)+"' stroke='"+col+"' stroke-width='1.2'/><rect x='"+(mx-11)+"' y='"+(my+5)+"' width='22' height='3.2' rx='1' fill='"+(o.burned?"#222":col)+"' fill-opacity='.8'/></g><path d='M"+(mx-3)+" "+(my+4)+" L"+(mx-3)+" "+(my-2)+" L"+(mx-5)+" "+(my-5)+" M"+(mx+3)+" "+(my+4)+" L"+(mx+3)+" "+(my-1)+" L"+(mx+5)+" "+(my-5)+"' stroke='rgba(255,255,255,.55)' fill='none' stroke-width='1.2'/><ellipse cx='"+(mx-4)+"' cy='"+(my-8)+"' rx='2.2' ry='3.2' fill='rgba(255,255,255,"+(0.5+lit*0.3)+")'/>";
+   var bc=o.burned?"#222":col,fo=o.burned?1:0.5+lit*0.5,lx=Math.min(P[0][0],P[1][0]),rx2=Math.max(P[0][0],P[1][0]),ml=P[0][0]<=P[1][0];
+   s+="<g filter='url(#mmSh)'><path d='M"+(mx-9)+" "+(my+7)+" L"+(mx-9)+" "+(my-12)+" A9 11 0 0 1 "+(mx+9)+" "+(my-12)+" L"+(mx+9)+" "+(my+7)+" Z' fill='"+bc+"' fill-opacity='"+fo+"' stroke='"+col+"' stroke-opacity='.8' stroke-width='1'/><rect x='"+(mx-11)+"' y='"+(my+6)+"' width='22' height='4.4' rx='1' fill='#fff' fill-opacity='.55' stroke='"+col+"' stroke-width='.8'/></g><path d='M"+(mx-4.5)+" "+(my+6)+" L"+(mx-4.5)+" "+(my-3)+" L"+(mx-7)+" "+(my-8)+" M"+(mx+4.5)+" "+(my+6)+" L"+(mx+4.5)+" "+(my-6)+"' stroke='rgba(70,70,70,.55)' fill='none' stroke-width='1.8' stroke-linejoin='round'/><path d='M"+(mx-6.5)+" "+(my-9)+" Q"+(mx-6.5)+" "+(my-14)+" "+(mx-2)+" "+(my-15)+"' stroke='rgba(255,255,255,.85)' fill='none' stroke-width='1.6' stroke-linecap='round'/><text x='"+(mx-5.5)+"' y='"+(my+9.4)+"' font-size='4.5' fill='#555' text-anchor='middle'>"+(ml?"+":"−")+"</text><text x='"+(mx+5.5)+"' y='"+(my+9.4)+"' font-size='4.5' fill='#555' text-anchor='middle'>"+(ml?"−":"+")+"</text>";
    s+="<text x='"+(P[0][0]+(P[0][0]<=P[1][0]?-7:7))+"' y='"+(P[0][1]-6)+"' font-size='10' fill='#b91c1c' font-weight='bold' text-anchor='middle'>+</text>";
    if(o.burned)s+="<text x='"+mx+"' y='"+(my+4)+"' font-size='12' fill='#fff' text-anchor='middle'>×</text>";
   }else if(c.type==="ldr"){
@@ -49,7 +50,7 @@ function drawComp(c){
    s+="<g filter='url(#mmSh)'><circle cx='"+mx+"' cy='"+my+"' r='10' fill='#d99a1c' stroke='#7a4f00' stroke-width='1.3'/><circle cx='"+mx+"' cy='"+my+"' r='7.6' fill='#e8b04a'/></g><path d='M"+(mx-6)+" "+(my-4)+" h12 M"+(mx-6)+" "+(my-4)+" v3 h12 v3 h-12 v3 h12' stroke='#5b3a00' fill='none' stroke-width='1.3'/><text x='"+(mx+1)+"' y='"+(my-14)+"' font-size='11' text-anchor='middle' opacity='"+(0.3+0.7*c.light)+"'>☀</text>";
   }else if(c.type==="ntc"){
    s+=legLine(P[0],[mx,my])+legLine(P[1],[mx,my]);
-   s+="<g filter='url(#mmSh)'><path d='M"+(mx-6)+" "+(my+5)+" Q"+(mx-8)+" "+(my-9)+" "+mx+" "+(my-9)+" Q"+(mx+8)+" "+(my-9)+" "+(mx+6)+" "+(my+5)+" Z' fill='#c2410c' stroke='#7c2d12'/></g><ellipse cx='"+(mx-2.5)+"' cy='"+(my-4)+"' rx='1.8' ry='3' fill='rgba(255,255,255,.45)'/><text x='"+mx+"' y='"+(my+3)+"' font-size='7' fill='#fff7ed' text-anchor='middle'>t°</text>";
+   s+="<g filter='url(#mmSh)'><path d='M"+(mx-6)+" "+(my+5)+" Q"+(mx-8)+" "+(my-9)+" "+mx+" "+(my-9)+" Q"+(mx+8)+" "+(my-9)+" "+(mx+6)+" "+(my+5)+" Z' fill='#1f2937' stroke='#0b1220'/></g><ellipse cx='"+(mx-2.5)+"' cy='"+(my-4)+"' rx='1.8' ry='3' fill='rgba(255,255,255,.45)'/><text x='"+mx+"' y='"+(my+3)+"' font-size='7' fill='#d1d5db' text-anchor='middle'>t°</text>";
   }else if(c.type==="npn"){
    var qx=(P[0][0]+P[1][0]+P[2][0])/3,qy=(P[0][1]+P[1][1]+P[2][1])/3;
    s+=P.map(function(p){return legLine(p,[qx,qy]);}).join("");
@@ -63,7 +64,7 @@ function drawComp(c){
    var ex=(P[0][0]+P[2][0])/2,ey=(P[0][1]+P[2][1])/2;
    s+=P.map(function(p){return legLine(p,[ex,ey]);}).join("");
    var kang=-135+270*c.pos;
-   s+="<g filter='url(#mmSh)'><rect x='"+(ex-17)+"' y='"+(ey-13)+"' width='34' height='26' rx='5' fill='url(#mmBlue)' stroke='#93c5fd'/></g><g transform='translate("+ex+" "+ey+") rotate("+kang+")'><circle r='9' fill='url(#mmKnob)' stroke='#6b7280'/><line x1='0' y1='0' x2='0' y2='-8' stroke='#111' stroke-width='2.2' stroke-linecap='round'/></g>";
+   s+="<g filter='url(#mmSh)'><circle cx='"+ex+"' cy='"+ey+"' r='15' fill='#374151' stroke='#9ca3af' stroke-width='1.5'/><circle cx='"+ex+"' cy='"+ey+"' r='12' fill='url(#mmKnob)'/></g><g transform='translate("+ex+" "+ey+") rotate("+kang+")'><rect x='-9' y='-2.2' width='18' height='4.4' rx='1.5' fill='#111827'/><rect x='-2.2' y='-9' width='4.4' height='18' rx='1.5' fill='#111827'/></g>";
    hx=ex;hy=ey;
   }
   if(c.type!=="pot"&&c.type!=="npn"){hx=mx;hy=my;}
