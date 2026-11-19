@@ -18,6 +18,7 @@ const SCHEMA = [
   `CREATE INDEX IF NOT EXISTS ix_ev_comp ON events(comp_id)`,
   `CREATE TABLE IF NOT EXISTS certs(id TEXT PRIMARY KEY, comp_id TEXT, learner_id TEXT, class_id TEXT, kind TEXT, rank INTEGER, name TEXT, title TEXT, school TEXT, score INTEGER, issued INTEGER, revoked INTEGER DEFAULT 0, ver INTEGER DEFAULT 1, supersedes TEXT, replaced_by TEXT, f_name TEXT, f_title TEXT, f_sig TEXT, t_name TEXT, t_title TEXT, t_school TEXT, t_sig TEXT)`,
   `CREATE TABLE IF NOT EXISTS phys(attempt_id TEXT PRIMARY KEY, comp_id TEXT, learner_id TEXT, ok INTEGER, t REAL, status TEXT, ts INTEGER)`,
+  `CREATE TABLE IF NOT EXISTS payments(id TEXT PRIMARY KEY, class_id TEXT, plan TEXT, amount INTEGER, phone TEXT, checkout_id TEXT UNIQUE, status TEXT, receipt TEXT UNIQUE, note TEXT, created INTEGER, paid_at INTEGER)`,
   `CREATE TABLE IF NOT EXISTS pairs(code TEXT PRIMARY KEY, offer TEXT, answer TEXT, ts INTEGER)`,
   `CREATE TABLE IF NOT EXISTS sigs(id TEXT PRIMARY KEY, data TEXT)`,
   `CREATE TABLE IF NOT EXISTS settings(k TEXT PRIMARY KEY, v TEXT)`,
@@ -27,6 +28,8 @@ const SCHEMA = [
 let ready = false;
 // ---------- plans ----------
 // Existing classes (plan is NULL) are grandfathered as "founding" partners until an admin changes them. New classes start on "free".
+const testAmt = (env) => (env && +env.MPESA_TEST_AMOUNT >= 1 && +env.MPESA_TEST_AMOUNT <= 100 ? Math.round(+env.MPESA_TEST_AMOUNT) : 0); // optional secret: charge only this many KSh while testing
+const PRICES = { starter: 5000, growth: 12000, advanced: 25000 }, TERM_DAYS = 90;
 const PLANS = { free: { label: "Free", learners: 10, comps: 2 }, founding: { label: "Founding partner", learners: 150, comps: 999 }, starter: { label: "Starter", learners: 50, comps: 999 }, growth: { label: "Growth", learners: 150, comps: 999 }, advanced: { label: "Advanced", learners: 400, comps: 999 } };
 function planOf(c) {
   const raw = PLANS[c.plan] ? c.plan : "founding", until = +c.plan_until || 0, expired = raw !== "free" && until > 0 && until < Date.now(), eff = expired ? "free" : raw;
@@ -151,12 +154,86 @@ R["class/create"] = async (db, b) => {
   return J({ code, key, name });
 };
 
-R["class/get"] = async (db, b) => {
+R["class/get"] = async (db, b, env) => {
   const c = await teacher(db, b); if (!c) return bad("Wrong class code or teacher key.", 401);
   const ls = (await db.prepare("SELECT id,name,extra_s,joined FROM learners WHERE class_id=? AND removed=0 ORDER BY name").bind(c.id).all()).results || [];
   const cs = (await db.prepare("SELECT * FROM comps WHERE class_id=? ORDER BY created DESC").bind(c.id).all()).results || [];
-  const pl = planOf(c); pl.used = ls.length;
+  const pl = planOf(c); pl.used = ls.length; pl.offers = Object.keys(PRICES).map((k) => ({ id: k, label: PLANS[k].label, learners: PLANS[k].learners, price: testAmt(env) || PRICES[k], days: TERM_DAYS })); pl.test = testAmt(env); pl.pay = !!(env && env.MPESA_CONSUMER_KEY);
   return J({ cls: { code: c.code, name: c.name, grade: c.grade, subject: c.subject }, plan: pl, learners: ls, comps: cs.map(compView), now: Date.now() });
+};
+
+// ---------- M-PESA (Daraja STK Push) ----------
+// Secrets: MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET, MPESA_SHORTCODE, MPESA_PASSKEY, MPESA_CALLBACK_SECRET.
+// Optional: MPESA_ENV ("production" for live, default sandbox), MPESA_TYPE ("till" for Buy Goods), MPESA_BASE (testing).
+const mpesaReady = (env) => !!(env.MPESA_CONSUMER_KEY && env.MPESA_CONSUMER_SECRET && env.MPESA_SHORTCODE && env.MPESA_PASSKEY && env.MPESA_CALLBACK_SECRET);
+const mpesaBase = (env) => env.MPESA_BASE || (env.MPESA_ENV === "production" ? "https://api.safaricom.co.ke" : "https://sandbox.safaricom.co.ke");
+function nairobiStamp() { const d = new Date(Date.now() + 3 * 3600000), p = (n) => String(n).padStart(2, "0"); return d.getUTCFullYear() + p(d.getUTCMonth() + 1) + p(d.getUTCDate()) + p(d.getUTCHours()) + p(d.getUTCMinutes()) + p(d.getUTCSeconds()); }
+function msisdn(v) { let p = String(v || "").replace(/[^\d]/g, ""); if (/^0[17]\d{8}$/.test(p)) p = "254" + p.slice(1); else if (/^[17]\d{8}$/.test(p)) p = "254" + p; return /^254[17]\d{8}$/.test(p) ? p : ""; }
+async function mpesaToken(env) {
+  const r = await fetch(mpesaBase(env) + "/oauth/v1/generate?grant_type=client_credentials", { headers: { authorization: "Basic " + btoa(env.MPESA_CONSUMER_KEY + ":" + env.MPESA_CONSUMER_SECRET) } });
+  const j = await r.json().catch(() => ({})); if (!r.ok || !j.access_token) throw new Error("M-PESA sign-in failed");
+  return j.access_token;
+}
+async function activatePlan(db, pay, receipt) {
+  const r = await db.prepare("UPDATE payments SET status='paid',receipt=?,paid_at=? WHERE id=? AND status='pending'").bind(receipt || null, Date.now(), pay.id).run();
+  if (!(r.meta && r.meta.changes)) return false; // already handled: never activate twice
+  const c = await db.prepare("SELECT plan,plan_until FROM classes WHERE id=?").bind(pay.class_id).first(); if (!c) return false;
+  const now = Date.now(), start = c.plan === pay.plan && +c.plan_until > now ? +c.plan_until : now;
+  await db.prepare("UPDATE classes SET plan=?,plan_until=? WHERE id=?").bind(pay.plan, start + TERM_DAYS * 86400000, pay.class_id).run();
+  return true;
+}
+R["pay/start"] = async (db, b, env, request) => {
+  const c = await teacher(db, b); if (!c) return bad("Not allowed.", 401);
+  if (!mpesaReady(env)) return bad("Online payment is not set up yet. Please contact Milestone Minds.", 503);
+  const plan = String(b.plan || ""); if (!PRICES[plan]) return bad("Pick a plan."); const amount = testAmt(env) || PRICES[plan];
+  const phone = msisdn(b.phone); if (!phone) return bad("Enter the M-PESA phone number, for example 0712345678.");
+  const recent = await db.prepare("SELECT 1 FROM payments WHERE class_id=? AND status='pending' AND created>?").bind(c.id, Date.now() - 60000).first();
+  if (recent) return bad("A payment request was just sent. Check your phone, or wait a minute and try again.", 429);
+  const ts = nairobiStamp(), till = env.MPESA_TYPE === "till", token = await mpesaToken(env);
+  const origin = new URL(request.url).origin;
+  const res = await fetch(mpesaBase(env) + "/mpesa/stkpush/v1/processrequest", { method: "POST", headers: { authorization: "Bearer " + token, "content-type": "application/json" }, body: JSON.stringify({
+    BusinessShortCode: env.MPESA_SHORTCODE, Password: btoa(env.MPESA_SHORTCODE + env.MPESA_PASSKEY + ts), Timestamp: ts,
+    TransactionType: till ? "CustomerBuyGoodsOnline" : "CustomerPayBillOnline", Amount: amount, PartyA: phone, PartyB: env.MPESA_PARTYB || env.MPESA_SHORTCODE, PhoneNumber: phone,
+    CallBackURL: origin + "/api/mpesa/callback/" + env.MPESA_CALLBACK_SECRET, AccountReference: c.code, TransactionDesc: "Robotics Lab " + PLANS[plan].label }) });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok || String(j.ResponseCode) !== "0" || !j.CheckoutRequestID) return bad("M-PESA could not send the request: " + String(j.errorMessage || j.ResponseDescription || "try again").slice(0, 100), 502);
+  const id = uid();
+  await db.prepare("INSERT INTO payments(id,class_id,plan,amount,phone,checkout_id,status,created) VALUES(?,?,?,?,?,?,'pending',?)").bind(id, c.id, plan, amount, phone.slice(0, 5) + "***" + phone.slice(-3), j.CheckoutRequestID, Date.now()).run();
+  return J({ id, amount, message: "Check your phone and enter your M-PESA PIN." });
+};
+R["pay/status"] = async (db, b, env) => {
+  const c = await teacher(db, b); if (!c) return bad("Not allowed.", 401);
+  let p = await db.prepare("SELECT * FROM payments WHERE id=? AND class_id=?").bind(str(b.id, 40), c.id).first(); if (!p) return bad("Payment not found.", 404);
+  if (p.status === "pending" && Date.now() - p.created > 20000 && mpesaReady(env)) { // the callback can be late: ask M-PESA directly
+    try {
+      const ts = nairobiStamp(), token = await mpesaToken(env);
+      const r = await fetch(mpesaBase(env) + "/mpesa/stkpushquery/v1/query", { method: "POST", headers: { authorization: "Bearer " + token, "content-type": "application/json" }, body: JSON.stringify({ BusinessShortCode: env.MPESA_SHORTCODE, Password: btoa(env.MPESA_SHORTCODE + env.MPESA_PASSKEY + ts), Timestamp: ts, CheckoutRequestID: p.checkout_id }) });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.ResultCode !== undefined && j.ResultCode !== null) {
+        if (String(j.ResultCode) === "0") await activatePlan(db, p, null); // M-PESA itself confirms this request was paid (the callback may have been lost)
+        else await db.prepare("UPDATE payments SET status='failed',note=? WHERE id=? AND status='pending'").bind(String(j.ResultDesc || "").slice(0, 100), p.id).run();
+      }
+    } catch (e) {}
+    p = await db.prepare("SELECT * FROM payments WHERE id=?").bind(p.id).first();
+  }
+  return J({ status: p.status, note: p.note || "", receipt: p.receipt || "" });
+};
+async function mpesaCallback(db, env, secret, body) {
+  const ok = J({ ResultCode: 0, ResultDesc: "Accepted" });
+  if (!env.MPESA_CALLBACK_SECRET || secret !== env.MPESA_CALLBACK_SECRET) return bad("Not allowed.", 401);
+  const cb = body && body.Body && body.Body.stkCallback; if (!cb || !cb.CheckoutRequestID) return ok;
+  const p = await db.prepare("SELECT * FROM payments WHERE checkout_id=?").bind(String(cb.CheckoutRequestID).slice(0, 80)).first(); if (!p || p.status !== "pending") return ok;
+  if (+cb.ResultCode !== 0) { await db.prepare("UPDATE payments SET status='failed',note=? WHERE id=? AND status='pending'").bind(String(cb.ResultDesc || "").slice(0, 100), p.id).run(); return ok; }
+  const items = (cb.CallbackMetadata && cb.CallbackMetadata.Item) || [], get = (n) => { const x = items.find((i) => i.Name === n); return x ? x.Value : undefined; };
+  const paid = +get("Amount"), receipt = String(get("MpesaReceiptNumber") || "").slice(0, 30);
+  if (!receipt || paid !== p.amount) { await db.prepare("UPDATE payments SET status='mismatch',note=? WHERE id=? AND status='pending'").bind("amount " + paid + " receipt " + receipt, p.id).run(); return ok; }
+  try { await activatePlan(db, p, receipt); } catch (e) { /* duplicate receipt etc.: stays unactivated for admin review */ }
+  return ok;
+}
+R["admin/payments"] = async (db, b, env) => {
+  if (!(await admin(env, b))) return bad("Not allowed.", 401);
+  const rows = (await db.prepare("SELECT p.id,p.plan,p.amount,p.phone,p.status,p.receipt,p.note,p.created,p.paid_at,c.code,c.name FROM payments p LEFT JOIN classes c ON c.id=p.class_id ORDER BY p.created DESC LIMIT 100").all()).results || [];
+  return J({ payments: rows });
 };
 
 R["class/learner"] = async (db, b) => {
@@ -512,8 +589,13 @@ R["fame"] = async (db, b) => {
 export async function handleApi(request, env, path) {
   if (request.method !== "POST") return bad("Method not allowed", 405);
   if (!env.DB) return J({ error: "The classroom database is not connected yet.", setup: true }, 503);
+  let body;
+  if (path.startsWith("mpesa/callback/")) {
+    try { body = await request.json(); } catch { return bad("Bad request"); }
+    try { await init(env.DB); return await mpesaCallback(env.DB, env, path.slice(15), body); } catch (e) { return J({ ResultCode: 0, ResultDesc: "Accepted" }); }
+  }
   const fn = R[path]; if (!fn) return bad("Not found", 404);
-  let body; try { body = await request.json(); } catch { return bad("Bad request"); }
-  try { await init(env.DB); return await fn(env.DB, body || {}, env); }
+  try { body = await request.json(); } catch { return bad("Bad request"); }
+  try { await init(env.DB); return await fn(env.DB, body || {}, env, request); }
   catch (e) { return J({ error: "Server error: " + String((e && e.message) || e).slice(0, 120) }, 500); }
 }

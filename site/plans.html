@@ -2,7 +2,7 @@
 <style>body{font-family:sans-serif;background:#0b1322;color:#e5e7eb;max-width:900px;margin:0 auto;padding:16px}input,select,button{font-size:15px;padding:8px;border-radius:8px;border:1px solid #334155;background:#111c33;color:#fff}button{background:#1d4ed8;cursor:pointer}
 table{width:100%;border-collapse:collapse;margin-top:12px}td,th{border-bottom:1px solid #1e293b;padding:6px;text-align:left;font-size:14px}.ok{color:#4ade80}.bad{color:#f87171}.sub{color:#94a3b8;font-size:13px}</style></head><body>
 <h2>School plans</h2><p class="sub">Switch a school onto a plan. Paid plans end after the number of days you enter (for example 90 for one term). When a plan ends the class returns to Free limits; nobody's data is deleted.</p>
-<input id="k" type="password" placeholder="ADMIN_KEY" autocomplete="off"> <input id="q" placeholder="Search code, class or school"> <button id="go">Load classes</button>
+<input id="k" type="password" placeholder="ADMIN_KEY" autocomplete="off"> <input id="q" placeholder="Search code, class or school"> <button id="go">Load classes</button> <button id="pay" style="background:#334155">Payments</button>
 <div id="m" class="sub" style="margin:8px 0"></div><table id="t"></table>
 <script>
 var $=function(i){return document.getElementById(i);},plans=[];
@@ -14,4 +14,5 @@ function load(){api("admin/classes",{adminKey:$("k").value,q:$("q").value}).then
  [].forEach.call(document.querySelectorAll(".sv"),function(b){b.onclick=function(){var c=b.dataset.c;api("admin/plan",{adminKey:$("k").value,code:c,plan:document.querySelector(".pl[data-c='"+c+"']").value,days:+document.querySelector(".dy[data-c='"+c+"']").value}).then(function(){$("m").className="ok";$("m").textContent="Saved "+c;load();}).catch(function(e){$("m").className="bad";$("m").textContent=e.message;});};});
  }).catch(function(e){$("m").className="bad";$("m").textContent=e.message;});}
 $("go").onclick=load;
+$("pay").onclick=function(){api("admin/payments",{adminKey:$("k").value}).then(function(j){$("m").textContent=j.payments.length+" payments";$("t").innerHTML="<tr><th>When</th><th>Class</th><th>Plan</th><th>KSh</th><th>Phone</th><th>Status</th><th>Receipt</th></tr>"+j.payments.map(function(x){return "<tr><td>"+new Date(x.created).toLocaleString()+"</td><td>"+esc(x.name||"")+" <span class=sub>"+esc(x.code||"")+"</span></td><td>"+esc(x.plan)+"</td><td>"+x.amount+"</td><td>"+esc(x.phone)+"</td><td class='"+(x.status==="paid"?"ok":x.status==="pending"?"":"bad")+"'>"+esc(x.status)+(x.note?" ("+esc(x.note)+")":"")+"</td><td>"+esc(x.receipt||"")+"</td></tr>";}).join("");}).catch(function(e){$("m").className="bad";$("m").textContent=e.message;});};
 </script></body></html>

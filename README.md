@@ -59,3 +59,20 @@ What the server enforces: server-side countdown/deadline/pause/extension, attemp
 while an attempt with Mila OFF is open, score calculation, ranking and the integrity log. Hints and Code suggestions are offline
 features, so they are switched off in the learner's app for the attempt (rules are snapshotted per attempt on the server).
 Known limit: results (collisions, time, route) are reported by the learner's browser; the program is stored for review.
+
+
+## M-PESA payments (school plans)
+
+Set these as Worker secrets (Cloudflare dashboard: Workers > your worker > Settings > Variables and Secrets, or `wrangler secret put NAME`). Never commit them.
+
+| Secret | Meaning |
+|---|---|
+| `MPESA_CONSUMER_KEY`, `MPESA_CONSUMER_SECRET` | Daraja app keys |
+| `MPESA_SHORTCODE` | Paybill or Till number used for STK Push |
+| `MPESA_PASSKEY` | Lipa na M-PESA Online passkey for that shortcode |
+| `MPESA_CALLBACK_SECRET` | A long random string. It becomes part of the callback URL, so only Safaricom (who is given the URL) can confirm a payment |
+| `MPESA_ENV` | `production` for live money. Anything else uses the sandbox |
+| `MPESA_TYPE` | Set to `till` if the shortcode is a Till (Buy Goods). Default is Paybill. For a Till, `MPESA_PARTYB` can hold the till number if it differs from the shortcode |
+| `MPESA_TEST_AMOUNT` | Optional, 1 to 100. While set, every plan charges only this many KSh. **Delete it when testing is finished.** |
+
+The callback URL is sent with each request (`/api/mpesa/callback/<MPESA_CALLBACK_SECRET>`), so nothing needs registering for STK Push. Payments are listed at `/plans.html` (Payments button).
