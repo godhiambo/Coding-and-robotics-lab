@@ -16,6 +16,7 @@ function missionData(){
  var scores=jget("mm_scores",{}),won=jget("mm_won",{}),out=[];
  if(!C)return out;
  C.LEVELS.forEach(function(l){if(l.id==="sandbox")return;if(won[l.id]||scores[l.id]){var st=(scores[l.id]&&scores[l.id].stars)||1;out.push({id:l.id,name:l.name,tier:l.tier||"Open",stars:st,pts:Math.round((TIERPTS[l.tier]||100)*(STARF[st]||0.6)),kind:l.kind||l.id,drone:!!l.drone,arm:!!l.arm,station:!!l.station});}});
+ var lab=jget("mm_lab",{});Object.keys(lab).forEach(function(k){var x=lab[k];out.push({id:k,name:x.name,tier:x.tier,stars:x.stars,pts:Math.round((TIERPTS[x.tier]||100)*(STARF[x.stars]||0.6)),kind:k,lab:true});});
  return out;}
 function state(){
  var m=missionData(),cs=certs(),xp=0;m.forEach(function(x){xp+=x.pts;});cs.forEach(function(c){xp+=CERTXP[c.kind]||0;});
@@ -32,6 +33,8 @@ var ACH=[
  ["Took flight","Complete any drone mission",function(s){return has(s.missions,function(x){return x.drone;});}],
  ["Built a circuit system","Complete Electronic Traffic Light or Automatic Door",function(s){return has(s.missions,function(x){return x.id==="trafficled"||x.id==="autodoor";});}],
  ["Smart farmer","Complete a farm or greenhouse mission",function(s){return has(s.missions,function(x){return ["farm","irrigate","greenhouse","solar"].indexOf(x.id)>=0;});}],
+ ["Structural engineer","Pass any Bridge Lab challenge",function(s){return has(s.missions,function(x){return /^bridge_/.test(x.id);});}],
+ ["Gear master","Pass any Gear Lab challenge",function(s){return has(s.missions,function(x){return /^gear_/.test(x.id);});}],
  ["Master Programmer","Earn 3 stars on 5 missions",function(s){return s.missions.filter(function(x){return x.stars===3;}).length>=5;}],
  ["Robotics Engineer","Complete 10 missions",function(s){return s.missions.length>=10;}],
  ["Mission Veteran","Complete 25 missions",function(s){return s.missions.length>=25;}],

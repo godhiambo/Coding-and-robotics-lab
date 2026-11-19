@@ -46,9 +46,10 @@ root.BridgeLab=api;
 
 // ---------------- UI ----------------
 var $=function(i){return document.getElementById(i);};
-var CH=[{id:"a",name:"Footbridge: 12 kN, max 20 kg",P:12,budget:20},{id:"b",name:"Village bridge: 30 kN, max 60 kg",P:30,budget:60},{id:"c",name:"Truck bridge: 60 kN, max 120 kg",P:60,budget:120}];
+var CH=[{id:"a",name:"Footbridge: 12 kN, max 20 kg",P:12,budget:20,tier:"Intermediate"},{id:"b",name:"Village bridge: 30 kN, max 60 kg",P:30,budget:60,tier:"Advanced"},{id:"c",name:"Truck bridge: 60 kN, max 120 kg",P:60,budget:120,tier:"Expert"}];
 var NX=7,NY=4,S=50,OX=30,OY=170,nodes=[];for(var yy=0;yy<NY;yy++)for(var xx=0;xx<NX;xx++)nodes.push({x:xx,y:yy});
 var st={mem:[],sel:-1,mat:"wood",ch:0,res:null,anim:-1,msg:""};
+function saveLab(id,name,tier,stars){try{var all=JSON.parse(localStorage.getItem("mm_lab")||"{}"),p=all[id];if(!p||stars>p.stars){all[id]={name:name,tier:tier,stars:stars,at:Date.now()};localStorage.setItem("mm_lab",JSON.stringify(all));return true;}}catch(e){}return false;}
 function key(a,b){return a<b?a+"-"+b:b+"-"+a;}
 function pinN(){return 0;}function rolN(){return NX-1;}
 function loadsFor(P){var l={};for(var k=1;k<NX-1;k++)l[k]=P/(NX-2);return l;}
@@ -61,7 +62,7 @@ function verdict(){var r=st.res,c=CH[st.ch];if(!r)return {ok:false,t:"Tap two do
  if(r.sf<1){var m=r.members[r.crit];return {ok:false,t:"✗ It collapses! Beam "+(r.crit+1)+" "+m.mode+" at "+(r.sf*100).toFixed(0)+"% of the load."};}
  if(r.sf<1.5)return {ok:false,t:"It stands but is too risky: safety factor "+r.sf.toFixed(2)+" (need 1.5)."};
  if(defl>25)return {ok:false,t:"Too bendy: it sags "+defl.toFixed(0)+" mm (max 25 mm)."};
- var stars=1+(r.sf>=2?1:0)+(r.sf>=2&&r.mass<=0.7*c.budget?1:0);return {ok:true,t:"★".repeat(stars)+" Safe bridge! Safety factor "+r.sf.toFixed(2)+", sag "+defl.toFixed(0)+" mm, mass "+r.mass.toFixed(1)+" kg."};}
+ var stars=1+(r.sf>=2?1:0)+(r.sf>=2&&r.mass<=0.7*c.budget?1:0);var nw=saveLab("bridge_"+c.id,"Bridge: "+c.name.split(":")[0],c.tier,stars);return {ok:true,saved:nw,t:"★".repeat(stars)+" Safe bridge! Safety factor "+r.sf.toFixed(2)+", sag "+defl.toFixed(0)+" mm, mass "+r.mass.toFixed(1)+" kg."};}
 function px(n){return OX+nodes[n].x*S;}function py(n){return OY-nodes[n].y*S;}
 function col(u){var h=120-Math.min(1,u)*120;return "hsl("+h+",85%,50%)";}
 function draw(){var cv=$("brCv");if(!cv)return;var g=cv.getContext("2d");g.clearRect(0,0,cv.width,cv.height);g.fillStyle="#0b1220";g.fillRect(0,0,cv.width,cv.height);
@@ -79,7 +80,7 @@ function draw(){var cv=$("brCv");if(!cv)return;var g=cv.getContext("2d");g.clear
  if(r&&deckOk()){var tx=OX+(NX-1)*S*(0.5+0.4*Math.sin(Math.min(1,f)*3.14159*0.0));g.fillStyle="#f59e0b";g.fillRect(tx-14,py(0)-13+(r?-r.disp[3][1]*S*sc*f*0:0),28,9);g.fillStyle="#111";g.beginPath();g.arc(tx-8,py(0)-3,3,0,7);g.arc(tx+8,py(0)-3,3,0,7);g.fill();}
  g.fillStyle="#94a3b8";g.font="10px sans-serif";g.fillText("Grid: 1 m. Tap two dots to place or remove a beam.",8,12);
 }
-function refresh(){analyse();var v=verdict();var el=$("brMsg");if(el){el.textContent=v.t;el.style.color=v.ok?"#86efac":"#fca5a5";}var r=st.res&&!st.res.err?st.res:null;
+function refresh(){analyse();var v=verdict();var el=$("brMsg");if(el){el.textContent=v.t+(v.ok?" Saved to your Passport.":"");el.style.color=v.ok?"#86efac":"#fca5a5";}var r=st.res&&!st.res.err?st.res:null;
  var inf=$("brInfo");if(inf)inf.innerHTML=r?"<b>Mass</b> "+r.mass.toFixed(1)+" / "+CH[st.ch].budget+" kg &nbsp; <b>Safety factor</b> "+(isFinite(r.sf)?r.sf.toFixed(2):"–")+" &nbsp; <b>Beams</b> "+st.mem.length:"";
  draw();}
 function tap(e){var cv=$("brCv"),rc=cv.getBoundingClientRect(),sx=cv.width/rc.width,x=(e.clientX-rc.left)*sx,y=(e.clientY-rc.top)*sx,best=-1,bd=1e9;
