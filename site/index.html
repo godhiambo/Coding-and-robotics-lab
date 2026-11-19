@@ -2736,10 +2736,21 @@ G.nano=function(D){var w=150,h=58;D.r(0,0,w,h,"#0f6a9c","#0a4a70",4);D.r(0,16,22
  D.txt(95,29,"ARDUINO",6.4,"#e8f7ff");D.txt(95,38,"NANO",5.6,"#e8f7ff");
  D.hdr(["TX1","RX0","RST","GND","D2","D3","D4","D5","D6","D7","D8","D9","D10","D11","D12"],14,5,8.9,true,false);
  D.hdr(["VIN","GND","RST","5V","A7","A6","A5","A4","A3","A2","A1","A0","REF","3V3","D13"],14,h-5,8.9,true,true);};
-G.esp32=function(D){var w=158,h=80;D.r(0,0,w,h,"#1f242b","#0b0e12",4);D.r(0,30,16,20,"#c9ccd1","#7a8087",2);D.r(4,33,10,14,"#aeb3b9");
- D.r(52,16,62,48,"#c3c8cd","#8b9298",2);D.r(56,20,54,40,"#b3b9bf");D.txt(83,38,"ESP-WROOM-32",5.4,"#333");D.txt(83,47,"FCC ID  2AC7Z-ESPWROOM32",3.2,"#555");
- for(var i=0;i<6;i++){D.l(120,22+i*8,150,22+i*8,GOLD,1.4);D.l(120,22+i*8,120,30+i*8,GOLD,1.4);}D.r(116,16,40,48,"none","#3a414a",1);
- D.r(22,18,10,8,"#cfd3d7","#666");D.r(22,54,10,8,"#cfd3d7","#666");D.txt(27,35,"EN",3.8,"#bbb");D.txt(27,50,"BOOT",3.8,"#bbb");D.c(40,40,2,"#ff3b3b");
+G.esp32=function(D){var w=158,h=80;D.b.push("<defs><linearGradient id='pGm' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#eef1f4'/><stop offset='.5' stop-color='#a8aeb6'/><stop offset='1' stop-color='#d5dae0'/></linearGradient><radialGradient id='pGc' cx='.35' cy='.3' r='.8'><stop offset='0' stop-color='#f3f5f7'/><stop offset='1' stop-color='#858c95'/></radialGradient><linearGradient id='pGk' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#3a4048'/><stop offset='1' stop-color='#14171b'/></linearGradient></defs>");
+ D.r(0,0,w,h,"#1b2027","#05070a",4);D.r(2,2,w-4,3,"rgba(255,255,255,.08)",null,1);
+ // micro-USB
+ D.r(0,30,18,20,"url(#pGm)","#6b727a",2);D.r(3,34,12,12,"#15181c");D.r(5,37,8,6,"#0a0c0f");
+ // CP2102 + regulator
+ D.r(24,22,10,10,"#111",null,1);D.txt(29,28,"CP",2.6,"#777");D.r(24,48,10,8,"#222",null,1);
+ // buttons EN / BOOT
+ D.r(22,13,11,9,"url(#pGm)","#666",1.5);D.c(27.5,17.5,2.8,"#222");D.r(22,58,11,9,"url(#pGm)","#666",1.5);D.c(27.5,62.5,2.8,"#222");D.txt(40,19,"EN",3.4,"#9aa0a6","start");D.txt(40,64,"BOOT",3.4,"#9aa0a6","start");
+ // WROOM metal shield
+ D.r(50,15,66,50,"url(#pGm)","#7b828a",2);D.r(53,18,60,44,"none","rgba(255,255,255,.5)",1,.6);D.txt(83,33,"ESP32-WROOM-32",4.8,"#444");D.txt(83,40,"FCC ID:2AC7Z-ESPWROOM32",2.8,"#666");D.txt(83,46,"IC:21098-ESPWROOM32",2.8,"#666");D.r(58,50,10,8,"#444",null,.5);D.r(60,52,6,4,"#888",null,.5);
+ // antenna (gold meander trace on bare PCB)
+ var ant="M118 18 L150 18 L150 26 L122 26 L122 34 L150 34 L150 42 L122 42 L122 50 L150 50 L150 58";D.p(ant,"none",GOLD,1.5);D.r(116,14,40,52,"none","#262c34",1);
+ // LEDs + caps
+ D.r(40,36,4,3,"#ff3b3b","#800",.4);D.r(40,42,4,3,"#3b82ff","#118",.4);D.c(46,56,3,"url(#pGc)","#666",.6);D.c(50,56,3,"url(#pGc)","#666",.6);
+ D.txt(8,26,"3V3",3,"#cfd3d7","start",-90);
  D.hdr(["3V3","EN","GPIO36","GPIO39","GPIO34","GPIO35","GPIO32","GPIO33","GPIO25","GPIO26","GPIO27","GPIO14","GPIO12","GND","GPIO13","SD2","SD3","CMD","5V"],6,5,7.5,true,false);
  D.hdr(["GND","GPIO23","GPIO22","TX0","RX0","GPIO21","GND","GPIO19","GPIO18","GPIO5","GPIO17","GPIO16","GPIO4","GPIO0","GPIO2","GPIO15","SD1","SD0","CLK"],6,h-5,7.5,true,true);};
 G.pico=function(D){var w=150,h=62;D.r(0,0,w,h,"#1f7a3b","#0f4d22",4);D.r(0,20,18,22,"#c9ccd1","#7a8087",2);D.r(4,23,10,16,"#aeb3b9");
@@ -2765,20 +2776,35 @@ G.aa=function(D){D.r(0,4,96,48,"#16191d","#000",5);for(var i=0;i<4;i++){D.r(6+i*
 G.lipo=function(D){D.r(0,2,90,50,"#2a62c9","#173a7c",6);D.r(6,10,60,34,"#1a2f6a",null,3);D.txt(36,28,"LiPo",8,"#fff");D.txt(36,38,"7.4V 2500mAh",5,"#cfe0ff");D.r(88,12,6,10,"#d32f2f");D.r(88,32,6,10,BLK);D.pin("+",94,17);D.pin("-",94,37);};
 G.bank=function(D){D.r(0,2,92,52,"#f2f2f2","#b9b9b9",7);D.r(6,8,52,40,"#2a2f36",null,4);D.txt(32,32,"5V 3A",8,"#7be0ff");D.r(66,10,20,8,BLK);D.r(66,24,20,8,"#bbb");D.pin("+",90,14);D.pin("-",90,38);};
 // ---------------- drivers & motors ----------------
-G.l298n=function(D){D.r(0,0,104,110,"#c62828","#7f1d1d",4);D.r(30,34,44,34,"#2b2f36","#000",2);for(var i=0;i<6;i++)D.r(33,37+i*4.8,38,2.6,"#555");D.r(26,32,52,38,"none","#999",1);D.txt(52,80,"L298N",7,"#ffe0e0");
- Tm(D,8,6,3,16,"#2e7d32");["12V","GND","5V"].forEach(function(n,i){D.pin(n,13.5+i*16,6);D.txt(13.5+i*16,22,n,4,"#fff");});
- D.r(2,34,16,12,"#2e7d32","#124d18",2);D.r(2,52,16,12,"#2e7d32","#124d18",2);D.r(86,34,16,12,"#2e7d32","#124d18",2);D.r(86,52,16,12,"#2e7d32","#124d18",2);
- D.c(10,40,3,"#c9ced3","#8b9096",.5);D.c(10,58,3,"#c9ced3","#8b9096",.5);D.c(94,40,3,"#c9ced3","#8b9096",.5);D.c(94,58,3,"#c9ced3","#8b9096",.5);
+G.l298n=function(D){D.b.push("<defs><linearGradient id='pGm' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#eef1f4'/><stop offset='.5' stop-color='#a8aeb6'/><stop offset='1' stop-color='#d5dae0'/></linearGradient><radialGradient id='pGc' cx='.35' cy='.3' r='.8'><stop offset='0' stop-color='#f3f5f7'/><stop offset='1' stop-color='#858c95'/></radialGradient><linearGradient id='pGk' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#3a4048'/><stop offset='1' stop-color='#14171b'/></linearGradient></defs>");
+ D.r(0,0,104,110,"#c62828","#7f1d1d",4);D.r(2,2,100,3,"rgba(255,255,255,.18)",null,1.5);
+ [[5,5],[99,5],[5,105],[99,105]].forEach(function(q){D.c(q[0],q[1],2.4,"#f3d9d9","#8a2a2a",.6);});
+ // heatsink with fins
+ D.r(27,30,50,42,"url(#pGk)","#000",2);for(var i=0;i<8;i++){D.r(30+i*5.6,33,3,36,"rgba(255,255,255,.12)");}D.r(26,29,52,3,"rgba(255,255,255,.25)",null,1);D.txt(52,84,"L298N",6.6,"#ffe0e0");
+ // chip legs
+ for(var k=0;k<15;k++){D.r(80,34+k*2.4,3,1.2,"url(#pGm)");}
+ // capacitors
+ D.c(88,16,6,"url(#pGc)","#6b727a",.8);D.c(88,16,3.8,"none","#555",.6);D.r(86,8,4,8,"#222",null,.5);D.c(14,92,5,"url(#pGc)","#6b727a",.8);
+ Tm(D,8,6,3,16,"#1b8a3a");["12V","GND","5V"].forEach(function(n,i){D.pin(n,13.5+i*16,6);D.txt(13.5+i*16,22,n,4,"#fff");});
+ [[2,34],[2,52],[86,34],[86,52]].forEach(function(q){D.r(q[0],q[1],16,12,"#1b8a3a","#0d4f20",2);D.r(q[0]+1,q[1]+1,14,2,"rgba(255,255,255,.3)",null,1);});
+ D.c(10,40,3.4,"url(#pGm)","#8b9096",.5);D.l(8,40,12,40,"#555",.9);D.c(10,58,3.4,"url(#pGm)","#8b9096",.5);D.l(8,58,12,58,"#555",.9);D.c(94,40,3.4,"url(#pGm)","#8b9096",.5);D.l(92,40,96,40,"#555",.9);D.c(94,58,3.4,"url(#pGm)","#8b9096",.5);D.l(92,58,96,58,"#555",.9);
  D.pin("OUT1",10,40);D.pin("OUT2",10,58);D.pin("OUT3",94,40);D.pin("OUT4",94,58);
- D.txt(10,32,"OUT1",3.6,"#fff");D.txt(10,70,"OUT2",3.6,"#fff");D.txt(94,32,"OUT3",3.6,"#fff");D.txt(94,70,"OUT4",3.6,"#fff");D.c(84,18,2,"#ff3b3b");
+ D.txt(10,32,"OUT1",3.6,"#fff");D.txt(10,70,"OUT2",3.6,"#fff");D.txt(94,32,"OUT3",3.6,"#fff");D.txt(94,70,"OUT4",3.6,"#fff");
+ D.c(84,50,1.8,"#ff3b3b");D.r(74,92,8,6,"#111");D.r(86,88,12,4,"#222");D.c(94,96,1.8,"#ffd54f");D.r(22,76,14,8,"#222",null,1);
  D.hdr(["ENA","IN1","IN2","IN3","IN4","ENB"],18,104,11,true,true);D.pin("VCC",96,80);};
+
 function h(x){return x;}
 G.l293d=function(D){D.r(0,0,90,74,"#1a237e","#0d1250",4);D.r(26,22,38,22,BLK,"#000",2);D.txt(45,35,"L293D",6,"#ccc");D.hdr(["EN1","IN1","IN2","IN3","IN4","EN2"],14,68,10,true,true);["VCC","GND","M1A","M1B","M2A","M2B"].forEach(function(n,i){D.r(7+i*13,3,11,10,"#2e7d32");D.pin(n,12.5+i*13,6);D.txt(12.5+i*13,21,n,3.2,"#fff");});};
 G.tb6612=function(D){D.r(0,0,80,64,"#7b1fa2","#4a148c",4);D.r(26,20,26,18,BLK,"#000",2);D.txt(39,31,"TB6612",4.6,"#ccc");D.hdr(["PWMA","AIN1","AIN2","BIN1","BIN2","PWMB"],8,58,10,true,true);["VM","GND","A01","A02","B01","B02"].forEach(function(n,i){D.r(4+i*12,3,10,9,"#c9ced3");D.pin(n,9+i*12,6);D.txt(9+i*12,20,n,3.4,"#fff");});};
 G.gear=function(D){D.r(8,8,52,30,"#f4b400","#a37400",4);D.r(60,16,16,14,"#cfd3d7","#888",2);D.r(2,14,8,18,"#222");D.l(76,23,82,23,"#888",3);D.c(30,23,9,"#c98f00","#7a5600");D.txt(30,26,"TT",6,"#5b3d00");D.l(10,16,2,6,"#d32f2f",1.6);D.l(10,30,2,40,BLK,1.6);D.pin("M+",2,6);D.pin("M-",2,40);};
 // ---------------- sensors ----------------
-G.us=function(D){D.r(0,0,104,56,"#1c6dd0","#0f3f86",3);[26,78].forEach(function(cx){D.c(cx,24,19,"#c3c8cd","#7a8087",1.5);D.c(cx,24,14,"#1b1f24");D.c(cx,24,9,"#3a4047");D.c(cx,24,3,"#c3c8cd");});D.e(52,44,7,4,"#c3c8cd","#888");D.txt(52,17,"HC-SR04",5.2,"#fff");
- D.txt(10,53,"VCC",3.8);D.txt(26,53,"TRIG",3.8);D.txt(42,53,"ECHO",3.8);D.txt(58,53,"GND",3.8);D.hdr(["VCC","TRIG","ECHO","GND"],36,56,8,false,true);};
+G.us=function(D){D.b.push("<defs><linearGradient id='pGm' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#eef1f4'/><stop offset='.5' stop-color='#a8aeb6'/><stop offset='1' stop-color='#d5dae0'/></linearGradient><radialGradient id='pGc' cx='.35' cy='.3' r='.8'><stop offset='0' stop-color='#f3f5f7'/><stop offset='1' stop-color='#858c95'/></radialGradient><linearGradient id='pGk' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#3a4048'/><stop offset='1' stop-color='#14171b'/></linearGradient></defs>");
+ D.r(0,0,104,56,"#1565c0","#0b3d80",3);D.r(2,2,100,4,"rgba(255,255,255,.18)",null,2);
+ [26,78].forEach(function(cx){D.c(cx,24,19.5,"url(#pGm)","#6b727a",1.2);D.c(cx,24,16,"url(#pGk)");for(var r=13;r>3;r-=3)D.c(cx,24,r,"none","rgba(160,170,180,.45)",.5);for(var g=-12;g<=12;g+=4){D.l(cx+g,24-Math.sqrt(Math.max(0,150-g*g)),cx+g,24+Math.sqrt(Math.max(0,150-g*g)),"rgba(150,160,170,.35)",.4);}D.c(cx,24,2.2,"url(#pGm)");D.c(cx-6,16,1.6,"rgba(255,255,255,.35)");});
+ D.r(40,12,24,14,"#14171b","#000",1.5);for(var i=0;i<8;i++){D.r(41+i*3,10,1.5,2.4,"url(#pGm)");D.r(41+i*3,26,1.5,2.4,"url(#pGm)");}D.txt(52,20,"MAX",2.8,"#8a9097");D.txt(52,23.5,"3232",2.4,"#8a9097");
+ D.e(52,41,7,3.6,"url(#pGm)","#7a8087");D.txt(52,42.2,"16M",2.6,"#444");D.r(70,36,6,3,"#222");D.r(78,36,6,3,"#222");D.r(88,40,5,3,"#d4af37");
+ D.txt(52,8,"HC-SR04",4.6,"#e8f1ff");D.txt(26,53.8,"VCC",3.2);D.txt(42,53.8,"TRIG",3.2);D.txt(58,53.8,"ECHO",3.2);D.txt(74,53.8,"GND",3.2);
+ D.hdr(["VCC","TRIG","ECHO","GND"],36,56,8,false,true);};
 G.sharp=function(D){D.r(0,0,70,40,"#2b2b2b","#000",3);D.r(8,5,18,20,"#c9ccd1","#888",2);D.r(40,5,20,20,"#c9ccd1","#888",2);D.txt(35,30,"GP2Y0A",3.8,"#ccc");D.hdr(["VCC","GND","AOUT"],12,40,16,true,true);};
 G.irobs=function(D){D.r(0,0,88,50,"#1c6dd0","#0f3f86",3);D.c(18,16,8,"#f3f3f3","#bbb");D.c(36,16,8,"#1b1f24","#000");D.r(52,8,14,14,"#2b6cc9","#fff",2);D.c(59,15,4,"#d4b02a");D.r(70,8,12,16,BLK,"#000",1);D.c(8,36,2,"#ff3b3b");D.c(16,36,2,"#66ff66");D.txt(44,27,"IR",4.4,"#fff");D.hdr(["VCC","GND","OUT"],24,50,10,true,true);};
 G.line=function(D){D.r(0,0,64,44,"#222",null,3);D.r(0,0,64,44,"#1d3b73","#0f2247",3);D.r(10,8,12,10,BLK);D.c(30,13,4,"#ff3b3b");D.r(40,8,10,10,BLK);D.c(10,32,2,"#66ff66");D.txt(32,28,"TCRT5000",4,"#ddd");D.hdr(["VCC","GND","OUT"],18,44,10,true,true);};
@@ -2802,7 +2828,13 @@ G.gps=function(D){D.r(0,0,78,60,"#1b3a8c","#0f2257",3);D.r(8,6,40,40,"#d9d3b8","
 G.gsm=function(D){D.r(0,0,90,66,"#c2185b","#7a0e3a",3);D.r(10,10,30,24,"#2b2f36","#000",2);D.txt(25,24,"SIM800L",4.6,"#ccc");D.r(48,8,34,22,"#f5f5f5","#bbb",2);D.txt(65,22,"SIM",5,"#444");D.l(70,38,86,38,"#bbb",2);D.c(14,46,2,"#66ff66");D.hdr(["VCC","GND","TX","RX","RST"],10,66,14,true,true);};
 G.bt=function(D){D.r(0,0,88,40,"#1b3a8c","#0f2257",3);D.r(8,8,34,22,"#c3c8cd","#7a8087",2);D.txt(25,22,"HC-05",5,"#333");D.r(48,10,12,12,BLK);D.c(70,14,3,"#4aa3ff");D.hdr(["VCC","GND","TX","RX"],8,40,13,true,true);};
 // ---------------- actuators ----------------
-G.servo=function(D){D.r(8,10,54,30,"#2b6fd6","#17408a",3);D.r(2,16,6,18,"#2b6fd6","#17408a");D.r(62,16,6,18,"#2b6fd6","#17408a");D.c(26,25,10,"#e9e9e9","#aaa");D.c(26,25,4,"#888");D.r(22,3,8,12,"#f3f3f3","#bbb",2);D.txt(48,28,"SG90",5,"#fff");D.l(62,22,76,22,"#f4b400",1.8);D.l(62,25,76,25,"#d32f2f",1.8);D.l(62,28,76,28,"#7a4a1c",1.8);D.pin("SIG",76,22);D.pin("VCC",76,25);D.pin("GND",76,28);};
+G.servo=function(D){D.b.push("<defs><linearGradient id='pGm' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#eef1f4'/><stop offset='.5' stop-color='#a8aeb6'/><stop offset='1' stop-color='#d5dae0'/></linearGradient><radialGradient id='pGc' cx='.35' cy='.3' r='.8'><stop offset='0' stop-color='#f3f5f7'/><stop offset='1' stop-color='#858c95'/></radialGradient><linearGradient id='pGk' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#3a4048'/><stop offset='1' stop-color='#14171b'/></linearGradient></defs>");
+ D.r(8,10,54,30,"#1f63c8","#0f3a80",3);D.r(8,10,54,5,"rgba(255,255,255,.25)",null,2);
+ D.r(2,16,6,18,"#1f63c8","#0f3a80",1);D.r(62,16,6,18,"#1f63c8","#0f3a80",1);D.c(4.5,25,1.4,"#0a2550");D.c(65.5,25,1.4,"#0a2550");
+ D.r(38,16,20,18,"#f2f5f9","#b6bdc6",2);D.txt(48,26,"TowerPro",3,"#c62828");D.txt(48,31,"SG90 9g",3.2,"#1f63c8");
+ // output shaft + white horn
+ D.c(26,25,10,"url(#pGm)","#8b9096",.8);D.c(26,25,4.2,"#444");D.r(21,0,10,14,"#f4f4f4","#b8b8b8",3);for(var i=0;i<3;i++)D.c(26,3+i*3.6,1,"#9aa");D.c(26,25,1.4,"#ddd");
+ D.l(62,22,76,22,"#f4a000",2.2);D.l(62,25,76,25,"#d32f2f",2.2);D.l(62,28,76,28,"#7a4a1c",2.2);D.pin("SIG",76,22);D.pin("VCC",76,25);D.pin("GND",76,28);};
 G.servo2=function(D){D.r(10,12,56,36,"#1b1b1b","#000",3);D.r(2,20,8,20,"#1b1b1b");D.r(66,20,8,20,"#1b1b1b");D.c(30,30,12,"#c9ccd1","#888");D.c(30,30,5,"#555");D.r(26,3,8,14,"#cfd3d7","#888",2);D.txt(50,34,"MG996R",5,"#ddd");D.l(66,26,78,26,"#f4b400",1.8);D.l(66,30,78,30,"#d32f2f",1.8);D.l(66,34,78,34,"#7a4a1c",1.8);D.pin("SIG",78,26);D.pin("VCC",78,30);D.pin("GND",78,34);};
 G.pump=function(D){D.r(8,10,34,26,"#1b1b1b","#000",5);D.r(42,14,18,18,"#2b6fd6","#17408a",4);D.c(51,23,5,"#9cd0ff");D.l(60,23,68,23,"#7ec8ff",3);D.l(8,18,0,14,"#d32f2f",1.6);D.l(8,28,0,34,BLK,1.6);D.pin("+",0,14);D.pin("-",0,34);};
 G.led=function(D){D.r(7,18,20,20,"#d32f2f","#8f1c1c",9);D.e(17,14,10,12,"#ef5350","#8f1c1c");D.e(14,11,3,5,"rgba(255,255,255,.6)");D.l(13,38,13,56,"#bbb",1.6);D.l(21,38,21,50,"#bbb",1.6);D.pin("+",13,56);D.pin("-",21,50);};
