@@ -2,7 +2,7 @@
 // All rules, timing and scoring are decided HERE (server time), never trusted from the browser.
 // Needs a D1 binding named DB. Tables are created automatically on first use.
 
-import { Bridge, Gear, Hydro, Labs2, Mcu } from "./labs.js";
+import { Bridge, Gear, Hydro, Labs2, Mcu, Rescue } from "./labs.js";
 
 const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const bad = (m, s = 400) => J({ error: m }, s);
@@ -303,6 +303,7 @@ function labEval(level, d) {
   if (level.startsWith("lab-hydro-")) return Hydro.evaluate({ ...d, ch: level.slice(10) });
   if (level.startsWith("lab-arm-")) return Labs2.Arm.evaluate({ ...d, ch: level.slice(8) });
   if (level.startsWith("lab-sumo-")) return Labs2.Sumo.evaluate({ ...d, ch: level.slice(9) });
+  if (level.startsWith("lab-rescue-")) return Rescue.evaluate(d);
   if (level.startsWith("lab-mcu-")) return Mcu.evaluate({ ...d, ch: "mcu_" + level.slice(8) });
   if (level.startsWith("lab-ai-")) return Labs2.AI.evaluate({ ...d, ch: level.slice(7) });
   return { ok: false, t: "Unknown lab." };
@@ -320,7 +321,7 @@ R["attempt/submit"] = async (db, b) => {
   if (now > o.dl + 15000) return bad("Time is up.", 409); // small grace for network delay
   const rules = JSON.parse(o.a.rules);
   if (String(o.a.level || "").startsWith("lab-")) {
-    const ev2 = labEval(o.a.level, b.design), elapsed = Math.max(1, (now - o.a.started) / 1000), sc = labScore(rules, ev2, elapsed), nb = Array.isArray(b.design && b.design.mem) ? b.design.mem.length : Array.isArray(b.design && b.design.tr) ? b.design.tr.length : Array.isArray(b.design && b.design.prog) ? b.design.prog.length : 0;
+    const ev2 = labEval(o.a.level, b.design), elapsed = Math.max(1, (now - o.a.started) / 1000), sc = labScore(rules, ev2, elapsed), nb = Array.isArray(b.design && b.design.mem) ? b.design.mem.length : Array.isArray(b.design && b.design.tr) ? b.design.tr.length : Array.isArray(b.design && b.design.prog) ? b.design.prog.length : Array.isArray(b.design && b.design.log) ? b.design.log.length : 0;
     await db.prepare("UPDATE attempts SET status='submitted',submitted=?,score=?,breakdown=?,win=?,collisions=0,time_s=?,blocks=?,progress=?,prog=? WHERE id=?")
       .bind(now, sc.total, JSON.stringify(sc.breakdown), ev2.ok ? 1 : 0, elapsed, clamp(nb, 0, 9999), ev2.ok ? 100 : 0, JSON.stringify(b.design || {}).slice(0, 20000), o.a.id).run();
     await ev(db, o.comp.id, l.id, "submit", { score: sc.total, win: !!ev2.ok, lab: true });
