@@ -38,6 +38,7 @@ var ACH=[
  ["Hydraulics engineer","Pass any Hydraulics Lab challenge",function(s){return has(s.missions,function(x){return /^hydro_/.test(x.id);});}],
  ["Arm designer","Pass any Robot Arm Lab challenge",function(s){return has(s.missions,function(x){return /^arm_/.test(x.id);});}],
  ["Sumo champion","Win any Sumo Lab challenge",function(s){return has(s.missions,function(x){return /^sumo_/.test(x.id);});}],
+ ["Microcontroller maker","Pass any Arduino Lab challenge",function(s){return has(s.missions,function(x){return /^mcu_/.test(x.id);});}],
  ["AI trainer","Pass any AI Lab challenge",function(s){return has(s.missions,function(x){return /^ai_/.test(x.id);});}],
  ["Master Programmer","Earn 3 stars on 5 missions",function(s){return s.missions.filter(function(x){return x.stars===3;}).length>=5;}],
  ["Robotics Engineer","Complete 10 missions",function(s){return s.missions.length>=10;}],

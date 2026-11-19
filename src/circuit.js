@@ -5,12 +5,14 @@ var RES=[100,220,330,470,1000,2200,4700,10000];
 var BATT={3:{r:1.0,name:"2×AA 3V"},5:{r:0.3,name:"USB 5V"},9:{r:2.0,name:"9V block"}};
 var BETA=100,RDQ=10,RD=8,ILED_MAX=0.030,RATED_W=0.5,IBAT_SHORT=1.0,POT_TOTAL=10000;
 var ROWS="abcdefghij";
+var UPINS=["D0","D1","D2","D3","D4","D5","D6","D7","D8","D9","D10","D11","D12","D13","A0","A1","A2","A3","A4","A5","5V","3V3","GND"];
 function holeNode(h){
+ if(/^U:/.test(h))return UPINS.indexOf(h.slice(2))>=0?h:null;
  var m=/^(tp|tn|bp|bn)(\d+)$/.exec(h);if(m)return m[1];
  m=/^([a-j])(\d+)$/.exec(h);if(!m)return null;
  return (ROWS.indexOf(m[1])<5?"T":"B")+m[2];
 }
-function validHole(h){var m=/^(tp|tn|bp|bn)(\d+)$/.exec(h)||/^([a-j])(\d+)$/.exec(h);return !!m&&+m[2]>=1&&+m[2]<=30;}
+function validHole(h){if(/^U:/.test(h))return UPINS.indexOf(h.slice(2))>=0;var m=/^(tp|tn|bp|bn)(\d+)$/.exec(h)||/^([a-j])(\d+)$/.exec(h);return !!m&&+m[2]>=1&&+m[2]<=30;}
 function clamp01(x){return Math.min(1,Math.max(0,x));}
 function ldrR(l){return 200+100000*Math.pow(1-clamp01(l),2);}
 function ntcR(t){var T=t+273.15;return 10000*Math.exp(3950*(1/T-1/298.15));}
@@ -40,10 +42,11 @@ function simulate(comps,over){
   if(c.type==="wire")uni(holeNode(c.holes[0]),holeNode(c.holes[1]));
   if(c.type==="switch"){var cl=over[c.id]!==undefined&&over[c.id].closed!==undefined?over[c.id].closed:c.closed;if(cl)uni(holeNode(c.holes[0]),holeNode(c.holes[1]));}
  });
- var bats=comps.filter(function(c){return c.type==="battery";});
- var res={ok:true,nodeV:{},comp:{},short:false,noBattery:!bats.length,notes:[],burned:[]};
+ var bats=comps.filter(function(c){return c.type==="battery";}),uno=comps.filter(function(c){return c.type==="uno";})[0];
+ if(uno)UPINS.forEach(function(p){find("U:"+p);});
+ var res={ok:true,nodeV:{},comp:{},short:false,noBattery:!bats.length&&!uno,notes:[],burned:[]};
  function nodeOf(h){return find(holeNode(h));}
- var gnd=bats.length?nodeOf(bats[0].holes[1]):null;
+ var gnd=uno?find("U:GND"):(bats.length?nodeOf(bats[0].holes[1]):null);
  var names=[],idx={};
  Object.keys(par).forEach(function(k){var r=find(k);if(r!==gnd&&idx[r]===undefined){idx[r]=names.length;names.push(r);}});
  var N=names.length;
@@ -60,6 +63,8 @@ function simulate(comps,over){
   else if(c.type==="led"){elems.push({k:"D",c:c,a:nodeOf(c.holes[0]),b:nodeOf(c.holes[1]),vf:LEDS[c.color].vf,on:false,dead:!!c.burned});}
   else if(c.type==="battery"){elems.push({k:"B",c:c,a:nodeOf(c.holes[0]),b:nodeOf(c.holes[1]),v:c.value,r:BATT[c.value].r});}
  });
+ if(uno){var mo=(over.mcu&&over.mcu.out)||{};elems.push({k:"B",c:{id:"u5",type:"upin"},a:nodeOf("U:5V"),b:gnd,v:5,r:0.3});elems.push({k:"B",c:{id:"u33",type:"upin"},a:nodeOf("U:3V3"),b:gnd,v:3.3,r:0.5});
+  Object.keys(mo).forEach(function(p){elems.push({k:"B",c:{id:"up"+p,type:"upin"},a:nodeOf("U:"+p),b:gnd,v:mo[p],r:25,pin:p});});}
  function idxOf(n){return n===gnd?-1:idx[n];}
  var diodes=elems.filter(function(e){return e.k==="D";}),trans=elems.filter(function(e){return e.k==="Q";});
  var V;
@@ -118,9 +123,10 @@ function simulate(comps,over){
   if(e.k==="R"){var cur=(va-vb)/Math.max(e.r,0.01);if(c.type==="pot"&&e.sub==="wb"){o.i2=cur;o.v2=va-vb;}else{o.i=cur;o.v=va-vb;o.p=cur*cur*e.r;}}
   else if(e.k==="D"){o.v=va-vb;o.i=e.on&&!e.dead?(va-vb-e.vf)/RD:0;o.lit=Math.min(1,Math.max(0,o.i/0.02));o.burned=!!c.burned;}
   else if(e.k==="Q"){var vbe2=volt(e.bn)-volt(e.en),ib2=e.beOn?Math.max(0,(vbe2-0.7)/RDQ):0,vce2=volt(e.cn)-volt(e.en);o.ib=ib2;o.i=e.beOn?(e.sat?Math.max(0,vce2-0.2):BETA*ib2):0;o.v=vce2;o.state=!e.beOn?"off":(e.sat?"saturated (fully on)":"amplifying");}
-  else if(e.k==="B"){o.v=va-vb;o.i=(e.v-(va-vb))/e.r;if(o.i>IBAT_SHORT){res.short=true;}}
+  else if(e.k==="B"){o.v=va-vb;o.i=(e.v-(va-vb))/e.r;if(e.pin!==undefined){o.pin=e.pin;if(Math.abs(o.i)>0.04)res.notes.push("Pin "+e.pin+" is overloaded ("+(Math.abs(o.i)*1000).toFixed(0)+" mA, max 40 mA)");}else if(o.i>IBAT_SHORT){res.short=true;}}
  });
  comps.forEach(function(c){if(!res.comp[c.id])res.comp[c.id]={i:0,v:0,p:0,lit:0,burned:!!c.burned};if(c.burned)res.burned.push(c.id);});
+ res.same=function(a,b){var x=holeNode(a),y=holeNode(b);return !!x&&!!y&&nodeOf(a)===nodeOf(b);};
  res.volt=function(h){var n=nodeOf(h);return n===gnd?0:(res.nodeV[n]!==undefined?res.nodeV[n]:0);};
  return res;
 }
@@ -190,6 +196,6 @@ function sensorFrom(comps){var ls=comps.filter(function(c){return c.type==="ldr"
  function ov(l){var o={};ls.forEach(function(c){o[c.id]={light:l};});return o;}
  var best=null,bs=0;ls.forEach(function(c){c.holes.forEach(function(h){try{var a=simulate(comps,ov(0.9)).volt(h),b=simulate(comps,ov(0.08)).volt(h),sw=Math.abs(a-b);if(sw>bs){bs=sw;best=h;}}catch(e){}});});
  if(!best)return null;var H=best;return function(light){return simulate(comps,ov(light)).volt(H);};}
-return {sensorFrom:sensorFrom,ldrR:ldrR,ntcR:ntcR,LEDS:LEDS,RES:RES,BATT:BATT,CHALLENGES:CHALLENGES,holeNode:holeNode,validHole:validHole,simulate:simulate,clean:clean,fmtR:fmtR,bands:bands,POT_TOTAL:POT_TOTAL,RD:RD};
+return {sensorFrom:sensorFrom,ldrR:ldrR,ntcR:ntcR,LEDS:LEDS,RES:RES,BATT:BATT,CHALLENGES:CHALLENGES,holeNode:holeNode,UPINS:UPINS,validHole:validHole,simulate:simulate,clean:clean,fmtR:fmtR,bands:bands,POT_TOTAL:POT_TOTAL,RD:RD};
 })();
 if(typeof module!=="undefined")module.exports=Circuit;
