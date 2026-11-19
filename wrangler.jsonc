@@ -14,7 +14,11 @@
       "database_id": "983c8f91-e8b2-421e-b927-ed9947217ac2"
     }
   ],
+  "keep_vars": true,
   "vars": {
-    "GEMINI_MODEL": "gemini-3.5-flash-lite"
+    "GEMINI_MODEL": "gemini-3.5-flash-lite",
+    "MPESA_ENV": "production",
+    "MPESA_TYPE": "till",
+    "MPESA_PARTYB": "1844024"
   }
 }

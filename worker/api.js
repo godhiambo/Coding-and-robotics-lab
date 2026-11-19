@@ -166,13 +166,14 @@ R["class/get"] = async (db, b, env) => {
 // Secrets: MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET, MPESA_SHORTCODE, MPESA_PASSKEY, MPESA_CALLBACK_SECRET.
 // Optional: MPESA_ENV ("production" for live, default sandbox), MPESA_TYPE ("till" for Buy Goods), MPESA_BASE (testing).
 const mpesaReady = (env) => !!(env.MPESA_CONSUMER_KEY && env.MPESA_CONSUMER_SECRET && env.MPESA_SHORTCODE && env.MPESA_PASSKEY && env.MPESA_CALLBACK_SECRET);
-const mpesaBase = (env) => env.MPESA_BASE || (env.MPESA_ENV === "production" ? "https://api.safaricom.co.ke" : "https://sandbox.safaricom.co.ke");
+const isLive = (env) => String(env.MPESA_ENV || "").trim().toLowerCase() === "production";
+const mpesaBase = (env) => env.MPESA_BASE || (isLive(env) ? "https://api.safaricom.co.ke" : "https://sandbox.safaricom.co.ke");
 function nairobiStamp() { const d = new Date(Date.now() + 3 * 3600000), p = (n) => String(n).padStart(2, "0"); return d.getUTCFullYear() + p(d.getUTCMonth() + 1) + p(d.getUTCDate()) + p(d.getUTCHours()) + p(d.getUTCMinutes()) + p(d.getUTCSeconds()); }
 function msisdn(v) { let p = String(v || "").replace(/[^\d]/g, ""); if (/^0[17]\d{8}$/.test(p)) p = "254" + p.slice(1); else if (/^[17]\d{8}$/.test(p)) p = "254" + p; return /^254[17]\d{8}$/.test(p) ? p : ""; }
 async function mpesaToken(env) {
   const r = await fetch(mpesaBase(env) + "/oauth/v1/generate?grant_type=client_credentials", { headers: { authorization: "Basic " + btoa(env.MPESA_CONSUMER_KEY + ":" + env.MPESA_CONSUMER_SECRET) } });
   const txt = await r.text().catch(() => ""); let j = {}; try { j = JSON.parse(txt); } catch {}
-  if (!r.ok || !j.access_token) throw new Error("M-PESA sign-in failed (" + (env.MPESA_ENV === "production" ? "live" : "sandbox, set MPESA_ENV=production for live") + ", HTTP " + r.status + (txt ? ": " + txt.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 90) : "") + ")");
+  if (!r.ok || !j.access_token) throw new Error("M-PESA sign-in failed (" + (isLive(env) ? "live" : "sandbox, set MPESA_ENV=production for live") + ", HTTP " + r.status + (txt ? ": " + txt.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 90) : "") + ")");
   return j.access_token;
 }
 async function activatePlan(db, pay, receipt) {
@@ -190,7 +191,7 @@ R["pay/start"] = async (db, b, env, request) => {
   const phone = msisdn(b.phone); if (!phone) return bad("Enter the M-PESA phone number, for example 0712345678.");
   const recent = await db.prepare("SELECT 1 FROM payments WHERE class_id=? AND status='pending' AND created>?").bind(c.id, Date.now() - 60000).first();
   if (recent) return bad("A payment request was just sent. Check your phone, or wait a minute and try again.", 429);
-  const ts = nairobiStamp(), till = env.MPESA_TYPE === "till", token = await mpesaToken(env);
+  const ts = nairobiStamp(), till = String(env.MPESA_TYPE || "").trim().toLowerCase() === "till", token = await mpesaToken(env);
   const origin = new URL(request.url).origin;
   const res = await fetch(mpesaBase(env) + "/mpesa/stkpush/v1/processrequest", { method: "POST", headers: { authorization: "Bearer " + token, "content-type": "application/json" }, body: JSON.stringify({
     BusinessShortCode: env.MPESA_SHORTCODE, Password: btoa(env.MPESA_SHORTCODE + env.MPESA_PASSKEY + ts), Timestamp: ts,
