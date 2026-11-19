@@ -35,6 +35,7 @@ var ACH=[
  ["Smart farmer","Complete a farm or greenhouse mission",function(s){return has(s.missions,function(x){return ["farm","irrigate","greenhouse","solar"].indexOf(x.id)>=0;});}],
  ["Structural engineer","Pass any Bridge Lab challenge",function(s){return has(s.missions,function(x){return /^bridge_/.test(x.id);});}],
  ["Gear master","Pass any Gear Lab challenge",function(s){return has(s.missions,function(x){return /^gear_/.test(x.id);});}],
+ ["Hydraulics engineer","Pass any Hydraulics Lab challenge",function(s){return has(s.missions,function(x){return /^hydro_/.test(x.id);});}],
  ["Master Programmer","Earn 3 stars on 5 missions",function(s){return s.missions.filter(function(x){return x.stars===3;}).length>=5;}],
  ["Robotics Engineer","Complete 10 missions",function(s){return s.missions.length>=10;}],
  ["Mission Veteran","Complete 25 missions",function(s){return s.missions.length>=25;}],

@@ -4768,6 +4768,7 @@ var ACH=[
  ["Smart farmer","Complete a farm or greenhouse mission",function(s){return has(s.missions,function(x){return ["farm","irrigate","greenhouse","solar"].indexOf(x.id)>=0;});}],
  ["Structural engineer","Pass any Bridge Lab challenge",function(s){return has(s.missions,function(x){return /^bridge_/.test(x.id);});}],
  ["Gear master","Pass any Gear Lab challenge",function(s){return has(s.missions,function(x){return /^gear_/.test(x.id);});}],
+ ["Hydraulics engineer","Pass any Hydraulics Lab challenge",function(s){return has(s.missions,function(x){return /^hydro_/.test(x.id);});}],
  ["Master Programmer","Earn 3 stars on 5 missions",function(s){return s.missions.filter(function(x){return x.stars===3;}).length>=5;}],
  ["Robotics Engineer","Complete 10 missions",function(s){return s.missions.length>=10;}],
  ["Mission Veteran","Complete 25 missions",function(s){return s.missions.length>=25;}],
@@ -4943,7 +4944,7 @@ function verdict(){var r=st.res,c=CH[st.ch];if(!r)return {ok:false,t:"Tap two do
  if(r.sf<1){var m=r.members[r.crit];return {ok:false,t:"✗ It collapses! Beam "+(r.crit+1)+" "+m.mode+" at "+(r.sf*100).toFixed(0)+"% of the load."};}
  if(r.sf<1.5)return {ok:false,t:"It stands but is too risky: safety factor "+r.sf.toFixed(2)+" (need 1.5)."};
  if(defl>25)return {ok:false,t:"Too bendy: it sags "+defl.toFixed(0)+" mm (max 25 mm)."};
- var stars=1+(r.sf>=2?1:0)+(r.sf>=2&&r.mass<=0.7*c.budget?1:0);var nw=saveLab("bridge_"+c.id,"Bridge: "+c.name.split(":")[0],c.tier,stars);return {ok:true,saved:nw,t:"★".repeat(stars)+" Safe bridge! Safety factor "+r.sf.toFixed(2)+", sag "+defl.toFixed(0)+" mm, mass "+r.mass.toFixed(1)+" kg."};}
+ var stars=1+(r.sf>=2?1:0)+(r.sf>=2&&r.mass<=0.7*c.budget?1:0);var isEx=st.mem.length===EX.length&&EX.every(function(p){return st.mem.some(function(m){return m.a===p[0]&&m.b===p[1];});});var nw=isEx?false:saveLab("bridge_"+c.id,"Bridge: "+c.name.split(":")[0],c.tier,stars);return {ok:true,ex:isEx,saved:nw,t:"★".repeat(stars)+" Safe bridge! Safety factor "+r.sf.toFixed(2)+", sag "+defl.toFixed(0)+" mm, mass "+r.mass.toFixed(1)+" kg."};}
 function px(n){return OX+nodes[n].x*S;}function py(n){return OY-nodes[n].y*S;}
 function col(u){var h=120-Math.min(1,u)*120;return "hsl("+h+",85%,50%)";}
 function draw(){var cv=$("brCv");if(!cv)return;var g=cv.getContext("2d");g.clearRect(0,0,cv.width,cv.height);g.fillStyle="#0b1220";g.fillRect(0,0,cv.width,cv.height);
@@ -4961,7 +4962,7 @@ function draw(){var cv=$("brCv");if(!cv)return;var g=cv.getContext("2d");g.clear
  if(r&&deckOk()){var tx=OX+(NX-1)*S*(0.5+0.4*Math.sin(Math.min(1,f)*3.14159*0.0));g.fillStyle="#f59e0b";g.fillRect(tx-14,py(0)-13+(r?-r.disp[3][1]*S*sc*f*0:0),28,9);g.fillStyle="#111";g.beginPath();g.arc(tx-8,py(0)-3,3,0,7);g.arc(tx+8,py(0)-3,3,0,7);g.fill();}
  g.fillStyle="#94a3b8";g.font="10px sans-serif";g.fillText("Grid: 1 m. Tap two dots to place or remove a beam.",8,12);
 }
-function refresh(){analyse();var v=verdict();var el=$("brMsg");if(el){el.textContent=v.t+(v.ok?" Saved to your Passport.":"");el.style.color=v.ok?"#86efac":"#fca5a5";}var r=st.res&&!st.res.err?st.res:null;
+function refresh(){analyse();var v=verdict();var el=$("brMsg");if(el){el.textContent=v.t+(v.ok&&!v.ex?" Saved to your Passport.":(v.ok?" That is the example. Change at least one beam to make it your own.":""));el.style.color=v.ok?"#86efac":"#fca5a5";}var r=st.res&&!st.res.err?st.res:null;
  var inf=$("brInfo");if(inf)inf.innerHTML=r?"<b>Mass</b> "+r.mass.toFixed(1)+" / "+CH[st.ch].budget+" kg &nbsp; <b>Safety factor</b> "+(isFinite(r.sf)?r.sf.toFixed(2):"–")+" &nbsp; <b>Beams</b> "+st.mem.length:"";
  draw();}
 function tap(e){var cv=$("brCv"),rc=cv.getBoundingClientRect(),sx=cv.width/rc.width,x=(e.clientX-rc.left)*sx,y=(e.clientY-rc.top)*sx,best=-1,bd=1e9;
@@ -5018,7 +5019,7 @@ if(typeof module!=="undefined"&&module.exports){module.exports=api;return;}
 root.GearLab=api;
 var $=function(i){return document.getElementById(i);};
 function saveLab(id,name,tier,stars){try{var all=JSON.parse(localStorage.getItem("mm_lab")||"{}"),p=all[id];if(!p||stars>p.stars){all[id]={name:name,tier:tier,stars:stars,at:Date.now()};localStorage.setItem("mm_lab",JSON.stringify(all));return true;}}catch(e){}return false;}
-var st={ch:0,t:[12,48,12,48],ang:0,raf:0};
+var st={ch:0,t:[12,48,12,48],ang:0,raf:0,touched:false};
 function gearPath(g,x,y,rad,n,rot,col,alpha){g.save();g.translate(x,y);g.rotate(rot);g.globalAlpha=alpha||1;g.fillStyle=col;g.beginPath();var tip=rad+4,root=rad-3;for(var i=0;i<n;i++){var a0=i*2*Math.PI/n,w=Math.PI/n*0.5;
   g.lineTo(root*Math.cos(a0-w),root*Math.sin(a0-w));g.lineTo(tip*Math.cos(a0-w*0.55),tip*Math.sin(a0-w*0.55));g.lineTo(tip*Math.cos(a0+w*0.55),tip*Math.sin(a0+w*0.55));g.lineTo(root*Math.cos(a0+w),root*Math.sin(a0+w));}
  g.closePath();g.fill();g.fillStyle="#0b1220";g.beginPath();g.arc(0,0,rad*0.22,0,7);g.fill();g.restore();g.globalAlpha=1;}
@@ -5034,7 +5035,7 @@ function draw(){var cv=$("grCv");if(!cv)return;var g=cv.getContext("2d"),t=st.t,
  g.fillStyle="#94a3b8";g.textAlign="left";g.fillText("Motor",6,12);g.fillText("Output →",cv.width-60,12);}
 function refresh(){var c=CH[st.ch],r=analyse(c,st.t),j=judge(c,r);
  $("grInfo").innerHTML="<b>Ratio</b> "+r.R.toFixed(2)+":1 &nbsp; <b>Efficiency</b> "+(r.eta*100).toFixed(0)+"%<br><b>Load torque</b> "+r.TL.toFixed(3)+" N·m &nbsp; <b>Motor torque</b> "+r.Tm.toFixed(3)+" N·m ("+(Math.min(r.frac,9.99)*100).toFixed(0)+"% of stall)<br><b>Motor</b> "+r.wm.toFixed(0)+" rpm → <b>Output</b> "+r.out.toFixed(0)+" rpm"+(r.v?" · "+(r.v*100).toFixed(1)+" cm/s":"");
- var m=$("grMsg"),nw=j.ok?saveLab("gear_"+c.id,"Gears: "+c.name.split(":")[0],c.tier,j.stars):false;m.textContent=j.t+(j.ok?" Saved to your Passport.":"");m.style.color=j.ok?"#86efac":"#fca5a5";$("grTxt").textContent=c.txt;draw();}
+ var m=$("grMsg"),nw=j.ok&&st.touched?saveLab("gear_"+c.id,"Gears: "+c.name.split(":")[0],c.tier,j.stars):false;m.textContent=j.t+(j.ok&&st.touched?" Saved to your Passport.":(j.ok?" Change the gears to try your own design.":""));m.style.color=j.ok?"#86efac":"#fca5a5";$("grTxt").textContent=c.txt;draw();}
 function loop(){var c=CH[st.ch],r=analyse(c,st.t);st.ang+=Math.min(6,(r.wm/60*2*Math.PI)/60)*0.35;draw();st.raf=requestAnimationFrame(loop);}
 function mount(){var host=document.getElementById("circuits");if(!host||$("gearLab"))return;var d=document.createElement("div");d.className="card";d.id="gearLab";
  var sel=function(i){return "<select class='grT' data-i='"+i+"'>"+TEETH.map(function(n){return "<option value='"+n+"'"+(n===st.t[i]?" selected":"")+">"+n+" teeth</option>";}).join("")+"</select>";};
@@ -5042,8 +5043,53 @@ function mount(){var host=document.getElementById("circuits");if(!host||$("gearL
  "<div class='row'><label>Gear 1 (driver)"+sel(0)+"</label><label>Gear 2 (driven)"+sel(1)+"</label></div><div class='row'><label>Gear 3 (on gear 2's shaft)"+sel(2)+"</label><label>Gear 4 (output)"+sel(3)+"</label></div>"+
  "<canvas id='grCv' width='370' height='190' style='width:100%;border-radius:8px'></canvas><div id='grInfo' class='sub'></div><div id='grMsg' class='sub'></div></details>";
  var br=$("bridgeLab");if(br&&br.nextSibling)host.insertBefore(d,br.nextSibling);else host.insertBefore(d,host.firstChild);
- d.querySelectorAll(".grT").forEach(function(s){s.onchange=function(){st.t[+this.dataset.i]=+this.value;refresh();};});$("grCh").onchange=function(){st.ch=+this.value;refresh();};
+ d.querySelectorAll(".grT").forEach(function(s){s.onchange=function(){st.touched=true;st.t[+this.dataset.i]=+this.value;refresh();};});$("grCh").onchange=function(){st.ch=+this.value;st.touched=false;refresh();};
  refresh();loop();}
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",mount);else mount();
+})(typeof window!=="undefined"?window:this);
+
+// Hydraulics Lab: Pascal's law with seal friction, a burst-pressure limit and the stroke count (volume conservation).
+(function(root){
+"use strict";
+var G=9.81,ETA=0.9,STROKE=0.03;
+var CH=[
+ {id:"jack",name:"Car jack: lift 1200 kg",tier:"Intermediate",m:1200,h:0.2,Fh:400,pmax:4e6,maxStrokes:60,txt:"Lift a 1200 kg car by 20 cm. Your hand pushes with 400 N on a lever. The hose bursts above 4 MPa and you can pump at most 60 times."},
+ {id:"tipper",name:"Tipper: lift 4 tonnes",tier:"Advanced",m:4000,h:0.3,Fh:500,pmax:10e6,maxStrokes:120,txt:"A pump driven by a 500 N hand force must raise a 4 t tipper body by 30 cm. Burst pressure is 10 MPa, at most 120 pumps."},
+ {id:"press",name:"Fruit press: 15 kN",tier:"Beginner",m:1530,h:0.05,Fh:200,pmax:3e6,maxStrokes:40,txt:"Squeeze juice with a press that must push with at least 15 kN over 5 cm. Hand force 200 N, burst 3 MPa, at most 40 pumps."}];
+var DS=[10,12,16,20,25,30,36,40],DL=[50,60,70,80,100,120,150,200],LV=[2,3,4,5,6,8,10];
+function analyse(c,d1,d2,lev){var A1=Math.PI*Math.pow(d1/2000,2),A2=Math.PI*Math.pow(d2/2000,2),F1=c.Fh*lev,p=F1/A1,F2=p*A2*ETA,W=c.m*G,strokes=c.h*A2/(A1*STROKE);
+ return {A1:A1,A2:A2,F1:F1,p:p,F2:F2,W:W,strokes:strokes,ratio:A2/A1};}
+function judge(c,r){
+ if(r.p>c.pmax)return {ok:false,t:"✗ The hose bursts! Pressure "+(r.p/1e6).toFixed(1)+" MPa is above "+(c.pmax/1e6)+" MPa. Use a bigger small piston or a shorter lever."};
+ if(r.F2<r.W)return {ok:false,t:"The load doesn't move: the big piston pushes "+(r.F2/1000).toFixed(1)+" kN but needs "+(r.W/1000).toFixed(1)+" kN."};
+ if(r.strokes>c.maxStrokes)return {ok:false,t:"Too many pumps: "+Math.ceil(r.strokes)+" (max "+c.maxStrokes+"). A smaller area ratio lifts faster."};
+ var s=1+(r.F2>=r.W*1.15?1:0)+(r.p<=c.pmax*0.7&&r.strokes<=c.maxStrokes*0.8?1:0);
+ return {ok:true,stars:s,t:"★".repeat(s)+" Lifts it! "+Math.ceil(r.strokes)+" pumps at "+(r.p/1e6).toFixed(1)+" MPa, force "+(r.F2/1000).toFixed(1)+" kN."};}
+var api={analyse:analyse,judge:judge,CH:CH};
+if(typeof module!=="undefined"&&module.exports){module.exports=api;return;}
+root.HydroLab=api;
+var $=function(i){return document.getElementById(i);};
+function saveLab(id,name,tier,stars){try{var all=JSON.parse(localStorage.getItem("mm_lab")||"{}"),p=all[id];if(!p||stars>p.stars){all[id]={name:name,tier:tier,stars:stars,at:Date.now()};localStorage.setItem("mm_lab",JSON.stringify(all));return true;}}catch(e){}return false;}
+var st={ch:0,d1:25,d2:100,lev:6,ph:0,touched:false};
+function draw(){var cv=$("hyCv");if(!cv)return;var g=cv.getContext("2d"),c=CH[st.ch],r=analyse(c,st.d1,st.d2,st.lev);g.fillStyle="#0b1220";g.fillRect(0,0,cv.width,cv.height);
+ var w1=st.d1*1.1,w2=st.d2*0.9+10,cx1=70,cx2=270,base=160,pump=(Math.sin(st.ph)+1)/2;
+ g.fillStyle="#1d4ed8";g.fillRect(cx1-w1/2,base-60,w1,60);g.fillRect(cx2-w2/2,base-60,w2,60);g.fillRect(cx1-w1/2,base-8,cx2-cx1+w2/2,8); // fluid
+ g.strokeStyle="#64748b";g.lineWidth=3;g.strokeRect(cx1-w1/2,base-90,w1,90);g.strokeRect(cx2-w2/2,base-90,w2,90);
+ var p1=base-60-pump*18,p2=base-60-(1-0)*0-((st.ph/6.283)%1)*14;
+ g.fillStyle="#cbd5e1";g.fillRect(cx1-w1/2+2,p1-8,w1-4,8);g.fillRect(cx1-3,p1-40,6,32);
+ g.fillRect(cx2-w2/2+2,p2-8,w2-4,8);g.fillRect(cx2-3,p2-34,6,26);
+ g.fillStyle="#f59e0b";g.fillRect(cx2-w2/2,p2-52,w2,18);g.fillStyle="#0b1220";g.font="10px sans-serif";g.textAlign="center";g.fillText(c.m+" kg",cx2,p2-39);
+ g.fillStyle="#e2e8f0";g.fillText("small "+st.d1+" mm",cx1,base+14);g.fillText("large "+st.d2+" mm",cx2,base+14);g.fillText("hand "+c.Fh+" N × "+st.lev,cx1,p1-46);}
+function refresh(){var c=CH[st.ch],r=analyse(c,st.d1,st.d2,st.lev),j=judge(c,r);
+ $("hyInfo").innerHTML="<b>Area ratio</b> "+r.ratio.toFixed(1)+":1 &nbsp; <b>Pressure</b> "+(r.p/1e6).toFixed(2)+" MPa (burst "+(c.pmax/1e6)+")<br><b>Push</b> "+(r.F2/1000).toFixed(1)+" kN (need "+(r.W/1000).toFixed(1)+") &nbsp; <b>Pumps</b> "+Math.ceil(r.strokes)+" (max "+c.maxStrokes+")";
+ if(j.ok&&st.touched)saveLab("hydro_"+c.id,"Hydraulics: "+c.name.split(":")[0],c.tier,j.stars);var m=$("hyMsg");m.textContent=j.t+(j.ok&&st.touched?" Saved to your Passport.":"");m.style.color=j.ok?"#86efac":"#fca5a5";$("hyTxt").textContent=c.txt;draw();}
+function loop(){st.ph+=0.06;draw();requestAnimationFrame(loop);}
+function mount(){var host=document.getElementById("circuits");if(!host||$("hydroLab"))return;var d=document.createElement("div");d.className="card";d.id="hydroLab";
+ var sel=function(k,arr,u,lab){return "<label>"+lab+"<select class='hyS' data-k='"+k+"'>"+arr.map(function(n){return "<option value='"+n+"'"+(n===st[k]?" selected":"")+">"+n+u+"</option>";}).join("")+"</select></label>";};
+ d.innerHTML="<details><summary><h2 style='display:inline'>💧 Hydraulics Lab</h2></summary><p class='sub'>Pascal's law: pressure is the same everywhere in the liquid, so a small piston pushing hard makes a big piston push with a big force. The trade-off: the big piston moves less, so you must pump many times. Seals waste 10%.</p><select id='hyCh'>"+CH.map(function(c,i){return "<option value='"+i+"'>"+c.name+"</option>";}).join("")+"</select><p class='sub' id='hyTxt'></p>"+
+ "<div class='row'>"+sel("d1",DS," mm","Small piston")+sel("d2",DL," mm","Large piston")+sel("lev",LV,"×","Lever")+"</div><canvas id='hyCv' width='370' height='190' style='width:100%;border-radius:8px'></canvas><div id='hyInfo' class='sub'></div><div id='hyMsg' class='sub'></div></details>";
+ var gl=$("gearLab"),br=$("bridgeLab"),a=gl||br;if(a&&a.nextSibling)host.insertBefore(d,a.nextSibling);else host.insertBefore(d,host.firstChild);
+ d.querySelectorAll(".hyS").forEach(function(s){s.onchange=function(){st.touched=true;st[this.dataset.k]=+this.value;refresh();};});$("hyCh").onchange=function(){st.ch=+this.value;st.touched=false;refresh();};refresh();loop();}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",mount);else mount();
 })(typeof window!=="undefined"?window:this);
 

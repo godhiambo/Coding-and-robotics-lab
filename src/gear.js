@@ -26,7 +26,7 @@ if(typeof module!=="undefined"&&module.exports){module.exports=api;return;}
 root.GearLab=api;
 var $=function(i){return document.getElementById(i);};
 function saveLab(id,name,tier,stars){try{var all=JSON.parse(localStorage.getItem("mm_lab")||"{}"),p=all[id];if(!p||stars>p.stars){all[id]={name:name,tier:tier,stars:stars,at:Date.now()};localStorage.setItem("mm_lab",JSON.stringify(all));return true;}}catch(e){}return false;}
-var st={ch:0,t:[12,48,12,48],ang:0,raf:0};
+var st={ch:0,t:[12,48,12,48],ang:0,raf:0,touched:false};
 function gearPath(g,x,y,rad,n,rot,col,alpha){g.save();g.translate(x,y);g.rotate(rot);g.globalAlpha=alpha||1;g.fillStyle=col;g.beginPath();var tip=rad+4,root=rad-3;for(var i=0;i<n;i++){var a0=i*2*Math.PI/n,w=Math.PI/n*0.5;
   g.lineTo(root*Math.cos(a0-w),root*Math.sin(a0-w));g.lineTo(tip*Math.cos(a0-w*0.55),tip*Math.sin(a0-w*0.55));g.lineTo(tip*Math.cos(a0+w*0.55),tip*Math.sin(a0+w*0.55));g.lineTo(root*Math.cos(a0+w),root*Math.sin(a0+w));}
  g.closePath();g.fill();g.fillStyle="#0b1220";g.beginPath();g.arc(0,0,rad*0.22,0,7);g.fill();g.restore();g.globalAlpha=1;}
@@ -42,7 +42,7 @@ function draw(){var cv=$("grCv");if(!cv)return;var g=cv.getContext("2d"),t=st.t,
  g.fillStyle="#94a3b8";g.textAlign="left";g.fillText("Motor",6,12);g.fillText("Output →",cv.width-60,12);}
 function refresh(){var c=CH[st.ch],r=analyse(c,st.t),j=judge(c,r);
  $("grInfo").innerHTML="<b>Ratio</b> "+r.R.toFixed(2)+":1 &nbsp; <b>Efficiency</b> "+(r.eta*100).toFixed(0)+"%<br><b>Load torque</b> "+r.TL.toFixed(3)+" N·m &nbsp; <b>Motor torque</b> "+r.Tm.toFixed(3)+" N·m ("+(Math.min(r.frac,9.99)*100).toFixed(0)+"% of stall)<br><b>Motor</b> "+r.wm.toFixed(0)+" rpm → <b>Output</b> "+r.out.toFixed(0)+" rpm"+(r.v?" · "+(r.v*100).toFixed(1)+" cm/s":"");
- var m=$("grMsg"),nw=j.ok?saveLab("gear_"+c.id,"Gears: "+c.name.split(":")[0],c.tier,j.stars):false;m.textContent=j.t+(j.ok?" Saved to your Passport.":"");m.style.color=j.ok?"#86efac":"#fca5a5";$("grTxt").textContent=c.txt;draw();}
+ var m=$("grMsg"),nw=j.ok&&st.touched?saveLab("gear_"+c.id,"Gears: "+c.name.split(":")[0],c.tier,j.stars):false;m.textContent=j.t+(j.ok&&st.touched?" Saved to your Passport.":(j.ok?" Change the gears to try your own design.":""));m.style.color=j.ok?"#86efac":"#fca5a5";$("grTxt").textContent=c.txt;draw();}
 function loop(){var c=CH[st.ch],r=analyse(c,st.t);st.ang+=Math.min(6,(r.wm/60*2*Math.PI)/60)*0.35;draw();st.raf=requestAnimationFrame(loop);}
 function mount(){var host=document.getElementById("circuits");if(!host||$("gearLab"))return;var d=document.createElement("div");d.className="card";d.id="gearLab";
  var sel=function(i){return "<select class='grT' data-i='"+i+"'>"+TEETH.map(function(n){return "<option value='"+n+"'"+(n===st.t[i]?" selected":"")+">"+n+" teeth</option>";}).join("")+"</select>";};
@@ -50,7 +50,7 @@ function mount(){var host=document.getElementById("circuits");if(!host||$("gearL
  "<div class='row'><label>Gear 1 (driver)"+sel(0)+"</label><label>Gear 2 (driven)"+sel(1)+"</label></div><div class='row'><label>Gear 3 (on gear 2's shaft)"+sel(2)+"</label><label>Gear 4 (output)"+sel(3)+"</label></div>"+
  "<canvas id='grCv' width='370' height='190' style='width:100%;border-radius:8px'></canvas><div id='grInfo' class='sub'></div><div id='grMsg' class='sub'></div></details>";
  var br=$("bridgeLab");if(br&&br.nextSibling)host.insertBefore(d,br.nextSibling);else host.insertBefore(d,host.firstChild);
- d.querySelectorAll(".grT").forEach(function(s){s.onchange=function(){st.t[+this.dataset.i]=+this.value;refresh();};});$("grCh").onchange=function(){st.ch=+this.value;refresh();};
+ d.querySelectorAll(".grT").forEach(function(s){s.onchange=function(){st.touched=true;st.t[+this.dataset.i]=+this.value;refresh();};});$("grCh").onchange=function(){st.ch=+this.value;st.touched=false;refresh();};
  refresh();loop();}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",mount);else mount();
 })(typeof window!=="undefined"?window:this);

@@ -62,7 +62,7 @@ function verdict(){var r=st.res,c=CH[st.ch];if(!r)return {ok:false,t:"Tap two do
  if(r.sf<1){var m=r.members[r.crit];return {ok:false,t:"✗ It collapses! Beam "+(r.crit+1)+" "+m.mode+" at "+(r.sf*100).toFixed(0)+"% of the load."};}
  if(r.sf<1.5)return {ok:false,t:"It stands but is too risky: safety factor "+r.sf.toFixed(2)+" (need 1.5)."};
  if(defl>25)return {ok:false,t:"Too bendy: it sags "+defl.toFixed(0)+" mm (max 25 mm)."};
- var stars=1+(r.sf>=2?1:0)+(r.sf>=2&&r.mass<=0.7*c.budget?1:0);var nw=saveLab("bridge_"+c.id,"Bridge: "+c.name.split(":")[0],c.tier,stars);return {ok:true,saved:nw,t:"★".repeat(stars)+" Safe bridge! Safety factor "+r.sf.toFixed(2)+", sag "+defl.toFixed(0)+" mm, mass "+r.mass.toFixed(1)+" kg."};}
+ var stars=1+(r.sf>=2?1:0)+(r.sf>=2&&r.mass<=0.7*c.budget?1:0);var isEx=st.mem.length===EX.length&&EX.every(function(p){return st.mem.some(function(m){return m.a===p[0]&&m.b===p[1];});});var nw=isEx?false:saveLab("bridge_"+c.id,"Bridge: "+c.name.split(":")[0],c.tier,stars);return {ok:true,ex:isEx,saved:nw,t:"★".repeat(stars)+" Safe bridge! Safety factor "+r.sf.toFixed(2)+", sag "+defl.toFixed(0)+" mm, mass "+r.mass.toFixed(1)+" kg."};}
 function px(n){return OX+nodes[n].x*S;}function py(n){return OY-nodes[n].y*S;}
 function col(u){var h=120-Math.min(1,u)*120;return "hsl("+h+",85%,50%)";}
 function draw(){var cv=$("brCv");if(!cv)return;var g=cv.getContext("2d");g.clearRect(0,0,cv.width,cv.height);g.fillStyle="#0b1220";g.fillRect(0,0,cv.width,cv.height);
@@ -80,7 +80,7 @@ function draw(){var cv=$("brCv");if(!cv)return;var g=cv.getContext("2d");g.clear
  if(r&&deckOk()){var tx=OX+(NX-1)*S*(0.5+0.4*Math.sin(Math.min(1,f)*3.14159*0.0));g.fillStyle="#f59e0b";g.fillRect(tx-14,py(0)-13+(r?-r.disp[3][1]*S*sc*f*0:0),28,9);g.fillStyle="#111";g.beginPath();g.arc(tx-8,py(0)-3,3,0,7);g.arc(tx+8,py(0)-3,3,0,7);g.fill();}
  g.fillStyle="#94a3b8";g.font="10px sans-serif";g.fillText("Grid: 1 m. Tap two dots to place or remove a beam.",8,12);
 }
-function refresh(){analyse();var v=verdict();var el=$("brMsg");if(el){el.textContent=v.t+(v.ok?" Saved to your Passport.":"");el.style.color=v.ok?"#86efac":"#fca5a5";}var r=st.res&&!st.res.err?st.res:null;
+function refresh(){analyse();var v=verdict();var el=$("brMsg");if(el){el.textContent=v.t+(v.ok&&!v.ex?" Saved to your Passport.":(v.ok?" That is the example. Change at least one beam to make it your own.":""));el.style.color=v.ok?"#86efac":"#fca5a5";}var r=st.res&&!st.res.err?st.res:null;
  var inf=$("brInfo");if(inf)inf.innerHTML=r?"<b>Mass</b> "+r.mass.toFixed(1)+" / "+CH[st.ch].budget+" kg &nbsp; <b>Safety factor</b> "+(isFinite(r.sf)?r.sf.toFixed(2):"–")+" &nbsp; <b>Beams</b> "+st.mem.length:"";
  draw();}
 function tap(e){var cv=$("brCv"),rc=cv.getBoundingClientRect(),sx=cv.width/rc.width,x=(e.clientX-rc.left)*sx,y=(e.clientY-rc.top)*sx,best=-1,bd=1e9;
