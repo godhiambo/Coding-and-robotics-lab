@@ -1,0 +1,14 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Milestone Minds admin</title>
+<style>body{font:16px system-ui,sans-serif;background:#0b1220;color:#e2e8f0;max-width:460px;margin:0 auto;padding:18px}input,button{width:100%;box-sizing:border-box;padding:12px;margin:6px 0;border-radius:8px;border:1px solid #334155;background:#111b2e;color:#fff;font-size:16px}button{background:#7c3aed;border:0;font-weight:600}img{background:#fff;max-width:100%;border-radius:8px}#m{margin-top:10px}</style></head><body>
+<h2>Founder signature</h2><p>Paste your ADMIN_KEY, then choose the signature image (PNG or JPG, under 150 KB).</p>
+<input id="k" type="password" placeholder="ADMIN_KEY" autocomplete="off">
+<input id="n" placeholder="Founder name (optional)" value="Godfrey Odhiambo"><input id="t" placeholder="Title (optional)" value="Founder, Milestone Minds">
+<input id="f" type="file" accept="image/png,image/jpeg"><img id="p" alt="" hidden>
+<button id="s">Save signature</button><button id="c" style="background:#334155">Check current status</button><div id="m"></div>
+<script>
+var d="",$=function(i){return document.getElementById(i)};
+function api(b){return fetch("/api/admin/founder",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(b)}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||r.status);return j;});});}
+$("f").onchange=function(){var f=this.files[0];if(!f)return;var r=new FileReader();r.onload=function(){d=r.result;$("p").src=d;$("p").hidden=false;};r.readAsDataURL(f);};
+$("s").onclick=function(){if(!d){$("m").textContent="Choose an image first.";return;}api({adminKey:$("k").value,save:1,name:$("n").value,title:$("t").value,sig:d}).then(function(j){$("m").textContent="Saved. Signature on file: "+(j.founder.hasSig?"yes":"no");}).catch(function(e){$("m").textContent=e.message;});};
+$("c").onclick=function(){api({adminKey:$("k").value}).then(function(j){$("m").textContent=j.founder.name+", "+j.founder.title+". Signature on file: "+(j.founder.hasSig?"yes":"no");}).catch(function(e){$("m").textContent=e.message;});};
+</script></body></html>
