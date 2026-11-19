@@ -33,6 +33,7 @@ function init(){
   document.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest("[data-t]");if(!b||!card||!card.contains(b))return;e.preventDefault();var a=b.dataset.t;
     if(a==="next"){if(S[i].last){end(true);}else{i++;draw();}}else if(a==="back"){i=Math.max(0,i-1);draw();}else end(false);});
   document.addEventListener("keydown",function(e){if(e.key==="Escape"&&card&&card.style.display==="block")end(false);});
+  ["play","club","classroom"].forEach(function(id){var v=$(id);if(!v||v.querySelector(".tourbtn"))return;var b=document.createElement("button");b.className="tourbtn";b.textContent="🧭 New here? Take the 2-minute tour";b.onclick=start;v.insertBefore(b,v.firstChild);});
   window.MM_tour={start:start,end:end};
 }
 init();
