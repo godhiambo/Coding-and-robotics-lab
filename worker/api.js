@@ -17,6 +17,7 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY AUTOINCREMENT, comp_id TEXT, learner_id TEXT, type TEXT, data TEXT, at INTEGER)`,
   `CREATE INDEX IF NOT EXISTS ix_ev_comp ON events(comp_id)`,
   `CREATE TABLE IF NOT EXISTS certs(id TEXT PRIMARY KEY, comp_id TEXT, learner_id TEXT, class_id TEXT, kind TEXT, rank INTEGER, name TEXT, title TEXT, school TEXT, score INTEGER, issued INTEGER, revoked INTEGER DEFAULT 0, ver INTEGER DEFAULT 1, supersedes TEXT, replaced_by TEXT, f_name TEXT, f_title TEXT, f_sig TEXT, t_name TEXT, t_title TEXT, t_school TEXT, t_sig TEXT)`,
+  `CREATE TABLE IF NOT EXISTS phys(attempt_id TEXT PRIMARY KEY, comp_id TEXT, learner_id TEXT, ok INTEGER, t REAL, status TEXT, ts INTEGER)`,
   `CREATE TABLE IF NOT EXISTS pairs(code TEXT PRIMARY KEY, offer TEXT, answer TEXT, ts INTEGER)`,
   `CREATE TABLE IF NOT EXISTS sigs(id TEXT PRIMARY KEY, data TEXT)`,
   `CREATE TABLE IF NOT EXISTS settings(k TEXT PRIMARY KEY, v TEXT)`,
@@ -211,13 +212,28 @@ R["comp/act"] = async (db, b) => {
   return J({ ok: true });
 };
 
+const PHYS_BONUS = 150;
+R["phys/decide"] = async (db, b) => {
+  const c = await teacher(db, b); if (!c) return bad("Not allowed.", 401);
+  const comp = await db.prepare("SELECT id FROM comps WHERE id=? AND class_id=?").bind(str(b.compId, 40), c.id).first(); if (!comp) return bad("Competition not found.", 404);
+  const aid = str(b.attemptId, 40), p = await db.prepare("SELECT * FROM phys WHERE attempt_id=? AND comp_id=?").bind(aid, comp.id).first();
+  if (!p) return bad("Physical run not found.", 404); if (p.status !== "pending") return bad("Already decided.", 409);
+  const yes = !!b.approve; await db.prepare("UPDATE phys SET status=? WHERE attempt_id=? AND status='pending'").bind(yes ? "confirmed" : "rejected", aid).run();
+  if (yes && p.ok) {
+    const at = await db.prepare("SELECT score,breakdown FROM attempts WHERE id=?").bind(aid).first();
+    if (at) { let bd = {}; try { bd = JSON.parse(at.breakdown || "{}"); } catch {} bd.physical = PHYS_BONUS; await db.prepare("UPDATE attempts SET score=score+?,breakdown=? WHERE id=?").bind(PHYS_BONUS, JSON.stringify(bd), aid).run(); }
+  }
+  await ev(db, comp.id, null, yes ? "phys-confirm" : "phys-reject", { attempt: aid });
+  return J({ ok: true });
+};
 R["comp/board"] = async (db, b) => {
   const c = await teacher(db, b); if (!c) return bad("Not allowed.", 401);
   const comp = await db.prepare("SELECT * FROM comps WHERE id=? AND class_id=?").bind(str(b.compId, 40), c.id).first(); if (!comp) return bad("Competition not found.", 404);
   const rows = await leaderboard(db, comp.id, true);
   const evs = (await db.prepare("SELECT e.type,e.data,e.at,l.name FROM events e LEFT JOIN learners l ON l.id=e.learner_id WHERE e.comp_id=? ORDER BY e.id DESC LIMIT 60").bind(comp.id).all()).results || [];
   const enrolled = (await db.prepare("SELECT COUNT(*) AS n FROM learners WHERE class_id=? AND removed=0").bind(c.id).first()).n;
-  return J({ comp: compView(comp), rows, events: evs, enrolled, now: Date.now() });
+  const phys = ((await db.prepare("SELECT p.attempt_id AS id,p.ok,p.t,p.status,l.name FROM phys p JOIN learners l ON l.id=p.learner_id WHERE p.comp_id=? ORDER BY p.ts DESC LIMIT 100").bind(comp.id).all()).results) || [];
+  return J({ comp: compView(comp), rows, events: evs, enrolled, phys, now: Date.now() });
 };
 
 R["join"] = async (db, b) => {
@@ -303,7 +319,7 @@ function labEval(level, d) {
   if (level.startsWith("lab-hydro-")) return Hydro.evaluate({ ...d, ch: level.slice(10) });
   if (level.startsWith("lab-arm-")) return Labs2.Arm.evaluate({ ...d, ch: level.slice(8) });
   if (level.startsWith("lab-sumo-")) return Labs2.Sumo.evaluate({ ...d, ch: level.slice(9) });
-  if (level.startsWith("lab-rescue-")) return Rescue.evaluate(d);
+  if (level.startsWith("lab-rescue-")) return Rescue.evaluate({ ...d, arena: level.slice(11) });
   if (level.startsWith("lab-mcu-")) return Mcu.evaluate({ ...d, ch: "mcu_" + level.slice(8) });
   if (level.startsWith("lab-ai-")) return Labs2.AI.evaluate({ ...d, ch: level.slice(7) });
   return { ok: false, t: "Unknown lab." };
@@ -324,6 +340,9 @@ R["attempt/submit"] = async (db, b) => {
     const ev2 = labEval(o.a.level, b.design), elapsed = Math.max(1, (now - o.a.started) / 1000), sc = labScore(rules, ev2, elapsed), nb = Array.isArray(b.design && b.design.mem) ? b.design.mem.length : Array.isArray(b.design && b.design.tr) ? b.design.tr.length : Array.isArray(b.design && b.design.prog) ? b.design.prog.length : Array.isArray(b.design && b.design.log) ? b.design.log.length : 0;
     await db.prepare("UPDATE attempts SET status='submitted',submitted=?,score=?,breakdown=?,win=?,collisions=0,time_s=?,blocks=?,progress=?,prog=? WHERE id=?")
       .bind(now, sc.total, JSON.stringify(sc.breakdown), ev2.ok ? 1 : 0, elapsed, clamp(nb, 0, 9999), ev2.ok ? 100 : 0, JSON.stringify(b.design || {}).slice(0, 20000), o.a.id).run();
+    const ph = b.design && b.design.phys;
+    if (String(o.a.level).startsWith("lab-rescue-") && ev2.ok && ph && typeof ph === "object")
+      await db.prepare("INSERT OR REPLACE INTO phys(attempt_id,comp_id,learner_id,ok,t,status,ts) VALUES(?,?,?,?,?,'pending',?)").bind(o.a.id, o.comp.id, l.id, ph.ok ? 1 : 0, clamp(Math.round((+ph.t || 0) * 10) / 10, 0, 9999), now).run();
     await ev(db, o.comp.id, l.id, "submit", { score: sc.total, win: !!ev2.ok, lab: true });
     return J({ score: sc.total, breakdown: sc.breakdown, max: sc.max, msg: ev2.t });
   }
