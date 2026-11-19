@@ -15,7 +15,8 @@ function judge(c,r){
  if(r.strokes>c.maxStrokes)return {ok:false,t:"Too many pumps: "+Math.ceil(r.strokes)+" (max "+c.maxStrokes+"). A smaller area ratio lifts faster."};
  var s=1+(r.F2>=r.W*1.15?1:0)+(r.p<=c.pmax*0.7&&r.strokes<=c.maxStrokes*0.8?1:0);
  return {ok:true,stars:s,t:"★".repeat(s)+" Lifts it! "+Math.ceil(r.strokes)+" pumps at "+(r.p/1e6).toFixed(1)+" MPa, force "+(r.F2/1000).toFixed(1)+" kN."};}
-var api={analyse:analyse,judge:judge,CH:CH};
+function evaluate(d){d=d||{};var c=CH.filter(function(x){return x.id===d.ch;})[0];if(!c||DS.indexOf(d.d1)<0||DL.indexOf(d.d2)<0||LV.indexOf(d.lev)<0)return {ok:false,t:"Invalid design."};var j=judge(c,analyse(c,d.d1,d.d2,d.lev));j.tier=c.tier;j.name=c.name;return j;}
+var api={analyse:analyse,judge:judge,evaluate:evaluate,CH:CH};
 if(typeof module!=="undefined"&&module.exports){module.exports=api;return;}
 root.HydroLab=api;
 var $=function(i){return document.getElementById(i);};

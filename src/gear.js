@@ -21,7 +21,9 @@ function judge(c,r){
  if(r.frac>0.6)return {ok:false,t:"Motor overheats: it works at "+(r.frac*100).toFixed(0)+"% of stall torque (max 60%). Add more gear reduction."};
  if(r.v<c.minV)return {ok:false,t:"Too slow: "+(r.v*100).toFixed(1)+" cm/s, need "+(c.minV*100).toFixed(1)+". Too much reduction slows the output."};
  var s=1+(r.v>=c.minV*1.3?1:0)+(r.frac<=0.45&&r.v>=c.minV*1.2?1:0);return {ok:true,stars:s,t:"★".repeat(s)+" Works! "+(r.v*100).toFixed(1)+" cm/s with the motor at "+(r.frac*100).toFixed(0)+"% of stall."};}
-var api={analyse:analyse,judge:judge,CH:CH,TEETH:TEETH};
+function evaluate(d){d=d||{};var c=CH.filter(function(x){return x.id===d.ch;})[0];if(!c||!Array.isArray(d.t)||d.t.length!==4)return {ok:false,t:"Invalid design."};
+ for(var i=0;i<4;i++)if(TEETH.indexOf(d.t[i])<0)return {ok:false,t:"Invalid design."};var j=judge(c,analyse(c,d.t));j.tier=c.tier;j.name=c.name;return j;}
+var api={analyse:analyse,judge:judge,evaluate:evaluate,CH:CH,TEETH:TEETH};
 if(typeof module!=="undefined"&&module.exports){module.exports=api;return;}
 root.GearLab=api;
 var $=function(i){return document.getElementById(i);};
@@ -51,6 +53,8 @@ function mount(){var host=document.getElementById("circuits");if(!host||$("gearL
  "<canvas id='grCv' width='370' height='190' style='width:100%;border-radius:8px'></canvas><div id='grInfo' class='sub'></div><div id='grMsg' class='sub'></div></details>";
  var br=$("bridgeLab");if(br&&br.nextSibling)host.insertBefore(d,br.nextSibling);else host.insertBefore(d,host.firstChild);
  d.querySelectorAll(".grT").forEach(function(s){s.onchange=function(){st.touched=true;st.t[+this.dataset.i]=+this.value;refresh();};});$("grCh").onchange=function(){st.ch=+this.value;st.touched=false;refresh();};
+ root.GearLab.getDesign=function(){return {ch:CH[st.ch].id,t:st.t.slice()};};
+ root.GearLab.setChallenge=function(id,lock){for(var i=0;i<CH.length;i++)if(CH[i].id===id){st.ch=i;$("grCh").value=i;}$("grCh").disabled=!!lock;st.touched=false;var dd=$("gearLab").querySelector("details");if(dd)dd.open=true;refresh();};
  refresh();loop();}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",mount);else mount();
 })(typeof window!=="undefined"?window:this);

@@ -40,29 +40,40 @@ function solve(nodes,mem,sup,loads,opt){
  var disp={};ids.forEach(function(nd){disp[nd]=[u[2*ix[nd]],u[2*ix[nd]+1]];});
  return {members:res,sf:sf,crit:crit,mass:mass,disp:disp,react:react,total:-F.reduce(function(a,b2,k){return k%2===1?a+b2:a;},0)};
 }
-var api={solve:solve,MAT:MAT,capacity:capacity};
+var CH=[{id:"a",name:"Footbridge: 12 kN, max 20 kg",P:12,budget:20,tier:"Intermediate"},{id:"b",name:"Village bridge: 30 kN, max 60 kg",P:30,budget:60,tier:"Advanced"},{id:"c",name:"Truck bridge: 60 kN, max 120 kg",P:60,budget:120,tier:"Expert"}];
+var NX=7,NY=4,S=50,OX=30,OY=170,nodes=[];for(var yy=0;yy<NY;yy++)for(var xx=0;xx<NX;xx++)nodes.push({x:xx,y:yy});
+function bkey(a,b){return a<b?a+"-"+b:b+"-"+a;}
+// Pure, deterministic check used by both the app and the competition server.  mem = [[a,b,"wood"|"steel"],...]
+function evaluate(mem,chId){var c=CH.filter(function(x){return x.id===chId;})[0];if(!c)return {ok:false,t:"Unknown challenge."};
+ if(!Array.isArray(mem)||mem.length>80)return {ok:false,t:"Invalid design."};var seen={},list=[];
+ for(var i=0;i<mem.length;i++){var m=mem[i];if(!Array.isArray(m))return {ok:false,t:"Invalid design."};var a=m[0]|0,b2=m[1]|0,mt=m[2];if(a<0||b2<0||a>=nodes.length||b2>=nodes.length||a===b2||!MAT[mt]||(mt!=="wood"&&mt!=="steel"))return {ok:false,t:"Invalid design."};
+  var L=Math.hypot(nodes[a].x-nodes[b2].x,nodes[a].y-nodes[b2].y);if(L>3.01)return {ok:false,t:"A beam is longer than 3 m."};var k=bkey(a,b2);if(seen[k])return {ok:false,t:"Duplicate beam."};seen[k]=1;list.push({a:Math.min(a,b2),b:Math.max(a,b2),m:mt});}
+ var r=solve(nodes,list,{pin:0,roller:NX-1},loadsFor(c.P));
+ if(!list.length)return {ok:false,t:"Tap two dots to place a beam between them.",r:r};if(r.err)return {ok:false,t:"⚠ "+r.err,r:r};
+ for(var d=0;d<NX-1;d++)if(!seen[bkey(d,d+1)])return {ok:false,t:"Add a beam along the whole deck (the bottom row) so vehicles can cross.",r:r};
+ var defl=0;Object.keys(r.disp).forEach(function(k2){defl=Math.max(defl,-r.disp[k2][1]*1000);});
+ if(r.mass>c.budget)return {ok:false,t:"Too heavy: "+r.mass.toFixed(1)+" kg (limit "+c.budget+" kg).",r:r};
+ if(r.sf<1){var mm=r.members[r.crit];return {ok:false,t:"✗ It collapses! Beam "+(r.crit+1)+" "+mm.mode+" at "+(r.sf*100).toFixed(0)+"% of the load.",r:r};}
+ if(r.sf<1.5)return {ok:false,t:"It stands but is too risky: safety factor "+r.sf.toFixed(2)+" (need 1.5).",r:r};
+ if(defl>25)return {ok:false,t:"Too bendy: it sags "+defl.toFixed(0)+" mm (max 25 mm).",r:r};
+ var stars=1+(r.sf>=2?1:0)+(r.sf>=2&&r.mass<=0.7*c.budget?1:0);
+ return {ok:true,stars:stars,t:"★".repeat(stars)+" Safe bridge! Safety factor "+r.sf.toFixed(2)+", sag "+defl.toFixed(0)+" mm, mass "+r.mass.toFixed(1)+" kg.",r:r,tier:c.tier,name:c.name};}
+var api={solve:solve,MAT:MAT,capacity:capacity,evaluate:evaluate,CH:CH};
 if(typeof module!=="undefined"&&module.exports){module.exports=api;return;}
 root.BridgeLab=api;
 
 // ---------------- UI ----------------
 var $=function(i){return document.getElementById(i);};
-var CH=[{id:"a",name:"Footbridge: 12 kN, max 20 kg",P:12,budget:20,tier:"Intermediate"},{id:"b",name:"Village bridge: 30 kN, max 60 kg",P:30,budget:60,tier:"Advanced"},{id:"c",name:"Truck bridge: 60 kN, max 120 kg",P:60,budget:120,tier:"Expert"}];
-var NX=7,NY=4,S=50,OX=30,OY=170,nodes=[];for(var yy=0;yy<NY;yy++)for(var xx=0;xx<NX;xx++)nodes.push({x:xx,y:yy});
 var st={mem:[],sel:-1,mat:"wood",ch:0,res:null,anim:-1,msg:""};
 function saveLab(id,name,tier,stars){try{var all=JSON.parse(localStorage.getItem("mm_lab")||"{}"),p=all[id];if(!p||stars>p.stars){all[id]={name:name,tier:tier,stars:stars,at:Date.now()};localStorage.setItem("mm_lab",JSON.stringify(all));return true;}}catch(e){}return false;}
-function key(a,b){return a<b?a+"-"+b:b+"-"+a;}
+function key(a,b){return bkey(a,b);}
 function pinN(){return 0;}function rolN(){return NX-1;}
 function loadsFor(P){var l={};for(var k=1;k<NX-1;k++)l[k]=P/(NX-2);return l;}
-function deckOk(){for(var k=0;k<NX-1;k++)if(!st.mem.some(function(e){return key(e.a,e.b)===key(k,k+1);}))return false;return true;}
 function analyse(){var c=CH[st.ch];st.res=solve(nodes,st.mem,{pin:pinN(),roller:rolN()},loadsFor(c.P));return st.res;}
-function verdict(){var r=st.res,c=CH[st.ch];if(!r)return {ok:false,t:"Tap two dots to place a beam between them."};if(r.err)return {ok:false,t:"⚠ "+r.err};
- if(!deckOk())return {ok:false,t:"Add a beam along the whole deck (the bottom row) so vehicles can cross."};
- var defl=0;Object.keys(r.disp).forEach(function(k){defl=Math.max(defl,-r.disp[k][1]*1000);});
- if(r.mass>c.budget)return {ok:false,t:"Too heavy: "+r.mass.toFixed(1)+" kg (limit "+c.budget+" kg)."};
- if(r.sf<1){var m=r.members[r.crit];return {ok:false,t:"✗ It collapses! Beam "+(r.crit+1)+" "+m.mode+" at "+(r.sf*100).toFixed(0)+"% of the load."};}
- if(r.sf<1.5)return {ok:false,t:"It stands but is too risky: safety factor "+r.sf.toFixed(2)+" (need 1.5)."};
- if(defl>25)return {ok:false,t:"Too bendy: it sags "+defl.toFixed(0)+" mm (max 25 mm)."};
- var stars=1+(r.sf>=2?1:0)+(r.sf>=2&&r.mass<=0.7*c.budget?1:0);var isEx=st.mem.length===EX.length&&EX.every(function(p){return st.mem.some(function(m){return m.a===p[0]&&m.b===p[1];});});var nw=isEx?false:saveLab("bridge_"+c.id,"Bridge: "+c.name.split(":")[0],c.tier,stars);return {ok:true,ex:isEx,saved:nw,t:"★".repeat(stars)+" Safe bridge! Safety factor "+r.sf.toFixed(2)+", sag "+defl.toFixed(0)+" mm, mass "+r.mass.toFixed(1)+" kg."};}
+function verdict(){var c=CH[st.ch],v=evaluate(st.mem.map(function(m){return [m.a,m.b,m.m];}),c.id);if(!v.ok)return v;
+ var isEx=st.mem.length===EX.length&&EX.every(function(p){return st.mem.some(function(m){return m.a===p[0]&&m.b===p[1];});});
+ if(!isEx)saveLab("bridge_"+c.id,"Bridge: "+c.name.split(":")[0],c.tier,v.stars);v.ex=isEx;return v;}
+function deckOk(){for(var k=0;k<NX-1;k++)if(!st.mem.some(function(e){return key(e.a,e.b)===key(k,k+1);}))return false;return true;}
 function px(n){return OX+nodes[n].x*S;}function py(n){return OY-nodes[n].y*S;}
 function col(u){var h=120-Math.min(1,u)*120;return "hsl("+h+",85%,50%)";}
 function draw(){var cv=$("brCv");if(!cv)return;var g=cv.getContext("2d");g.clearRect(0,0,cv.width,cv.height);g.fillStyle="#0b1220";g.fillRect(0,0,cv.width,cv.height);
@@ -102,6 +113,8 @@ function mount(){var host=document.getElementById("circuits");if(!host||$("bridg
  "<div class='row'><button id='brTest' class='p'>▶ Load test</button><button id='brClr'>Clear</button><button id='brEx'>Show example</button></div></details>";
  host.insertBefore(d,host.firstChild);
  $("brCv").addEventListener("click",tap);$("brCh").onchange=function(){st.ch=+this.value;refresh();};$("brMat").onchange=function(){st.mat=this.value;};
+ root.BridgeLab.getDesign=function(){return {ch:CH[st.ch].id,mem:st.mem.map(function(m){return [m.a,m.b,m.m];})};};
+ root.BridgeLab.setChallenge=function(id,lock){for(var i=0;i<CH.length;i++)if(CH[i].id===id){st.ch=i;$("brCh").value=i;}$("brCh").disabled=!!lock;st.mem=[];st.sel=-1;var d=$("bridgeLab").querySelector("details");if(d)d.open=true;refresh();};
  $("brClr").onclick=function(){st.mem=[];st.sel=-1;refresh();};
  $("brEx").onclick=function(){st.mem=EX.map(function(p){return {a:p[0],b:p[1],m:st.mat};});st.sel=-1;refresh();};
  $("brTest").onclick=function(){analyse();var t0=performance.now();(function f(){var t=(performance.now()-t0)/1400;st.anim=Math.min(1,t);draw();if(t<1)requestAnimationFrame(f);else{st.anim=-1;refresh();}})();};

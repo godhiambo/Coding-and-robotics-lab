@@ -2,6 +2,8 @@
 // All rules, timing and scoring are decided HERE (server time), never trusted from the browser.
 // Needs a D1 binding named DB. Tables are created automatically on first use.
 
+import { Bridge, Gear, Hydro } from "./labs.js";
+
 const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const bad = (m, s = 400) => J({ error: m }, s);
 
@@ -267,12 +269,35 @@ R["attempt/save"] = async (db, b) => {
   return J({ ok: true, now, status: o.comp.status, deadline: o.dl });
 };
 
+
+// Engineering labs in a competition: the server re-runs the physics on the submitted design (nothing is trusted from the phone).
+function labEval(level, d) {
+  d = d || {};
+  if (level.startsWith("lab-bridge-")) return Bridge.evaluate(d.mem, level.slice(11));
+  if (level.startsWith("lab-gear-")) return Gear.evaluate({ ...d, ch: level.slice(9) });
+  if (level.startsWith("lab-hydro-")) return Hydro.evaluate({ ...d, ch: level.slice(10) });
+  return { ok: false, t: "Unknown lab." };
+}
+function labScore(rules, ev, elapsed) {
+  const ok = !!ev.ok, st = ev.stars || 0, b = {};
+  b.reach = ok ? 300 : 0; b.complete = ok ? 200 : 0; b.collisions = ok ? (st >= 2 ? 150 : 75) : 0; b.logic = st >= 3 ? 150 : 0;
+  b.time = ok && rules.speed ? Math.round(100 * Math.min(1, rules.targetTime / Math.max(elapsed, 1))) : 0; b.movement = ok ? 100 : 0;
+  return { total: b.reach + b.complete + b.collisions + b.logic + b.time + b.movement, breakdown: b, max: rules.speed ? 1000 : 900 };
+}
 R["attempt/submit"] = async (db, b) => {
   const l = await learner(db, b); if (!l) return bad("Please join your class again.", 401);
   const o = await openAttempt(db, l, b); if (o.err) return o.err;
   const now = Date.now();
   if (now > o.dl + 15000) return bad("Time is up.", 409); // small grace for network delay
-  const rules = JSON.parse(o.a.rules), r = b.result || {}, s = score(rules, r);
+  const rules = JSON.parse(o.a.rules);
+  if (String(o.a.level || "").startsWith("lab-")) {
+    const ev2 = labEval(o.a.level, b.design), elapsed = Math.max(1, (now - o.a.started) / 1000), sc = labScore(rules, ev2, elapsed), nb = Array.isArray(b.design && b.design.mem) ? b.design.mem.length : 0;
+    await db.prepare("UPDATE attempts SET status='submitted',submitted=?,score=?,breakdown=?,win=?,collisions=0,time_s=?,blocks=?,progress=?,prog=? WHERE id=?")
+      .bind(now, sc.total, JSON.stringify(sc.breakdown), ev2.ok ? 1 : 0, elapsed, clamp(nb, 0, 9999), ev2.ok ? 100 : 0, JSON.stringify(b.design || {}).slice(0, 20000), o.a.id).run();
+    await ev(db, o.comp.id, l.id, "submit", { score: sc.total, win: !!ev2.ok, lab: true });
+    return J({ score: sc.total, breakdown: sc.breakdown, max: sc.max, msg: ev2.t });
+  }
+  const r = b.result || {}, s = score(rules, r);
   await db.prepare("UPDATE attempts SET status='submitted',submitted=?,score=?,breakdown=?,win=?,collisions=?,time_s=?,blocks=?,progress=?,prog=? WHERE id=?")
     .bind(now, s.total, JSON.stringify(s.breakdown), r.win ? 1 : 0, clamp(Math.round(+r.collisions || 0), 0, 999), Math.max(0, +r.time || 0), clamp(Math.round(+r.blocks || 0), 0, 9999), r.win ? 100 : clamp(Math.round(+r.progress || 0), 0, 100), JSON.stringify(b.prog || []).slice(0, 20000), o.a.id).run();
   await ev(db, o.comp.id, l.id, "submit", { score: s.total, win: !!r.win });
