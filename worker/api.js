@@ -25,7 +25,15 @@ const SCHEMA = [
   `CREATE INDEX IF NOT EXISTS ix_cert_comp ON certs(comp_id)`,
 ];
 let ready = false;
-async function init(db) { if (ready) return; await db.batch(SCHEMA.map((s) => db.prepare(s))); for (const q of ["ALTER TABLE attempts ADD COLUMN level TEXT", "ALTER TABLE classes ADD COLUMN t_name TEXT", "ALTER TABLE classes ADD COLUMN t_title TEXT", "ALTER TABLE classes ADD COLUMN t_school TEXT", "ALTER TABLE classes ADD COLUMN t_sig TEXT", "ALTER TABLE classes ADD COLUMN t_status TEXT", "ALTER TABLE classes ADD COLUMN t_auth INTEGER DEFAULT 0"]) { try { await db.prepare(q).run(); } catch (e) {} } ready = true; }
+// ---------- plans ----------
+// Existing classes (plan is NULL) are grandfathered as "founding" partners until an admin changes them. New classes start on "free".
+const PLANS = { free: { label: "Free", learners: 10, comps: 2 }, founding: { label: "Founding partner", learners: 150, comps: 999 }, starter: { label: "Starter", learners: 50, comps: 999 }, growth: { label: "Growth", learners: 150, comps: 999 }, advanced: { label: "Advanced", learners: 400, comps: 999 } };
+function planOf(c) {
+  const raw = PLANS[c.plan] ? c.plan : "founding", until = +c.plan_until || 0, expired = raw !== "free" && until > 0 && until < Date.now(), eff = expired ? "free" : raw;
+  return { plan: raw, label: PLANS[raw].label, effective: eff, expired, until, learners: PLANS[eff].learners, comps: PLANS[eff].comps };
+}
+
+async function init(db) { if (ready) return; await db.batch(SCHEMA.map((s) => db.prepare(s))); for (const q of ["ALTER TABLE attempts ADD COLUMN level TEXT", "ALTER TABLE classes ADD COLUMN t_name TEXT", "ALTER TABLE classes ADD COLUMN t_title TEXT", "ALTER TABLE classes ADD COLUMN t_school TEXT", "ALTER TABLE classes ADD COLUMN t_sig TEXT", "ALTER TABLE classes ADD COLUMN t_status TEXT", "ALTER TABLE classes ADD COLUMN t_auth INTEGER DEFAULT 0", "ALTER TABLE classes ADD COLUMN plan TEXT", "ALTER TABLE classes ADD COLUMN plan_until INTEGER DEFAULT 0"]) { try { await db.prepare(q).run(); } catch (e) {} } ready = true; }
 
 const hex = (b) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
 const sha = async (s) => hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(s))));
@@ -139,7 +147,7 @@ R["class/create"] = async (db, b) => {
   const key = short(6), id = uid();
   let code = classCode();
   for (let i = 0; i < 5; i++) { const x = await db.prepare("SELECT 1 FROM classes WHERE code=?").bind(code).first(); if (!x) break; code = classCode(); }
-  await db.prepare("INSERT INTO classes(id,code,name,grade,subject,key_hash,created) VALUES(?,?,?,?,?,?,?)").bind(id, code, name, str(b.grade, 30), str(b.subject, 60), await sha(key), Date.now()).run();
+  await db.prepare("INSERT INTO classes(id,code,name,grade,subject,key_hash,created,plan,plan_until) VALUES(?,?,?,?,?,?,?,'free',0)").bind(id, code, name, str(b.grade, 30), str(b.subject, 60), await sha(key), Date.now()).run();
   return J({ code, key, name });
 };
 
@@ -147,7 +155,8 @@ R["class/get"] = async (db, b) => {
   const c = await teacher(db, b); if (!c) return bad("Wrong class code or teacher key.", 401);
   const ls = (await db.prepare("SELECT id,name,extra_s,joined FROM learners WHERE class_id=? AND removed=0 ORDER BY name").bind(c.id).all()).results || [];
   const cs = (await db.prepare("SELECT * FROM comps WHERE class_id=? ORDER BY created DESC").bind(c.id).all()).results || [];
-  return J({ cls: { code: c.code, name: c.name, grade: c.grade, subject: c.subject }, learners: ls, comps: cs.map(compView), now: Date.now() });
+  const pl = planOf(c); pl.used = ls.length;
+  return J({ cls: { code: c.code, name: c.name, grade: c.grade, subject: c.subject }, plan: pl, learners: ls, comps: cs.map(compView), now: Date.now() });
 };
 
 R["class/learner"] = async (db, b) => {
@@ -162,6 +171,8 @@ R["class/learner"] = async (db, b) => {
 R["comp/create"] = async (db, b) => {
   const c = await teacher(db, b); if (!c) return bad("Not allowed.", 401);
   const title = str(b.title, 80), level = (Array.isArray(b.levels) ? b.levels : String(b.level || "").split(",")).map((x) => str(x, 40).replace(/[^\w-]/g, "")).filter(Boolean).slice(0, 30).join(","); if (!title || !level) return bad("Pick at least one mission and give the competition a title.");
+  const pl = planOf(c), nc = (await db.prepare("SELECT COUNT(*) AS n FROM comps WHERE class_id=?").bind(c.id).first()).n;
+  if (nc >= pl.comps) return bad("The " + pl.label + " plan allows " + pl.comps + " competitions. Ask your school to upgrade to run more.", 403);
   const id = uid();
   await db.prepare("INSERT INTO comps(id,class_id,title,level,rules,status,published,created) VALUES(?,?,?,?,?,?,0,?)").bind(id, c.id, title, level, JSON.stringify(cleanRules(b.rules)), "draft", Date.now()).run();
   await ev(db, id, null, "comp_created", { title, level });
@@ -240,6 +251,8 @@ R["join"] = async (db, b) => {
   const code = normCode(b.code), name = str(b.name, 40);
   if (!code || !name) return bad("Enter the class code and your name.");
   const c = await db.prepare("SELECT * FROM classes WHERE code=?").bind(code).first(); if (!c) return bad("That class code was not found.", 404);
+  const pl = planOf(c), used = (await db.prepare("SELECT COUNT(*) AS n FROM learners WHERE class_id=? AND removed=0").bind(c.id).first()).n;
+  if (used >= pl.learners) return bad("This class is full (" + pl.learners + " learners on the " + pl.label + (pl.expired ? " plan, which has expired" : " plan") + "). Ask your teacher to upgrade the class.", 403);
   const lt = rnd(16), id = uid();
   await db.prepare("INSERT INTO learners(id,class_id,name,tok_hash,joined) VALUES(?,?,?,?,?)").bind(id, c.id, name, await sha(lt), Date.now()).run();
   return J({ lt, name, cls: { name: c.name, grade: c.grade, code: c.code } });
@@ -449,6 +462,19 @@ R["admin/founder"] = async (db, b, env) => {
   if (!(await admin(env, b))) return bad("Not allowed.", 401);
   if (b.save) { const sig = cleanSig(b.sig); if (sig === null) return bad("The signature must be a PNG or JPG image under 150 KB."); const cur = await founder(db); await db.prepare("INSERT OR REPLACE INTO settings(k,v) VALUES('founder',?)").bind(JSON.stringify({ name: str(b.name, 80) || cur.name, title: str(b.title, 80) || cur.title, sig: b.sig === undefined ? cur.sig : sig })).run(); }
   const f = await founder(db); return J({ founder: { name: f.name, title: f.title, hasSig: !!f.sig } });
+};
+R["admin/classes"] = async (db, b, env) => {
+  if (!(await admin(env, b))) return bad("Not allowed.", 401);
+  const q = "%" + str(b.q, 40).replace(/[%_]/g, "") + "%";
+  const rows = (await db.prepare("SELECT c.code,c.name,c.grade,c.t_school,c.plan,c.plan_until,c.created,(SELECT COUNT(*) FROM learners l WHERE l.class_id=c.id AND l.removed=0) AS learners FROM classes c WHERE c.code LIKE ? OR c.name LIKE ? OR IFNULL(c.t_school,'') LIKE ? ORDER BY c.created DESC LIMIT 200").bind(q, q, q).all()).results || [];
+  return J({ classes: rows.map((r) => { const p = planOf(r); return { ...p, code: r.code, name: r.name, grade: r.grade, school: r.t_school || "", learners: r.learners, learners_cap: p.learners, created: r.created }; }), plans: Object.keys(PLANS).map((k) => ({ id: k, label: PLANS[k].label, learners: PLANS[k].learners })) });
+};
+R["admin/plan"] = async (db, b, env) => {
+  if (!(await admin(env, b))) return bad("Not allowed.", 401);
+  const plan = String(b.plan || ""); if (!PLANS[plan]) return bad("Unknown plan.");
+  const days = Math.max(0, Math.min(1500, Math.round(+b.days || 0))), until = plan === "free" || !days ? 0 : Date.now() + days * 86400000;
+  const r = await db.prepare("UPDATE classes SET plan=?,plan_until=? WHERE code=?").bind(plan, until, normCode(b.code)).run();
+  return r.meta && r.meta.changes ? J({ ok: true, until }) : bad("Class not found.", 404);
 };
 R["admin/verify"] = async (db, b, env) => {
   if (!(await admin(env, b))) return bad("Not allowed.", 401);
