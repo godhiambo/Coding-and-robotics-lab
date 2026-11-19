@@ -127,8 +127,8 @@ if(typeof SCN!=="undefined"){var sbx=LEVELS.map(function(l){return l.id;}).index
   V("armpick",{id:"armfar",name:"45 Arm: Far reach",mission:"The cube is on the <b>far right</b> side. Reach it with the robot arm and drop it into the <b>bin</b> on the left.",hint:"Hint: stretch the shoulder and elbow to reach. Use the Teach pendant to find the angles.",cubes:[[215,130,"orange"]]})
  ];
  var sb=LEVELS.map(function(l){return l.id;}).indexOf("sandbox");NEW.forEach(function(l,k){LEVELS.splice(sb+k,0,l);});
- var T={Beginner:["drive","detour","sensor","line","farm","hop","twowalls","stopnear"],
-  Intermediate:["maze","cargo","greenhouse","solar","boda","homeeyes","beacon","compass","dronefirst","armpick","wetdry","handwash","cloth","irrigate","avoider","sharpline","schoolrun","farshelf"],
+ var T={Beginner:["trafficled","drive","detour","sensor","line","farm","hop","twowalls","stopnear"],
+  Intermediate:["trafficsmart","autodoor","maze","cargo","greenhouse","solar","boda","homeeyes","beacon","compass","dronefirst","armpick","wetdry","handwash","cloth","irrigate","avoider","sharpline","schoolrun","farshelf"],
   Advanced:["armstack","armsort","dronegate","dronewall","escarp","armbelt","wastetype","lake","dam","pothole","tomato","mastermaze","slalom","tallwall","armfar"],
   Expert:["armbelt2","dronenight","fire","cropmon"]};
  LEVELS.forEach(function(l){l.tier="Open";for(var t in T)if(T[t].indexOf(l.id)>=0)l.tier=t;});

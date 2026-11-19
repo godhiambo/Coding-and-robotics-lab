@@ -302,6 +302,71 @@ register({id:"dam",name:"34 Smart Dam Gate",floor:"workshop",station:true,dur:12
  end:function(S){return this.check(S)||{win:false,msg:"Program ended early."};},
  info:function(S){return [["Water level",Math.round(S.level)+"%"],["Gate",Math.round(S.gate)+"%"],["Inflow",S.in.toFixed(1)+" /s"]];}});
 
+// ============================ 46: smart traffic lights ============================
+register({id:"trafficsmart",name:"46 Smart Traffic Lights",floor:"workshop",station:true,dur:90,start:{x:150,y:100,a:0},
+ mission:"A busy junction in Nairobi: road <b>North-South</b> and road <b>East-West</b>. One road is much busier (it changes every run). Use the <b>vehicle counters</b> to give green to the road with the longer queue. Keep every queue under <b>10 cars</b> for 90 seconds, and never leave a car waiting more than 45 s.",
+ hint:"Hint: Forever → If queue NS &gt; queue EW then Green NS else Green EW, Wait 4. A fixed 50/50 timer fails because one road is busier!",
+ kit:["uno","bank","irobs","led","buzzer"],
+ actions:[{id:"green_ns",label:"Green for North-South",need:"led",tip:"East-West goes red first (2 s amber change)"},{id:"green_ew",label:"Green for East-West",need:"led"},{id:"all_red",label:"All red (pedestrians cross)",need:"led"}],
+ sensors:[{id:"queue_ns",label:"Cars waiting North-South >",unit:"cars",type:"num",gt:true,need:["irobs","us","sharp"]},{id:"queue_ew",label:"Cars waiting East-West >",unit:"cars",type:"num",gt:true,need:["irobs","us","sharp"]},{id:"green_now",label:"Current green is NS",type:"bool"}],
+ init:function(S){S.t=0;S.g="ns";S.q={ns:2,ew:2};S.rate=Math.random()<0.5?{ns:0.5,ew:0.13}:{ns:0.13,ew:0.5};S.acc={ns:0,ew:0};S.pass=0;S.maxq=0;S.age={ns:[],ew:[]};S.amber=0;S.maxwait=0;S.switches=0;S.bad=null;S.rel=0;S.waitT={ns:0,ew:0};},
+ step:function(S,dt){S.t+=dt;["ns","ew"].forEach(function(k){S.acc[k]+=S.rate[k]*dt*(0.7+Math.random()*0.6);while(S.acc[k]>=1){S.acc[k]-=1;S.q[k]++;S.age[k].push(S.t);}});
+  if(S.amber>0)S.amber=Math.max(0,S.amber-dt);
+  else if(S.g!=="red"){S.rel+=dt;if(S.rel>=1.2){S.rel=0;if(S.q[S.g]>0){S.q[S.g]--;S.age[S.g].shift();S.pass++;}}}
+  ["ns","ew"].forEach(function(k){S.maxq=Math.max(S.maxq,S.q[k]);if(S.age[k].length)S.maxwait=Math.max(S.maxwait,S.t-S.age[k][0]);});
+  if(S.maxq>=10&&!S.bad)S.bad="Traffic jam! A queue reached 10 cars. Give green to the busier road sooner.";
+  if(S.maxwait>45&&!S.bad)S.bad="A driver waited more than 45 s. Do not ignore the quieter road.";},
+ act:function*(S,id){var to=id==="green_ns"?"ns":id==="green_ew"?"ew":"red";if(to!==S.g){S.g=to;S.amber=2;S.switches++;S.rel=0;yield* api.wait(2);return;}yield* api.wait(0.1);},
+ sense:function(S,id){if(id==="queue_ns")return S.q.ns;if(id==="queue_ew")return S.q.ew;if(id==="green_now")return S.g==="ns";return 0;},
+ check:function(S){if(S.bad)return {win:false,msg:S.bad};if(S.t>=this.dur)return tl6(S);return null;},end:function(S){return S.bad?{win:false,msg:S.bad}:(S.t>=this.dur-1?tl6(S):{win:false,msg:"Program ended early. Use Forever so the lights keep working."});},
+ info:function(S){return [["Queue NS",S.q.ns],["Queue EW",S.q.ew],["Cars passed",S.pass],["Green",S.g==="ns"?"North-South":S.g==="ew"?"East-West":"ALL RED"]];}});
+function tl6(S){return {win:true,msg:"★ Smooth traffic! "+S.pass+" cars passed, longest queue "+S.maxq+", longest wait "+Math.round(S.maxwait)+" s."};}
+
+// ============================ 47: electronic traffic light ============================
+register({id:"trafficled",name:"47 Electronic Traffic Light",floor:"workshop",station:true,dur:60,start:{x:150,y:100,a:0},
+ mission:"Make a working <b>traffic light</b> with the RGB LED. Repeat this order: <b>Red → Green → Amber → Red</b>. Each colour must stay on for <b>3 to 6 seconds</b>. Show at least <b>2 full cycles</b>.",
+ hint:"Hint: Forever → Red, Wait 5, Green, Wait 5, Amber, Wait 3. Check your LED wiring in the Build tab first.",
+ kit:["uno","bank","led","buzzer"],
+ actions:[{id:"set_red",label:"Light RED",need:"led"},{id:"set_amber",label:"Light AMBER",need:"led"},{id:"set_green",label:"Light GREEN",need:"led"},{id:"set_off",label:"Light OFF",need:"led"},{id:"beep",label:"Pedestrian beep",need:"buzzer"}],
+ sensors:[],
+ init:function(S){S.t=0;S.col="off";S.since=0;S.hist=[];S.bad=null;S.cycles=0;},
+ step:function(S,dt){S.t+=dt;},
+ act:function*(S,id){if(id==="beep"){yield* api.wait(0.3);return;}var c=id.replace("set_","");if(c!==S.col){if(S.col!=="off")S.hist.push({c:S.col,d:S.t-S.since});S.col=c;S.since=S.t;var h=S.hist,n=h.length;
+   if(c!=="off"&&n){var prev=h[n-1],ok={red:"amber",green:"red",amber:"green"};if(prev.c!==S.col&&ok[S.col]!==prev.c&&prev.c!=="off")S.bad="Wrong order: "+prev.c.toUpperCase()+" then "+S.col.toUpperCase()+". Real lights go Red → Green → Amber → Red.";}
+   if(n){var last=h[n-1];if(last.c!=="off"&&(last.d<3||last.d>6)&&!S.bad)S.bad=last.c.toUpperCase()+" stayed on for "+last.d.toFixed(1)+" s. Each colour must last 3 to 6 s.";}
+   if(c==="red"&&n>=3)S.cycles=Math.max(S.cycles,Math.floor((h.filter(function(x){return x.c==="red";}).length)));}
+  yield* api.wait(0.05);},
+ sense:function(){return 0;},
+ check:function(S){if(S.bad)return {win:false,msg:S.bad};if(S.t>=this.dur)return tle(S);return null;},end:function(S){if(S.bad)return {win:false,msg:S.bad};return S.t>=this.dur-1?tle(S):{win:false,msg:"The light stopped too early. Use Forever or Repeat so it keeps cycling."};},
+ info:function(S){return [["Light",S.col.toUpperCase()],["On for",(S.t-S.since).toFixed(1)+" s"],["Cycles",S.cycles]];}});
+function tle(S){var h=S.hist.slice();if(S.col!=="off")h.push({c:S.col,d:S.t-S.since});if(h.length&&(h[h.length-1].d>6))return {win:false,msg:"The last colour stayed on too long ("+h[h.length-1].d.toFixed(1)+" s)."};
+ var reds=h.filter(function(x){return x.c==="red";}).length,gr=h.filter(function(x){return x.c==="green";}).length,am=h.filter(function(x){return x.c==="amber";}).length;
+ if(reds>=2&&gr>=2&&am>=2)return {win:true,msg:"★ Perfect traffic light! "+Math.min(reds,gr,am)+" full cycles, every colour 3–6 s."};
+ return {win:false,msg:"Show at least 2 full cycles of Red, Green and Amber. You showed "+reds+" red, "+gr+" green, "+am+" amber."};}
+
+// ============================ 48: automatic door ============================
+register({id:"autodoor",name:"48 Automatic Door",floor:"workshop",station:true,dur:70,start:{x:150,y:100,a:0},
+ mission:"Build the <b>automatic door</b> of a school library. <b>Open</b> the door when a person is closer than <b>100 cm</b>, keep it open while someone is <b>in the doorway</b>, and <b>close</b> it afterwards. 4 people will come. Don't let anyone wait, never close on a person, and don't leave the door open for nothing!",
+ hint:"Hint: Forever → If distance &lt; 100 then Open door, else Close door. One person stands still in the doorway for a few seconds, so the door must wait for them.",
+ kit:["uno","bank","us","servo","buzzer"],
+ actions:[{id:"open_door",label:"Open the door",need:"servo",tip:"Servo swings the door open (1 s)"},{id:"close_door",label:"Close the door",need:"servo"},{id:"beep",label:"Warning beep",need:"buzzer"}],
+ sensors:[{id:"person_dist",label:"Person in front closer than",unit:"cm",type:"num",need:["us","irobs","sharp"]},{id:"door_open",label:"Door opening >",unit:"%",type:"num",gt:true}],
+ init:function(S){S.t=0;S.gate=0;S.target=0;S.bad=null;S.wasted=0;S.ppl=[];var t=R(3,6);for(var i=0;i<4;i++){S.ppl.push({s:t,x:190,v:R(34,52),lin:i===2?R(3,5):0,linT:0,state:"wait",wait:0});t+=R(11,15);}S.passed=0;S.opens=0;},
+ step:function(S,dt){S.t+=dt;var sp=90*dt;S.gate+=Math.max(-sp,Math.min(sp,S.target-S.gate));var near=false;
+  S.ppl.forEach(function(p,i){if(p.state==="gone"||S.t<p.s)return;if(p.state==="wait")p.state="walk";
+   if(p.state==="walk"){var stop=(S.gate<70&&p.x<=12);if(stop){p.wait+=dt;if(p.wait>2&&!S.bad)S.bad="Person "+(i+1)+" had to wait at a closed door. Open it earlier.";}else{
+     if(p.lin&&p.x<=28&&p.linT<p.lin){p.linT+=dt;}else{p.x-=p.v*dt;}}
+    if(p.x<=-30){p.state="gone";S.passed++;}}
+   if(p.x>-30&&p.x<30&&Math.abs(p.x)<=25&&S.gate<70&&S.target<S.gate&&p.state==="walk"&&!S.bad)S.bad="The door closed on person "+(i+1)+"! Keep it open while someone is in the doorway.";
+   if(p.state==="walk"&&p.x<110)near=true;});
+  if(S.gate>30&&!near)S.wasted+=dt;},
+ act:function*(S,id){if(id==="open_door"){if(S.target<50)S.opens++;S.target=100;yield* api.wait(0.15);return;}if(id==="close_door"){S.target=0;yield* api.wait(0.15);return;}yield* api.wait(0.2);},
+ sense:function(S,id){if(id==="door_open")return Math.round(S.gate);var best=250;S.ppl.forEach(function(p){if(p.state==="walk"&&p.x>-30)best=Math.min(best,Math.max(0,p.x));});return Math.round(best+noise(2));},
+ check:function(S){if(S.bad)return {win:false,msg:S.bad};if(S.wasted>18)return {win:false,msg:"The door stayed open with nobody near for "+Math.round(S.wasted)+" s. Close it to save energy and keep dust out."};if(S.t>=this.dur)return ad8(S);return null;},end:function(S){return S.bad?{win:false,msg:S.bad}:(S.t>=this.dur-1?ad8(S):{win:false,msg:"Program ended early. Use Forever so the door keeps watching."});},
+ info:function(S){return [["Door",Math.round(S.gate)+"%"],["People through",S.passed+" / 4"],["Open, nobody near",Math.round(S.wasted)+" s"]];}});
+function ad8(S){if(S.passed<4)return {win:false,msg:S.passed+" of 4 people got through. The door must open for everyone."};return {win:true,msg:"★ All 4 people walked through safely! Door opened "+S.opens+" time"+(S.opens===1?"":"s")+", wasted only "+Math.round(S.wasted)+" s open."};}
+
+
 return {def:def,levels:levels,bind:bind};
 })();
 if(typeof module!=="undefined")module.exports=SCN;

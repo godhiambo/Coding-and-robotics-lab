@@ -239,6 +239,41 @@ function dam(G,l,S){var t=T(),conc=MM(0xb7b2a8,0.9),wt=waterTex();wt.repeat.set(
   var rr=S.in>2.2?Math.min(100,(S.in-1.6)*18):0;rain.visible=rr>2;if(rr>2){var a=rain.geometry.attributes.position;for(var d=0;d<n;d++){var s=seed[d];s[2]-=3;if(s[2]<0)s[2]+=100;a.setXYZ(d*2,s[0],s[2],s[1]);a.setXYZ(d*2+1,s[0]-0.5,s[2]+4,s[1]);}a.needsUpdate=true;}};}
 B.dam=dam;
 
+
+// ---------------- traffic + door missions ----------------
+function lampHead(G,x,y,z,ry){var t=T(),g=new t.Group();box(g,7,19,7,MM(0x1b1b1b,0.5),0,0,0);var ls=[];[[0xff2020,6],[0xffb300,0],[0x22dd55,-6]].forEach(function(c){var m=new t.MeshStandardMaterial({color:0x222222,emissive:c[0],emissiveIntensity:0});var o=new t.Mesh(new t.SphereGeometry(2.4,12,10),m);o.position.set(0,c[1],3.8);g.add(o);ls.push(m);});g.position.set(x,y,z);g.rotation.y=ry||0;G.add(g);
+ return function(c){ls[0].emissiveIntensity=c==="red"?2.2:0;ls[1].emissiveIntensity=c==="amber"?2.2:0;ls[2].emissiveIntensity=c==="green"?2.2:0;};}
+function carMesh(col){var t=T(),g=new t.Group();box(g,16,5,8,gloss(col,80),0,4,0);box(g,8,4,7,gloss(0xcfe8f5,100),-1,8.5,0);[[-5,-4.3],[5,-4.3],[-5,4.3],[5,4.3]].forEach(function(w){cyl(g,2,1.6,MM(0x111,0.9),w[0],2,w[1],Math.PI/2,0);});return g;}
+function roadBase(G,vert){var t=T(),ground=new t.Mesh(new t.PlaneGeometry(300,200),new t.MeshStandardMaterial({color:0x6a8a4a,roughness:1}));ground.rotation.x=-Math.PI/2;ground.position.set(150,0.1,100);G.add(ground);
+ var rm=new t.MeshStandardMaterial({color:0x3a3d42,roughness:0.9});var r1=new t.Mesh(new t.PlaneGeometry(300,40),rm);r1.rotation.x=-Math.PI/2;r1.position.set(150,0.3,100);G.add(r1);if(vert){var r2=new t.Mesh(new t.PlaneGeometry(40,200),rm);r2.rotation.x=-Math.PI/2;r2.position.set(150,0.35,100);G.add(r2);}
+ var dm=MM(0xf2f2f2,0.6);for(var x=10;x<290;x+=26){if(vert&&x>125&&x<175)continue;box(G,12,0.2,1.4,dm,x,0.45,100);}if(vert)for(var z=8;z<195;z+=26){if(z>78&&z<122)continue;box(G,1.4,0.2,12,dm,150,0.45,z);}}
+function trafficsmart(G,l,S){var t=T();roadBase(G,true);
+ var A=lampHead(G,132,28,78,Math.PI),Bf=lampHead(G,168,28,122,0),C1=lampHead(G,132,28,122,-Math.PI/2),D1=lampHead(G,168,28,78,Math.PI/2);
+ [[132,78],[168,122],[132,122],[168,78]].forEach(function(q){cyl(G,1.2,28,MM(0x555),q[0],14,q[1]);});
+ var ns=[],ew=[];for(var i=0;i<12;i++){var c1=carMesh([0xe53935,0x1e88e5,0xfdd835,0x43a047,0xfafafa,0x8e24aa][i%6]);c1.rotation.y=-Math.PI/2;c1.position.set(142,0,128+i*13);G.add(c1);ns.push(c1);var c2=carMesh([0x00acc1,0xff7043,0x9ccc65,0xeceff1,0x5c6bc0,0xffca28][i%6]);c2.position.set(122-i*19,0,111);G.add(c2);ew.push(c2);}
+ var mv=carMesh(0xffffff);mv.visible=false;G.add(mv);var lastPass=0,pt=-1,pk="ns";
+ return function(tm){var gr=S.g,am=S.amber>0;var cs=function(k){return am?"amber":(gr===k?"green":"red");};A(cs("ns"));Bf(cs("ns"));C1(cs("ew"));D1(cs("ew"));
+  ns.forEach(function(c,i){c.visible=i<S.q.ns;});ew.forEach(function(c,i){c.visible=i<S.q.ew;});
+  if(S.pass!==lastPass){lastPass=S.pass;pt=0;pk=gr;}if(pt>=0){pt+=0.03;mv.visible=true;if(pk==="ns"){mv.rotation.y=-Math.PI/2;mv.position.set(158,0,122-pt*140);}else{mv.rotation.y=0;mv.position.set(112+pt*140,0,89);}if(pt>1)pt=-1,mv.visible=false;}};}
+B.trafficsmart=trafficsmart;
+function trafficled(G,l,S){var t=T();roadBase(G,false);
+ cyl(G,3,78,MM(0x444,0.6),150,39,70);box(G,24,62,14,MM(0x161616,0.5),150,92,70);var ls=[];[[0xff2020,110],[0xffb300,92],[0x22dd55,74]].forEach(function(c){var m=new t.MeshStandardMaterial({color:0x2a2a2a,emissive:c[0],emissiveIntensity:0});var o=new t.Mesh(new t.SphereGeometry(8,18,14),m);o.position.set(150,c[1],78.5);G.add(o);ls.push(m);});
+ var sl=lab("RGB LED traffic light",70,9,null,"#fff");sl.position.set(150,138,70);sl.rotation.x=-0.3;G.add(sl);
+ var car=carMesh(0xe53935);car.scale.setScalar(2);car.position.set(0,0,108);G.add(car);var sm=0;
+ return function(tm){var c=S.col;ls[0].emissiveIntensity=c==="red"?2.4:0.05;ls[1].emissiveIntensity=c==="amber"?2.4:0.05;ls[2].emissiveIntensity=c==="green"?2.4:0.05;
+  if(c==="green")sm=Math.min(1,sm+0.02);else if(c==="amber")sm=Math.max(0.35,sm-0.01);else sm=Math.max(0,sm-0.04);car.position.x=30+sm*60+((tm*8)%240)*(c==="green"?1:0)*0;
+  car.position.x=(c==="green"?(tm*50)%330-20:(c==="red"?110:car.position.x));};}
+B.trafficled=trafficled;
+function autodoor(G,l,S){var t=T();
+ var floor=new t.Mesh(new t.PlaneGeometry(300,200),new t.MeshPhongMaterial({map:tileTex().clone(),shininess:70}));floor.material.map.needsUpdate=true;floor.material.map.wrapS=floor.material.map.wrapT=t.RepeatWrapping;floor.material.map.repeat.set(12,8);floor.rotation.x=-Math.PI/2;floor.position.set(150,0.2,100);G.add(floor);
+ var wm=MM(0xe8e4d8,0.9);box(G,75,44,6,wm,97.5,22,70);box(G,75,44,6,wm,202.5,22,70);box(G,34,8,6,wm,150,40,70);
+ var glass=gloss(0x9fd6f2,110,null,{transparent:true,opacity:0.55});var dl=box(G,15,36,2,glass,142.5,18,70),dr=box(G,15,36,2,glass,157.5,18,70);
+ box(G,50,2,6,MM(0x777),150,37,70);var sn=box(G,8,5,4,MM(0x111,0.4),150,41,66);var sl=lab("ULTRASONIC SENSOR",30,4,"#0d2b2b","#37d6c6");sl.position.set(150,47,66.5);G.add(sl);var ll=lab("SCHOOL LIBRARY",40,7,"#1e3a5f","#fff");ll.position.set(150,56,66.5);G.add(ll);
+ var shelf=MM(0x8d6a47,0.8);for(var i=0;i<4;i++)box(G,40,40,8,shelf,50+i*60,20,20);
+ var colors=[0x1e88e5,0xe53935,0x43a047,0xf9a825],skins=[0xf1c27d,0x8d5524,0xc68642,0xe0ac69],people=[];colors.forEach(function(c,i){var p=new t.Group();cyl(p,5,26,MM(c,0.8),0,13+8,0);sph(p,4.6,MM(skins[i],0.7),0,40,0);p.visible=false;G.add(p);people.push(p);});
+ return function(tm){var g=S.gate/100*15;dl.position.x=142.5-g;dr.position.x=157.5+g;S.ppl.forEach(function(p,i){var pr=people[i];pr.visible=p.state==="walk";if(pr.visible){pr.position.set(150,0,70+p.x*0.6);pr.rotation.y=Math.PI;pr.position.y=Math.abs(Math.sin(tm*9+i))*0.8;}});};}
+B.autodoor=autodoor;
+
 // =============================== phone app overlay ===============================
 function phoneShow(on,html){if(!phone){var host=document.getElementById("stage")||document.getElementById("view3d")||E.box;phone=document.createElement("div");phone.style.cssText="position:absolute;right:8px;top:58px;width:150px;max-height:86%;overflow:auto;background:#0f172a;color:#e5e7eb;border:3px solid #334155;border-radius:16px;padding:7px 8px;font:11px/1.35 system-ui,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.45);z-index:6;pointer-events:none";(E.box).appendChild(phone);}
  phone.style.display=on?"block":"none";if(on&&html!==undefined&&phone._h!==html){phone._h=html;phone.innerHTML=html;}}

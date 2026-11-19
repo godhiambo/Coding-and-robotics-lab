@@ -14,9 +14,14 @@ const SCHEMA = [
   `CREATE INDEX IF NOT EXISTS ix_att_comp ON attempts(comp_id)`,
   `CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY AUTOINCREMENT, comp_id TEXT, learner_id TEXT, type TEXT, data TEXT, at INTEGER)`,
   `CREATE INDEX IF NOT EXISTS ix_ev_comp ON events(comp_id)`,
+  `CREATE TABLE IF NOT EXISTS certs(id TEXT PRIMARY KEY, comp_id TEXT, learner_id TEXT, class_id TEXT, kind TEXT, rank INTEGER, name TEXT, title TEXT, school TEXT, score INTEGER, issued INTEGER, revoked INTEGER DEFAULT 0, ver INTEGER DEFAULT 1, supersedes TEXT, replaced_by TEXT, f_name TEXT, f_title TEXT, f_sig TEXT, t_name TEXT, t_title TEXT, t_school TEXT, t_sig TEXT)`,
+  `CREATE TABLE IF NOT EXISTS sigs(id TEXT PRIMARY KEY, data TEXT)`,
+  `CREATE TABLE IF NOT EXISTS settings(k TEXT PRIMARY KEY, v TEXT)`,
+  `CREATE TABLE IF NOT EXISTS counters(k TEXT PRIMARY KEY, n INTEGER)`,
+  `CREATE INDEX IF NOT EXISTS ix_cert_comp ON certs(comp_id)`,
 ];
 let ready = false;
-async function init(db) { if (ready) return; await db.batch(SCHEMA.map((s) => db.prepare(s))); try { await db.prepare("ALTER TABLE attempts ADD COLUMN level TEXT").run(); } catch (e) {} ready = true; }
+async function init(db) { if (ready) return; await db.batch(SCHEMA.map((s) => db.prepare(s))); for (const q of ["ALTER TABLE attempts ADD COLUMN level TEXT", "ALTER TABLE classes ADD COLUMN t_name TEXT", "ALTER TABLE classes ADD COLUMN t_title TEXT", "ALTER TABLE classes ADD COLUMN t_school TEXT", "ALTER TABLE classes ADD COLUMN t_sig TEXT", "ALTER TABLE classes ADD COLUMN t_status TEXT", "ALTER TABLE classes ADD COLUMN t_auth INTEGER DEFAULT 0"]) { try { await db.prepare(q).run(); } catch (e) {} } ready = true; }
 
 const hex = (b) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
 const sha = async (s) => hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(s))));
@@ -41,6 +46,7 @@ export function cleanRules(r) {
     board: r.board === "after" ? "after" : "live",  // when learners may see the leaderboard
     targetTime: clamp(+r.targetTime || 60, 5, 3600),
     parBlocks: clamp(+r.parBlocks || 12, 1, 200),
+    certs: r.certs !== false, top3: r.top3 !== false, partic: r.partic !== false, special: r.special !== false, dl: r.dl !== false,
   };
 }
 
@@ -160,6 +166,14 @@ R["comp/act"] = async (db, b) => {
     await db.prepare("UPDATE comps SET deadline=deadline+? WHERE id=?").bind(m * 60000, comp.id).run();
   } else if (a === "publish" || a === "unpublish") {
     await db.prepare("UPDATE comps SET published=? WHERE id=?").bind(a === "publish" ? 1 : 0, comp.id).run();
+    if (a === "publish") await issueCerts(db, comp, c, rules);
+    else await db.prepare("UPDATE certs SET revoked=1 WHERE comp_id=? AND revoked=0").bind(comp.id).run();
+  } else if (a === "innovation") {
+    const l = await db.prepare("SELECT * FROM learners WHERE id=? AND class_id=?").bind(str(b.learnerId, 40), c.id).first(); if (!l) return bad("Learner not found.", 404);
+    await db.prepare("DELETE FROM certs WHERE comp_id=? AND kind='innovation'").bind(comp.id).run();
+    await addCert(db, comp, c, l.id, l.name, "innovation", 0, 0);
+    await ev(db, comp.id, l.id, "innovation_award", null);
+    return J({ ok: true });
   } else if (a === "disq" || a === "undisq") {
     const att = await db.prepare("SELECT * FROM attempts WHERE id=? AND comp_id=?").bind(str(b.attemptId, 40), comp.id).first(); if (!att) return bad("Attempt not found.", 404);
     await db.prepare("UPDATE attempts SET disq=? WHERE id=?").bind(a === "disq" ? 1 : 0, att.id).run();
@@ -202,7 +216,15 @@ R["me"] = async (db, b) => {
       await db.prepare("UPDATE attempts SET status='locked' WHERE comp_id=? AND learner_id=? AND status='open'").bind(comp.id, l.id).run();
       mine.forEach((a) => { if (a.status === "open") a.status = "locked"; });
     }
-    out.comp = v; out.mine = mine.map((a) => ({ ...a, breakdown: a.breakdown ? JSON.parse(a.breakdown) : null }));
+    out.comp = v;
+    if (comp.published) {
+      const lb = await leaderboard(db, comp.id, false), best = await db.prepare("SELECT breakdown FROM attempts WHERE comp_id=? AND status='submitted' AND disq=0").bind(comp.id).all();
+      const keys = ["reach", "complete", "collisions", "logic", "time", "movement"], sum = {}, n = {};
+      (best.results || []).forEach((r) => { try { const bd = JSON.parse(r.breakdown || "{}"); keys.forEach((k) => { if (bd[k] != null) { sum[k] = (sum[k] || 0) + bd[k]; n[k] = (n[k] || 0) + 1; } }); } catch (e) {} });
+      const scored = lb.filter((r) => r.status === "Submitted"), me2 = lb.find((r) => r.id === l.id);
+      out.stats = { avg: scored.length ? Math.round(scored.reduce((t, r) => t + r.score, 0) / scored.length) : 0, n: scored.length, rank: me2 ? me2.rank : 0, crit: Object.fromEntries(keys.map((k) => [k, n[k] ? Math.round(sum[k] / n[k]) : 0])) };
+    }
+    out.mine = mine.map((a) => ({ ...a, breakdown: a.breakdown ? JSON.parse(a.breakdown) : null }));
     const showBoard = v.rules.board === "live" || comp.published;
     if (showBoard) { const rows = await leaderboard(db, comp.id, false); out.board = rows.slice(0, 15).map((r) => ({ rank: r.rank, name: r.name, score: r.score, status: r.status, me: r.id === l.id })); }
     else out.boardHidden = true;
@@ -270,11 +292,128 @@ export async function milaAllowed(env, lt) {
   } catch (e) { return true; }
 }
 
+
+// ---------- awards & certificates ----------
+// IDs look like MM-RBL-2026-00001. Each certificate stores a snapshot of the signatories at issue time,
+// so later profile changes never alter a certificate that has already been issued.
+const FOUNDER_DEFAULT = { name: "Godfrey Odhiambo", title: "Founder, Milestone Minds", sig: "" };
+async function founder(db) { const r = await db.prepare("SELECT v FROM settings WHERE k='founder'").first(); return { ...FOUNDER_DEFAULT, ...(r ? JSON.parse(r.v) : {}) }; }
+async function putSig(db, data) { if (!data) return ""; const id = (await sha(data)).slice(0, 20); await db.prepare("INSERT OR IGNORE INTO sigs(id,data) VALUES(?,?)").bind(id, data).run(); return id; }
+function cleanSig(v) { v = String(v || ""); if (!v) return ""; if (!/^data:image\/(png|jpeg);base64,[A-Za-z0-9+\/=]+$/.test(v) || v.length > 220000) return null; return v; }
+const teacherOk = (c) => !!(c.t_status === "verified" && c.t_auth && c.t_name && c.t_sig);
+async function nextCertId(db) {
+  const y = new Date().getFullYear(), k = "cert" + y;
+  await db.prepare("INSERT OR IGNORE INTO counters(k,n) VALUES(?,0)").bind(k).run();
+  const r = await db.prepare("UPDATE counters SET n=n+1 WHERE k=? RETURNING n").bind(k).first();
+  return "MM-RBL-" + y + "-" + String(r.n).padStart(5, "0");
+}
+async function addCert(db, comp, cls, lid, name, kind, rank, sc, extra) {
+  const id = await nextCertId(db), f = await founder(db), t = teacherOk(cls);
+  const fs = f.sig ? await putSig(db, f.sig) : "";
+  const ts = t ? await putSig(db, (await db.prepare("SELECT t_sig FROM classes WHERE id=?").bind(cls.id).first()).t_sig) : "";
+  const x = extra || {};
+  await db.prepare("INSERT INTO certs(id,comp_id,learner_id,class_id,kind,rank,name,title,school,score,issued,revoked,ver,supersedes,f_name,f_title,f_sig,t_name,t_title,t_school,t_sig) VALUES(?,?,?,?,?,?,?,?,?,?,?,0,?,?,?,?,?,?,?,?,?)")
+    .bind(id, comp.id, lid, cls.id, kind, rank, name, comp.title, (cls.t_school || cls.name), sc, Date.now(), x.ver || 1, x.supersedes || null, f.name, f.title, fs, t ? cls.t_name : "", t ? (cls.t_title || "Teacher") : "", t ? (cls.t_school || cls.name) : "", ts).run();
+  return id;
+}
+async function issueCerts(db, comp, cls, rules) {
+  if (rules.certs === false) return;
+  const have = await db.prepare("SELECT COUNT(*) AS n FROM certs WHERE comp_id=? AND revoked=0 AND kind!='innovation'").bind(comp.id).first();
+  await db.prepare("UPDATE certs SET revoked=0 WHERE comp_id=? AND revoked=1").bind(comp.id).run(); // re-publish restores earlier certificates
+  if (have.n > 0 || (await db.prepare("SELECT COUNT(*) AS n FROM certs WHERE comp_id=?").bind(comp.id).first()).n > 0) return;
+  const rows = (await leaderboard(db, comp.id, false)).filter((r) => r.status === "Submitted" && r.score >= 0);
+  for (const r of rows) {
+    if (r.rank <= 3 && rules.top3 !== false) await addCert(db, comp, cls, r.id, r.name, r.rank === 1 ? "gold" : r.rank === 2 ? "silver" : "bronze", r.rank, r.score);
+    else if (rules.partic !== false) await addCert(db, comp, cls, r.id, r.name, "participation", r.rank, r.score);
+  }
+  if (rules.special !== false) {
+    const all = (await db.prepare("SELECT a.*, l.name AS lname FROM attempts a JOIN learners l ON l.id=a.learner_id WHERE a.comp_id=? AND a.status='submitted' AND a.disq=0 AND a.win=1").bind(comp.id).all()).results || [];
+    if (all.length) {
+      const f = all.slice().sort((x, y) => (x.time_s - y.time_s) || (y.score - x.score))[0];
+      const pz = all.slice().sort((x, y) => (x.collisions - y.collisions) || (x.blocks - y.blocks) || (y.score - x.score))[0];
+      await addCert(db, comp, cls, f.learner_id, f.lname, "fastest", 0, f.score);
+      if (pz.learner_id !== f.learner_id || all.length === 1) await addCert(db, comp, cls, pz.learner_id, pz.lname, "precision", 0, pz.score);
+    }
+  }
+  await ev(db, comp.id, null, "certs_issued", null);
+}
+const certView = (c) => ({ id: c.id, kind: c.kind, rank: c.rank, name: c.name, title: c.title, school: c.school, score: c.score, issued: c.issued, revoked: !!c.revoked, compId: c.comp_id, ver: c.ver || 1,
+  f: { name: c.f_name, title: c.f_title, sig: c.f_sig || "" }, t: c.t_name ? { name: c.t_name, title: c.t_title, school: c.t_school, sig: c.t_sig || "" } : null });
+
+R["cert/mine"] = async (db, b) => {
+  const l = await learner(db, b); if (!l) return bad("Please join your class again.", 401);
+  const rows = (await db.prepare("SELECT c.* FROM certs c JOIN comps p ON p.id=c.comp_id WHERE c.learner_id=? AND c.revoked=0 AND p.published=1 ORDER BY c.issued DESC").bind(l.id).all()).results || [];
+  const comps = {}; for (const r of rows) { if (!comps[r.comp_id]) { const p = await db.prepare("SELECT rules FROM comps WHERE id=?").bind(r.comp_id).first(); comps[r.comp_id] = JSON.parse((p && p.rules) || "{}"); } }
+  return J({ certs: rows.map((r) => ({ ...certView(r), dl: comps[r.comp_id].dl !== false })) });
+};
+R["cert/verify"] = async (db, b) => {
+  const id = str(b.id, 40).toUpperCase().replace(/[^A-Z0-9-]/g, "");
+  const c = await db.prepare("SELECT c.*, p.published AS pub FROM certs c JOIN comps p ON p.id=c.comp_id WHERE c.id=?").bind(id).first();
+  if (!c) return J({ found: false, valid: false });
+  const status = c.revoked === 2 ? "Superseded" : (c.revoked || !c.pub) ? "Revoked" : "Valid";
+  return J({ found: true, valid: status === "Valid", status, replacedBy: c.replaced_by || null, issuer: "Milestone Minds", cert: certView(c) });
+};
+R["sig/get"] = async (db, b) => { const r = await db.prepare("SELECT data FROM sigs WHERE id=?").bind(str(b.id, 40)).first(); return J({ data: r ? r.data : "" }); };
+// Teacher "Certificate & Professional Identity" profile. Only the class's teacher key can change it; learners cannot.
+R["teacher/profile"] = async (db, b) => {
+  const c = await teacher(db, b); if (!c) return bad("Not allowed.", 401);
+  if (b.save) {
+    const sig = b.sig === undefined ? c.t_sig : cleanSig(b.sig); if (sig === null) return bad("The signature must be a PNG or JPG image under 150 KB.");
+    const name = str(b.name, 80), title = str(b.title, 80), school = str(b.school, 100);
+    if (!name || !title || !school) return bad("Enter your full name, designation and school.");
+    const changed = sig !== c.t_sig || name !== c.t_name || title !== c.t_title || school !== c.t_school;
+    await db.prepare("UPDATE classes SET t_name=?,t_title=?,t_school=?,t_sig=?,t_auth=?,t_status=? WHERE id=?").bind(name, title, school, sig || "", b.auth ? 1 : 0, changed || !c.t_status ? "pending" : c.t_status, c.id).run();
+    await ev(db, null, null, "teacher_profile", { class: c.id });
+  }
+  const p = await db.prepare("SELECT t_name,t_title,t_school,t_sig,t_status,t_auth FROM classes WHERE id=?").bind(c.id).first();
+  return J({ profile: { name: p.t_name || "", title: p.t_title || "", school: p.t_school || "", sig: p.t_sig || "", status: p.t_status === "verified" ? "Verified" : (p.t_name ? "Pending" : "Not set"), auth: !!p.t_auth } });
+};
+// Platform administration (Milestone Minds only). Needs the ADMIN_KEY secret on the Worker.
+async function admin(env, b) { return !!env.ADMIN_KEY && String(b.adminKey || "") === env.ADMIN_KEY; }
+R["admin/founder"] = async (db, b, env) => {
+  if (!env.ADMIN_KEY) return bad("Set the ADMIN_KEY secret on the Worker first.", 503);
+  if (!(await admin(env, b))) return bad("Not allowed.", 401);
+  if (b.save) { const sig = cleanSig(b.sig); if (sig === null) return bad("The signature must be a PNG or JPG image under 150 KB."); const cur = await founder(db); await db.prepare("INSERT OR REPLACE INTO settings(k,v) VALUES('founder',?)").bind(JSON.stringify({ name: str(b.name, 80) || cur.name, title: str(b.title, 80) || cur.title, sig: b.sig === undefined ? cur.sig : sig })).run(); }
+  const f = await founder(db); return J({ founder: { name: f.name, title: f.title, hasSig: !!f.sig } });
+};
+R["admin/verify"] = async (db, b, env) => {
+  if (!(await admin(env, b))) return bad("Not allowed.", 401);
+  const code = normCode(b.classCode);
+  if (b.list) { const rows = (await db.prepare("SELECT code,name,t_name,t_title,t_school,t_status FROM classes WHERE t_name IS NOT NULL AND t_name!=''").all()).results || []; return J({ teachers: rows }); }
+  const r = await db.prepare("UPDATE classes SET t_status=? WHERE code=?").bind(b.revoke ? "pending" : "verified", code).run();
+  return J({ ok: true });
+};
+// A correction issues a NEW certificate (next version) and invalidates the old one.
+R["cert/correct"] = async (db, b) => {
+  const c = await teacher(db, b); if (!c) return bad("Not allowed.", 401);
+  const old = await db.prepare("SELECT * FROM certs WHERE id=? AND class_id=?").bind(str(b.id, 40).toUpperCase(), c.id).first(); if (!old) return bad("Certificate not found.", 404);
+  if (old.revoked) return bad("This certificate is no longer current.");
+  const name = str(b.name, 80) || old.name, comp = await db.prepare("SELECT * FROM comps WHERE id=?").bind(old.comp_id).first();
+  const nid = await addCert(db, comp, c, old.learner_id, name, old.kind, old.rank, old.score, { ver: (old.ver || 1) + 1, supersedes: old.id });
+  await db.prepare("UPDATE certs SET revoked=2, replaced_by=? WHERE id=?").bind(nid, old.id).run();
+  await ev(db, comp.id, old.learner_id, "cert_corrected", { from: old.id, to: nid });
+  return J({ id: nid });
+};
+R["cert/list"] = async (db, b) => {
+  const c = await teacher(db, b); if (!c) return bad("Not allowed.", 401);
+  const comp = await db.prepare("SELECT * FROM comps WHERE id=? AND class_id=?").bind(str(b.compId, 40), c.id).first(); if (!comp) return bad("Competition not found.", 404);
+  const rows = (await db.prepare("SELECT * FROM certs WHERE comp_id=? AND revoked=0 ORDER BY kind, rank").bind(comp.id).all()).results || [];
+  return J({ certs: rows.map(certView), published: !!comp.published });
+};
+R["fame"] = async (db, b) => {
+  const l = await learner(db, b); if (!l) return bad("Please join your class again.", 401);
+  const rows = (await db.prepare("SELECT c.learner_id, c.name, c.kind, c.score FROM certs c JOIN comps p ON p.id=c.comp_id WHERE c.class_id=? AND c.revoked=0 AND p.published=1").bind(l.class_id).all()).results || [];
+  const W = { gold: 5, silver: 3, bronze: 2, participation: 1, fastest: 2, precision: 2, innovation: 2 }, by = {};
+  rows.forEach((r) => { const x = (by[r.learner_id] = by[r.learner_id] || { name: r.name, pts: 0, gold: 0, silver: 0, bronze: 0, certs: 0, best: 0 }); x.pts += W[r.kind] || 1; x.certs++; if (r.kind === "gold" || r.kind === "silver" || r.kind === "bronze") x[r.kind]++; x.best = Math.max(x.best, r.score || 0); });
+  const list = Object.values(by).sort((a, b2) => (b2.pts - a.pts) || (b2.best - a.best)).slice(0, 10);
+  return J({ hall: list });
+};
+
 export async function handleApi(request, env, path) {
   if (request.method !== "POST") return bad("Method not allowed", 405);
   if (!env.DB) return J({ error: "The classroom database is not connected yet.", setup: true }, 503);
   const fn = R[path]; if (!fn) return bad("Not found", 404);
   let body; try { body = await request.json(); } catch { return bad("Bad request"); }
-  try { await init(env.DB); return await fn(env.DB, body || {}); }
+  try { await init(env.DB); return await fn(env.DB, body || {}, env); }
   catch (e) { return J({ error: "Server error: " + String((e && e.message) || e).slice(0, 120) }, 500); }
 }
