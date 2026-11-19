@@ -166,7 +166,7 @@ function refresh(){
 var cam={theta:0,phi:0.02,d:62,tx:Wx(300),tz:Wz(175)};
 var PRESET={place:{theta:0,phi:0.02,d:66,tz:-3},look:{theta:0.3,phi:0.9,d:68,tz:-2}};
 function place(){var sp=Math.sin(cam.phi);camera.position.set(cam.tx+cam.d*sp*Math.sin(cam.theta),cam.d*Math.cos(cam.phi),cam.tz+cam.d*sp*Math.cos(cam.theta));camera.lookAt(cam.tx,0,cam.tz);}
-function setMode(m){mode=m;var p=PRESET[m];cam.theta=p.theta;cam.phi=p.phi;cam.d=p.d;cam.tx=Wx(300);cam.tz=Wz(175)+(p.tz||0);[].forEach.call($("bbViews").children,function(b){b.className=b.dataset.m===m?"on":"";});
+function setMode(m){mode=m;var p=PRESET[m]||PRESET.place;cam.theta=p.theta;cam.phi=p.phi;cam.d=p.d;cam.tx=Wx(300);cam.tz=Wz(175)+(p.tz||0);[].forEach.call($("bbViews").children,function(b){b.className=b.dataset.m===m?"on":"";});
  var flat=m==="flat";$("bb3d").style.display=flat?"none":"block";$("bbBoard").style.display=flat?"block":"none";dirty=true;}
 function size(){var w=box.clientWidth;if(w&&Math.abs(w-lowBox)>1){lowBox=w;var h=Math.round(w/1.45);renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();dirty=true;}}
 // ---------- picking ----------

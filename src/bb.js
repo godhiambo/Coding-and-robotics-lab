@@ -3,8 +3,11 @@
 var X=Circuit,$=function(id){return document.getElementById(id);};
 var PITCH=17.5,X0=44,RAILY={tp:34,tn:48,bp:304,bn:318},ROWY={a:86,b:103.5,c:121,d:138.5,e:156,f:196,g:213.5,h:231,i:248.5,j:266};
 var comps=[],nid=1,pending=null,selected=null,meter=null,mreading="",chIdx=0,done={},sim=null;
-var mode="basic",store={basic:[],mcu:null},prog=[],run=null,timer=null,lastT=0,OFFY=0,UNO={x:8,y:6,s:1.55},UP=null,CH=X.CHALLENGES;
-function unoPins(){if(UP)return UP;UP={};var d=PIC.part("uno",false);Object.keys(d.pins).forEach(function(n){if(!/^(D\d+|A\d|5V|3V3|GND)$/.test(n))return;UP[n]=d.pins[n].map(function(q){return [UNO.x+q[0]*UNO.s,UNO.y+q[1]*UNO.s];});});return UP;}
+var mode="basic",store={basic:[],mcu:null,esp:null},progs={mcu:[],esp:[]},prog=[],run=null,timer=null,lastT=0,OFFY=0,UNO={x:8,y:6,s:1.55},UPS={},CH=X.CHALLENGES;
+function PRE(){return curBoard()==="esp32"?"GPIO":"D";}
+function isM(){return mode!=="basic";}
+function curBoard(){return mode==="esp"?"esp32":"uno";}
+function unoPins(){var bd=curBoard();if(UPS[bd])return UPS[bd];var u=UPS[bd]={},d=PIC.part(bd==="esp32"?"esp32":"uno",false),re=bd==="esp32"?/^(GPIO\d+|5V|3V3|GND)$/:/^(D\d+|A\d|5V|3V3|GND)$/;Object.keys(d.pins).forEach(function(n){if(!re.test(n))return;var nm=n.replace(/^GPIO/,"G");u[nm]=d.pins[n].map(function(q){return [UNO.x+q[0]*UNO.s,UNO.y+q[1]*UNO.s];});});return u;}
 var WIRECOL=["#e53935","#fb8c00","#43a047","#1e88e5","#8e24aa","#00acc1","#6d4c41","#546e7a"];
 function pos(h){
  if(/^U:/.test(h)){var a=unoPins()[h.slice(2)];return a?a[0]:[0,0];}
@@ -16,7 +19,7 @@ function cname(c){
  switch(c.type){case "battery":return X.BATT[c.value].name;case "resistor":return "Resistor "+X.fmtR(c.value);case "led":return c.color+" LED";case "switch":return "Push switch ("+(c.closed?"closed":"open")+")";case "pot":return "Potentiometer 10kΩ";case "wire":return "Jumper wire";case "ldr":return "Light sensor (LDR) · light "+Math.round(c.light*100)+"%";case "ntc":return "Thermistor 10kΩ NTC · "+Math.round(c.temp)+"°C";case "npn":return "NPN transistor (C, B, E)";case "hcsr04":return "HC-SR04 distance sensor · object at "+c.dist+" cm";case "servo":return "Servo motor";case "uno":return "Arduino Uno";}return c.type;
 }
 var LABELS={battery:["+ lead (red)","− lead (black)"],resistor:["leg 1","leg 2"],led:["anode + (long leg)","cathode − (short leg)"],switch:["terminal 1","terminal 2"],pot:["end A","wiper (middle pin)","end B"],wire:["end 1","end 2"],ldr:["leg 1","leg 2"],ntc:["leg 1","leg 2"],npn:["collector (C)","base (B)","emitter (E)"],hcsr04:["VCC","TRIG","ECHO","GND"],servo:["GND (brown)","VCC (red)","signal (orange)"]};
-function recompute(){if(run&&mode==="mcu")sim=MCU.finish(run,comps,{});else sim=X.simulate(comps);}
+function recompute(){if(run&&isM())sim=MCU.finish(run,comps,{});else sim=X.simulate(comps);}
 // ---------- drawing ----------
 function legLine(a,b,col){return "<line x1='"+a[0]+"' y1='"+(a[1]+1.4)+"' x2='"+b[0]+"' y2='"+(b[1]+1.4)+"' stroke='rgba(0,0,0,.28)' stroke-width='2.6' stroke-linecap='round'/><line x1='"+a[0]+"' y1='"+a[1]+"' x2='"+b[0]+"' y2='"+b[1]+"' stroke='"+(col||"url(#mmMetal)")+"' stroke-width='2.1' stroke-linecap='round'/><circle cx='"+a[0]+"' cy='"+a[1]+"' r='2.6' fill='#9ca3af'/>";}
 var DEFS="<defs><linearGradient id='mmBoard' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#f6f3ea'/><stop offset='1' stop-color='#d9d4c0'/></linearGradient><linearGradient id='mmMetal' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#f1f5f9'/><stop offset='.5' stop-color='#9aa3ad'/><stop offset='1' stop-color='#d8dee4'/></linearGradient><linearGradient id='mmRes' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#f3e6bd'/><stop offset='.45' stop-color='#dcc58b'/><stop offset='1' stop-color='#a98d52'/></linearGradient><linearGradient id='mmBlk' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#4b5563'/><stop offset='1' stop-color='#111827'/></linearGradient><linearGradient id='mmBlue' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#60a5fa'/><stop offset='1' stop-color='#1e3a8a'/></linearGradient><radialGradient id='mmKnob' cx='.35' cy='.3' r='.8'><stop offset='0' stop-color='#fff'/><stop offset='1' stop-color='#9ca3af'/></radialGradient><radialGradient id='mmHole' cx='.5' cy='.45' r='.6'><stop offset='0' stop-color='#111'/><stop offset='1' stop-color='#4a4a44'/></radialGradient><filter id='mmSh' x='-20%' y='-20%' width='140%' height='150%'><feDropShadow dx='0' dy='2' stdDeviation='2' flood-opacity='.35'/></filter><filter id='mmBlur'><feGaussianBlur stdDeviation='5'/></filter></defs>";
@@ -94,9 +97,9 @@ function renderBoard(){
  for(var c=1;c<=30;c++){var x=X0+(c-1)*PITCH;if(c===1||c%5===0)s+="<text x='"+x+"' y='76' font-size='8' fill='#8a846e' text-anchor='middle'>"+c+"</text>";}
  "abcdefghij".split("").forEach(function(l){s+="<text x='28' y='"+(ROWY[l]+3)+"' font-size='8.5' fill='#8a846e' text-anchor='middle'>"+l+"</text>";});
  s+="</g>";
- if(mode==="mcu"){var cs=run?1:0;s+="<g transform='translate("+UNO.x+" "+UNO.y+") scale("+UNO.s+")'>"+PIC.part("uno",false).svg+"</g>";var up=unoPins(),usedU={};comps.forEach(function(cp){cp.holes.forEach(function(h){if(/^U:/.test(h))usedU[h.slice(2)]=1;});});
+ if(isM()){var cs=run?1:0;s+="<g transform='translate("+UNO.x+" "+UNO.y+") scale("+UNO.s+")'>"+PIC.part(curBoard()==="esp32"?"esp32":"uno",false).svg+"</g>";var up=unoPins(),usedU={};comps.forEach(function(cp){cp.holes.forEach(function(h){if(/^U:/.test(h))usedU[h.slice(2)]=1;});});
   Object.keys(up).forEach(function(n){up[n].forEach(function(p){var u=usedU[n],pend=pending&&pending.holes.indexOf("U:"+n)>=0,mt=meter&&meter.holes.indexOf("U:"+n)>=0;if(u||pend||mt)s+="<circle cx='"+p[0]+"' cy='"+p[1]+"' r='4.2' fill='none' stroke='"+(mt?"#7c3aed":pend?"#fbbf24":"#34d399")+"' stroke-width='2'/>";s+="<circle cx='"+p[0]+"' cy='"+p[1]+"' r='6.2' fill='transparent' data-h='U:"+n+"' style='cursor:crosshair'/>";});});
-  if(run&&sim){var lv=[];Object.keys(run.out).forEach(function(p){lv.push("D"+p+(run.out[p]?"=HIGH":"=LOW"));});Object.keys(run.pwm).forEach(function(p){lv.push("D"+p+"~"+run.pwm[p]);});s+="<text x='"+(UNO.x+4)+"' y='"+(UNO.y+190)+"' font-size='9' fill='#86efac'>▶ running · "+(lv.join("  ")||"no outputs yet")+"</text>";}}
+  if(run&&sim){var lv=[];Object.keys(run.out).forEach(function(p){lv.push(PRE()+p+(run.out[p]?"=HIGH":"=LOW"));});Object.keys(run.pwm).forEach(function(p){lv.push(PRE()+p+"~"+run.pwm[p]);});s+="<text x='"+(UNO.x+4)+"' y='"+(OFFY-14)+"' font-size='9' fill='#86efac'>▶ running · "+(lv.join("  ")||"no outputs yet")+"</text>";}}
  // holes
  function hole(h,p){var used=oc[h]!==undefined,pend=pending&&pending.holes.indexOf(h)>=0,mt=meter&&meter.holes.indexOf(h)>=0;
   return "<rect x='"+(p[0]-3.6)+"' y='"+(p[1]-3.6)+"' width='7.2' height='7.2' rx='1.6' fill='"+(mt?"#7c3aed":pend?"#fbbf24":used?"#555":"url(#mmHole)")+"' stroke='rgba(0,0,0,.25)' stroke-width='.6'/><circle cx='"+p[0]+"' cy='"+p[1]+"' r='8.2' fill='transparent' data-h='"+h+"' style='cursor:crosshair'/>";}
@@ -110,7 +113,7 @@ function renderBoard(){
 function render(){renderBoard();renderRead();renderSel();}
 function renderRead(){
  var el=$("bbRead"),h="";
- if(!sim||!comps.filter(function(c){return c.type!=="uno";}).length){el.innerHTML="<div class='note'>"+(mode==="mcu"?"Plug parts into the breadboard, then use jumper wires to reach the Arduino pins (tap a pin on the board, then a breadboard hole).":"Add a battery and a few parts. The circuit is simulated live.")+"</div>";return;}
+ if(!sim||!comps.filter(function(c){return c.type!=="uno";}).length){el.innerHTML="<div class='note'>"+(isM()?"Plug parts into the breadboard, then use jumper wires to reach the Arduino pins (tap a pin on the board, then a breadboard hole).":"Add a battery and a few parts. The circuit is simulated live.")+"</div>";return;}
  if(sim.noBattery)h+="<div class='vwarn'>⚠ No battery yet: nothing can flow.</div>";
  if(sim.notes&&sim.notes.length)h+="<div class='vwarn'>⚠ "+sim.notes.filter(function(x,i,a){return a.indexOf(x)===i;}).join("; ")+"</div>";
  if(sim.short)h+="<div class='verr'>✖ SHORT CIRCUIT: the battery is delivering far too much current and would overheat. Check for a wire joining + to − with nothing in between.</div>";
@@ -216,15 +219,16 @@ try{var sc=JSON.parse(localStorage.getItem(LSC)||"null");if(sc)Core.setSensor(X.
 function unlock(id){try{Core.st.unlocked[id]=true;try{localStorage.setItem(LSU,JSON.stringify(Core.st.unlocked));}catch(e){}window.dispatchEvent(new Event("mm-unlock"));}catch(e){}}
 try{var su=JSON.parse(localStorage.getItem(LSU)||"{}");Object.keys(su).forEach(function(k){Core.st.unlocked[k]=true;done[k]=true;});}catch(e){}
 var milaN={};
-$("bbMilaBtn").onclick=function(){if(mode==="mcu"){var c0=CH[chIdx],el0=$("bbMila");el0.style.display="block";el0.style.cssText+=";background:#0f172a;border-left:3px solid #38bdf8;border-radius:8px;padding:8px;margin-top:6px;font-size:13px";el0.innerHTML="<b>Mila</b>: "+c0.hint;return;}var c=CH[chIdx],n=milaN[c.id]||0,m=$("bbMsg").className==="bad"?$("bbMsg").textContent:"",out=Mila.circuitHelp(c,m,n);milaN[c.id]=n+1;var el=$("bbMila");el.style.display="block";el.style.cssText+=";background:#0f172a;border-left:3px solid #38bdf8;border-radius:8px;padding:8px;margin-top:6px;font-size:13px";el.innerHTML="<b>Mila</b> (hint "+Math.min(n+1,3)+" of 3)<br>"+out.map(function(x){return String(x).replace(/</g,"&lt;");}).join("<br>");};
+$("bbMilaBtn").onclick=function(){if(isM()){var c0=CH[chIdx],el0=$("bbMila");el0.style.display="block";el0.style.cssText+=";background:#0f172a;border-left:3px solid #38bdf8;border-radius:8px;padding:8px;margin-top:6px;font-size:13px";el0.innerHTML="<b>Mila</b>: "+c0.hint;return;}var c=CH[chIdx],n=milaN[c.id]||0,m=$("bbMsg").className==="bad"?$("bbMsg").textContent:"",out=Mila.circuitHelp(c,m,n);milaN[c.id]=n+1;var el=$("bbMila");el.style.display="block";el.style.cssText+=";background:#0f172a;border-left:3px solid #38bdf8;border-radius:8px;padding:8px;margin-top:6px;font-size:13px";el.innerHTML="<b>Mila</b> (hint "+Math.min(n+1,3)+" of 3)<br>"+out.map(function(x){return String(x).replace(/</g,"&lt;");}).join("<br>");};
 function saveMcu(c,stars){try{var all=JSON.parse(localStorage.getItem("mm_lab")||"{}"),id=c.id,p=all[id];if(!p||stars>p.stars){all[id]={name:"Arduino: "+c.name.replace(/^\d+\s*/,""),tier:c.tier,stars:stars,at:Date.now()};localStorage.setItem("mm_lab",JSON.stringify(all));}}catch(e){}}
 $("bbCheck").onclick=function(){
- var r=mode==="mcu"?CH[chIdx].check(comps,prog):CH[chIdx].check(comps),m=$("bbMsg");
- if(r===true&&mode==="mcu"){var c=CH[chIdx],n=MCU.progSize(prog),st=1+(sim&&sim.notes&&sim.notes.length?0:1)+(n<=c.par?1:0);done[c.id]=true;saveMcu(c,st);m.textContent="★".repeat(st)+" Challenge complete! "+(st<3?"For 3 stars use a safe circuit and at most "+c.par+" block"+(c.par>1?"s":"")+" ("+n+" used).":"Saved to your Passport.");m.className="ok";renderCh();return;}
+ var m=$("bbMsg");
+ if(isM()){var c=CH[chIdx],e=MCU.evaluate(window.LabMcu.getDesign());if(e.ok){done[c.id]=true;saveMcu(c,e.stars);m.textContent=e.t+" Saved to your Passport.";m.className="ok";renderCh();}else{m.textContent=e.t;m.className="bad";}return;}
+ var r=CH[chIdx].check(comps);
  if(r===true){done[CH[chIdx].id]=true;unlock(CH[chIdx].id);if(CH[chIdx].id==="ldr")saveSensor(comps);m.textContent="★ Challenge complete! "+(chIdx<CH.length-1?"Try the next one.":"You finished all circuit challenges.");m.className="ok";renderCh();}
  else{m.textContent=r;m.className="bad";}
 };
-$("bbClear").onclick=function(){comps=mode==="mcu"?[UNOC]:[];selected=null;pending=null;meter=null;mreading="";setPrompt("");update();$("bbMsg").textContent="";};
+$("bbClear").onclick=function(){comps=isM()?[mode==="esp"?ESPC:UNOC]:[];selected=null;pending=null;meter=null;mreading="";setPrompt("");update();$("bbMsg").textContent="";};
 $("bbRevive").onclick=function(){comps.forEach(function(c){c.burned=false;});update();};
 // Ohm's law helper
 function calc(){
@@ -235,29 +239,34 @@ function calc(){
 }
 ["calcV","calcL","calcI"].forEach(function(id){$(id).oninput=calc;$(id).onchange=calc;});
 // ---------- Arduino mode ----------
-var UNOC={id:9999,type:"uno",holes:[]};
+var UNOC={id:9999,type:"uno",holes:[],board:"uno"},ESPC={id:9999,type:"uno",holes:[],board:"esp32"};
 function stopRun(){if(timer){clearInterval(timer);timer=null;}run=null;$("mcuRun").className="p";recompute();render();}
 function startRun(){if(timer)clearInterval(timer);run=MCU.Run();lastT=performance.now();$("mcuRun").className="";timer=setInterval(function(){if(!run)return;var now=performance.now(),n=Math.min(8,Math.floor((now-lastT)/MCU.TICK));if(n<1)return;lastT+=n*MCU.TICK;for(var i=0;i<n;i++)sim=MCU.tick(run,comps,prog,{});renderBoard();renderRead();},40);}
-function setMode(m){if(m===mode)return;stopRun();store[mode]=comps;if(m==="mcu"&&!store.mcu)store.mcu=[UNOC];mode=m;comps=store[m];selected=null;pending=null;meter=null;mreading="";setPrompt("");
- OFFY=m==="mcu"?232:0;CH=m==="mcu"?MCU.CHALLENGES:X.CHALLENGES;chIdx=0;$("bbMsg").textContent="";$("bbMila").style.display="none";
+var DEFP={uno:{out:13,out2:8,pwm:9,sv:6,din:2,ana:0,anaN:300,tp:9,ep:10,d:20},esp32:{out:4,out2:18,pwm:18,sv:13,din:5,ana:34,anaN:1500,tp:18,ep:19,d:20}};
+var PINS=[],PINI=[],PWM=[],AN=[],ANN=[],PWMV=[];
+function setBoardLists(){var bd=curBoard(),B=MCU.BOARDS[bd],pf=bd==="esp32"?"GPIO":"D";PINS=B.out.map(function(p){return [p,pf+p];});PINI=B.inp.map(function(p){return [p,pf+p];});PWM=B.pwm.map(function(p){return [p,pf+p+"~"];});
+ AN=B.adc.map(function(a){return [a,(bd==="esp32"?"GPIO":"A")+a];});ANN=bd==="esp32"?[300,600,1000,1500,2000,2500,3000]:[50,100,200,300,400,500,600,800];
+ PWMV=[[0,"0"],[64,"64"],[128,"128"],[192,"192"],[255,"255"]].concat(B.adc.map(function(a){return [(bd==="esp32"?"G":"A")+a,(bd==="esp32"?"GPIO":"A")+a+" ÷ "+B.div];}));}
+function setMode(m,force){if(m===mode&&!force)return;stopRun();if(isM())progs[mode]=prog;store[mode]=comps;if(m==="mcu"&&!store.mcu)store.mcu=[UNOC];if(m==="esp"&&!store.esp)store.esp=[ESPC];mode=m;comps=store[m];selected=null;pending=null;meter=null;mreading="";setPrompt("");
+ prog=isM()?progs[m]:[];setBoardLists();
+ OFFY=m==="mcu"?232:m==="esp"?150:0;CH=isM()?MCU.CHALLENGES.filter(function(c){return c.board===curBoard();}):X.CHALLENGES;chIdx=0;$("bbMsg").textContent="";$("bbMila").style.display="none";
  [].forEach.call(document.querySelectorAll("#mcuMode button"),function(x){x.className=x.dataset.mode===m?"on":"";});
- $("mcuPanel").style.display=m==="mcu"?"block":"none";$("bbViews").style.display=m==="mcu"?"none":"";
- [].forEach.call($("bbTray").children,function(d){d.style.display=(d.dataset.mode&&d.dataset.mode!==m)?"none":"";});
- if(m==="mcu"){var pv=document.querySelector("#bbViews [data-m=place]");if(pv)pv.click();$("bbCalcWrap")&&($("bbCalcWrap").style.display="none");}
+ $("mcuPanel").style.display=isM()?"block":"none";$("bbViews").style.display=isM()?"none":"";
+ [].forEach.call($("bbTray").children,function(d){d.style.display=(d.dataset.mode&&(d.dataset.mode==="basic"?isM():!isM()))?"none":"";});
+ if(isM()){var pv=document.querySelector("#bbViews [data-m=flat]");if(pv)pv.click();$("bbBoard").style.display="block";$("bb3d").style.display="none";}else{$("bbBoard").style.display="none";$("bb3d").style.display="block";var pl=document.querySelector("#bbViews [data-m=place]");if(pl)pl.click();}
  renderCh();renderProg();update();}
 [].forEach.call(document.querySelectorAll("#mcuMode button"),function(x){x.onclick=function(){setMode(x.dataset.mode);};});
 $("mcuRun").onclick=function(){if(!prog.length){$("bbMsg").textContent="Add some blocks to your program first.";$("bbMsg").className="bad";return;}startRun();};
 $("mcuStop").onclick=stopRun;
 function osel(opts,val,fn){var s=document.createElement("select");s.className="sm";opts.forEach(function(o){var a=Array.isArray(o)?o:[o,o],op=document.createElement("option");op.value=a[0];op.textContent=a[1];if(String(a[0])===String(val))op.selected=true;s.appendChild(op);});s.onchange=function(){fn(s.value);};return s;}
 function span(t){var e=document.createElement("span");e.textContent=t;e.style.margin="0 4px";return e;}
-var PINS=MCU.DPINS.map(function(p){return [p,"D"+p];}),PWM=MCU.PWMP.map(function(p){return [p,"D"+p+"~"];}),AN=[0,1,2,3,4,5].map(function(a){return [a,"A"+a];});
 function actUI(a,set,wrap){var w=document.createElement("span"),kind=a?a.t:"none";
- w.appendChild(osel([["none","do nothing"],["w","set pin"],["pwm","PWM pin"],["sv","servo pin"]],kind,function(v){set(v==="none"?null:v==="w"?{t:"w",p:13,v:1}:v==="pwm"?{t:"pwm",p:9,v:128}:{t:"sv",p:6,a:90});wrap();}));
+ w.appendChild(osel([["none","do nothing"],["w","set pin"],["pwm","PWM pin"],["sv","servo pin"]],kind,function(v){var D=DEFP[curBoard()];set(v==="none"?null:v==="w"?{t:"w",p:D.out,v:1}:v==="pwm"?{t:"pwm",p:D.pwm,v:128}:{t:"sv",p:D.sv,a:90});wrap();}));
  if(a&&a.t==="w"){w.appendChild(osel(PINS,a.p,function(v){a.p=+v;wrap(1);}));w.appendChild(span("="));w.appendChild(osel([[1,"HIGH"],[0,"LOW"]],a.v,function(v){a.v=+v;wrap(1);}));}
- if(a&&a.t==="pwm"){w.appendChild(osel(PWM,a.p,function(v){a.p=+v;wrap(1);}));w.appendChild(span("="));w.appendChild(osel([[0,"0"],[64,"64"],[128,"128"],[192,"192"],[255,"255"]].concat(AN.map(function(x){return ["A"+x[0],"A"+x[0]+" ÷ 4"];})),a.v,function(v){a.v=/^A/.test(v)?v:+v;wrap(1);}));}
+ if(a&&a.t==="pwm"){w.appendChild(osel(PWM,a.p,function(v){a.p=+v;wrap(1);}));w.appendChild(span("="));w.appendChild(osel(PWMV,a.v,function(v){a.v=/^[AG]/.test(v)?v:+v;wrap(1);}));}
  if(a&&a.t==="sv"){w.appendChild(osel(PINS,a.p,function(v){a.p=+v;wrap(1);}));w.appendChild(span("angle"));w.appendChild(osel([0,45,90,135,180],a.a,function(v){a.a=+v;wrap(1);}));}
  return w;}
-function changed(){if(run){run.pc=0;run.wait=0;}$("mcuCode").textContent=MCU.toCpp(prog);}
+function changed(){if(run){run.pc=0;run.wait=0;}$("mcuCode").textContent=MCU.toCpp(prog,curBoard());}
 function renderProg(){var host=$("mcuProg");host.innerHTML="";
  if(!prog.length){host.innerHTML="<div class='note'>Empty. Add blocks below: the program repeats forever, like <code>loop()</code> in Arduino.</div>";}
  prog.forEach(function(bk,i){var row=document.createElement("div");row.className="mb";var head=document.createElement("div");
@@ -266,19 +275,21 @@ function renderProg(){var host=$("mcuProg");host.innerHTML="";
   else if(bk.t==="d"){head.appendChild(span("Wait"));head.appendChild(osel([100,200,250,500,1000,2000,3000],bk.ms,function(v){bk.ms=+v;changed();}));head.appendChild(span("ms"));}
   else if(bk.t==="pwm"||bk.t==="sv"){head.appendChild(actUI(bk,function(){},function(){changed();}));}
   else if(bk.t==="if"){var c=bk.c;head.appendChild(span("If"));
-   head.appendChild(osel([["dig","digital pin"],["ana","analog pin"],["dist","distance sensor"]],c.k,function(v){bk.c=v==="dig"?{k:"dig",p:2,is:1}:v==="ana"?{k:"ana",a:0,op:"<",n:300}:{k:"dist",tp:9,ep:10,op:"<",n:20};rer();}));
-   if(c.k==="dig"){head.appendChild(osel(PINS,c.p,function(v){c.p=+v;changed();}));head.appendChild(span("is"));head.appendChild(osel([[1,"HIGH"],[0,"LOW"]],c.is,function(v){c.is=+v;changed();}));}
-   if(c.k==="ana"){head.appendChild(osel(AN,c.a,function(v){c.a=+v;changed();}));head.appendChild(osel(["<",">"],c.op,function(v){c.op=v;changed();}));head.appendChild(osel([50,100,200,300,400,500,600,800],c.n,function(v){c.n=+v;changed();}));}
-   if(c.k==="dist"){head.appendChild(span("trig"));head.appendChild(osel(PINS,c.tp,function(v){c.tp=+v;changed();}));head.appendChild(span("echo"));head.appendChild(osel(PINS,c.ep,function(v){c.ep=+v;changed();}));head.appendChild(osel(["<",">"],c.op,function(v){c.op=v;changed();}));head.appendChild(osel([5,10,15,20,30,50,100],c.n,function(v){c.n=+v;changed();}));head.appendChild(span("cm"));}
+   head.appendChild(osel([["dig","digital pin"],["ana","analog pin"],["dist","distance sensor"]],c.k,function(v){var D=DEFP[curBoard()];bk.c=v==="dig"?{k:"dig",p:D.din,is:1}:v==="ana"?{k:"ana",a:D.ana,op:"<",n:D.anaN}:{k:"dist",tp:D.tp,ep:D.ep,op:"<",n:20};rer();}));
+   if(c.k==="dig"){head.appendChild(osel(PINI,c.p,function(v){c.p=+v;changed();}));head.appendChild(span("is"));head.appendChild(osel([[1,"HIGH"],[0,"LOW"]],c.is,function(v){c.is=+v;changed();}));}
+   if(c.k==="ana"){head.appendChild(osel(AN,c.a,function(v){c.a=+v;changed();}));head.appendChild(osel(["<",">"],c.op,function(v){c.op=v;changed();}));head.appendChild(osel(ANN,c.n,function(v){c.n=+v;changed();}));}
+   if(c.k==="dist"){head.appendChild(span("trig"));head.appendChild(osel(PINS,c.tp,function(v){c.tp=+v;changed();}));head.appendChild(span("echo"));head.appendChild(osel(PINI,c.ep,function(v){c.ep=+v;changed();}));head.appendChild(osel(["<",">"],c.op,function(v){c.op=v;changed();}));head.appendChild(osel([5,10,15,20,30,50,100],c.n,function(v){c.n=+v;changed();}));head.appendChild(span("cm"));}
   }
   row.appendChild(head);
   if(bk.t==="if"){var t1=document.createElement("div");t1.className="mbi";t1.appendChild(span("then"));t1.appendChild(actUI(bk.th,function(a){bk.th=a;},function(k){rer(k);}));row.appendChild(t1);var t2=document.createElement("div");t2.className="mbi";t2.appendChild(span("else"));t2.appendChild(actUI(bk.el,function(a){bk.el=a;},function(k){rer(k);}));row.appendChild(t2);}
   var ctl=document.createElement("div");ctl.className="mbc";[["↑",function(){if(i>0){var t=prog[i-1];prog[i-1]=prog[i];prog[i]=t;rer();}}],["↓",function(){if(i<prog.length-1){var t=prog[i+1];prog[i+1]=prog[i];prog[i]=t;rer();}}],["✕",function(){prog.splice(i,1);rer();}]].forEach(function(q){var bt=document.createElement("button");bt.textContent=q[0];bt.onclick=q[1];ctl.appendChild(bt);});row.appendChild(ctl);host.appendChild(row);});
- $("mcuCode").textContent=MCU.toCpp(prog);}
+ $("mcuCode").textContent=MCU.toCpp(prog,curBoard());}
 var ADD=[["w","Set pin HIGH/LOW"],["d","Wait"],["pwm","PWM write"],["sv","Servo angle"],["ifd","If digital pin"],["ifa","If analog pin"],["ifx","If distance sensor"]];
 $("mcuAdd").innerHTML=ADD.map(function(a){return "<option value='"+a[0]+"'>"+a[1]+"</option>";}).join("");
-$("mcuAddBtn").onclick=function(){var k=$("mcuAdd").value,bk=k==="w"?{t:"w",p:13,v:1}:k==="d"?{t:"d",ms:500}:k==="pwm"?{t:"pwm",p:9,v:128}:k==="sv"?{t:"sv",p:6,a:90}:k==="ifd"?{t:"if",c:{k:"dig",p:2,is:1},th:{t:"w",p:8,v:1},el:{t:"w",p:8,v:0}}:k==="ifa"?{t:"if",c:{k:"ana",a:0,op:"<",n:300},th:{t:"w",p:9,v:1},el:{t:"w",p:9,v:0}}:{t:"if",c:{k:"dist",tp:9,ep:10,op:"<",n:20},th:{t:"w",p:8,v:1},el:{t:"w",p:8,v:0}};prog.push(bk);renderProg();changed();};
-$("mcuClearProg").onclick=function(){prog=[];renderProg();changed();};
-window.MM_mcu={setMode:setMode,prog:function(){return prog;},setProg:function(p){prog=p;renderProg();changed();},comps:function(){return comps;},setComps:function(c){comps=c;update();},run:function(){return startRun();},stop:stopRun};
+$("mcuAddBtn").onclick=function(){var D=DEFP[curBoard()],k=$("mcuAdd").value,th={t:"w",p:D.out2,v:1},el={t:"w",p:D.out2,v:0},bk=k==="w"?{t:"w",p:D.out,v:1}:k==="d"?{t:"d",ms:500}:k==="pwm"?{t:"pwm",p:D.pwm,v:128}:k==="sv"?{t:"sv",p:D.sv,a:90}:k==="ifd"?{t:"if",c:{k:"dig",p:D.din,is:1},th:th,el:el}:k==="ifa"?{t:"if",c:{k:"ana",a:D.ana,op:"<",n:D.anaN},th:th,el:el}:{t:"if",c:{k:"dist",tp:D.tp,ep:D.ep,op:"<",n:20},th:th,el:el};prog.push(bk);renderProg();changed();};
+$("mcuClearProg").onclick=function(){prog.length=0;renderProg();changed();};
+window.LabMcu={setChallenge:function(id,lock){var c=MCU.CHALLENGES.filter(function(x){return x.id===id;})[0];if(!c)return;setMode(c.board==="esp32"?"esp":"mcu",true);for(var i=0;i<CH.length;i++)if(CH[i].id===id)chIdx=i;renderCh();$("bblab").querySelector("details")&&0;if(lock)document.body.classList.add("lockmcu");},
+ getDesign:function(){var c=CH[chIdx];return {ch:c.id,board:curBoard(),comps:comps.map(function(q){var o={id:q.id,type:q.type,holes:q.holes.slice()};["value","color","closed","pos","light","temp","dist","board"].forEach(function(k){if(q[k]!==undefined)o[k]=q[k];});return o;}),prog:JSON.parse(JSON.stringify(prog))};}};
+window.MM_mcu={setMode:setMode,prog:function(){return prog;},setProg:function(p){prog=p;progs[mode]=p;renderProg();changed();},comps:function(){return comps;},setComps:function(c){comps=c;update();},run:function(){return startRun();},stop:stopRun};
 renderCh();calc();update();
 })();

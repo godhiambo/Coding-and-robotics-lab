@@ -5,7 +5,7 @@ var RES=[100,220,330,470,1000,2200,4700,10000];
 var BATT={3:{r:1.0,name:"2×AA 3V"},5:{r:0.3,name:"USB 5V"},9:{r:2.0,name:"9V block"}};
 var BETA=100,RDQ=10,RD=8,ILED_MAX=0.030,RATED_W=0.5,IBAT_SHORT=1.0,POT_TOTAL=10000;
 var ROWS="abcdefghij";
-var UPINS=["D0","D1","D2","D3","D4","D5","D6","D7","D8","D9","D10","D11","D12","D13","A0","A1","A2","A3","A4","A5","5V","3V3","GND"];
+var UPINS=["D0","D1","D2","D3","D4","D5","D6","D7","D8","D9","D10","D11","D12","D13","A0","A1","A2","A3","A4","A5","5V","3V3","GND","G2","G4","G5","G12","G13","G14","G15","G16","G17","G18","G19","G21","G22","G23","G25","G26","G27","G32","G33","G34","G35","G36","G39"];
 function holeNode(h){
  if(/^U:/.test(h))return UPINS.indexOf(h.slice(2))>=0?h:null;
  var m=/^(tp|tn|bp|bn)(\d+)$/.exec(h);if(m)return m[1];
@@ -64,6 +64,7 @@ function simulate(comps,over){
   else if(c.type==="battery"){elems.push({k:"B",c:c,a:nodeOf(c.holes[0]),b:nodeOf(c.holes[1]),v:c.value,r:BATT[c.value].r});}
  });
  if(uno){var mo=(over.mcu&&over.mcu.out)||{};elems.push({k:"B",c:{id:"u5",type:"upin"},a:nodeOf("U:5V"),b:gnd,v:5,r:0.3});elems.push({k:"B",c:{id:"u33",type:"upin"},a:nodeOf("U:3V3"),b:gnd,v:3.3,r:0.5});
+  (over.src||[]).forEach(function(q,qi){elems.push({k:"B",c:{id:"usrc"+qi,type:"upin"},a:nodeOf(q.hole),b:gnd,v:q.v,r:q.r||50});});
   Object.keys(mo).forEach(function(p){elems.push({k:"B",c:{id:"up"+p,type:"upin"},a:nodeOf("U:"+p),b:gnd,v:mo[p],r:25,pin:p});});}
  function idxOf(n){return n===gnd?-1:idx[n];}
  var diodes=elems.filter(function(e){return e.k==="D";}),trans=elems.filter(function(e){return e.k==="Q";});
