@@ -7,7 +7,7 @@ var ARENA=3.0;
 function arenaObstacles(){return [{x:1.05,y:1.0,w:0.3,h:0.3},{x:1.9,y:1.9,w:0.35,h:0.25},{x:0.4,y:2.0,w:0.25,h:0.6},{x:2.3,y:0.5,w:0.25,h:0.25},{x:1.2,y:2.55,w:0.9,h:0.12}];}
 function Sim(opt){
   opt=opt||{};
-  this.t=0;this.x=0.35;this.y=0.35;this.th=0.3;this.vL=0;this.vR=0;
+  this.t=0;this.x=0.4;this.y=0.4;this.th=0.785;this.vL=0;this.vR=0;
   this.cmdL=0;this.cmdR=0;this.servo=90;this.led=false;this.buzz=false;
   this.tired=!!opt.tired;this.weak=!!opt.weak;this.obs=opt.obstacles||arenaObstacles();
   this.volt=this.v0();this.amps=0;this.resetT=0;this.resets=0;this.stalled=false;

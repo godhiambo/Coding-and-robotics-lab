@@ -138,7 +138,7 @@ function attach3d(){
  var box=$("rv3d");if(!box)return;
  if(T.fail){box.innerHTML="<div class='sub' style='padding:30px;text-align:center'>"+X("3D is not available on this device. Follow the written steps.","3D haipatikani kwenye kifaa hiki. Fuata hatua zilizoandikwa.")+"</div>";return;}
  if(!T.sc){init3d(box);if(T.fail){attach3d();return;}}else{box.appendChild(T.r.domElement);resize3d();}
- T.cur=step;T.parts.forEach(function(p){if(p.name==="uno")p.m.material.color.setHex(ESP()?0x111827:0x1d6fb8);});
+ T.cur=step;box.style.display=step===10?"none":"";T.parts.forEach(function(p){if(p.name==="uno")p.m.material.color.setHex(ESP()?0x111827:0x1d6fb8);});
 }
 function init3d(box){
  var r;try{r=new THREE.WebGLRenderer({antialias:true});}catch(e){T.fail=true;return;}
@@ -189,7 +189,7 @@ function resize3d(){if(!T.ok)return;var box=$("rv3d"),w=box.clientWidth||320,h=M
 function tick3d(){
  if(!T.ok)return;
  var v=$("rover")&&$("rover").classList.contains("on");
- if(v&&!document.hidden){
+ if(v&&!document.hidden&&T.cur!==10){
   if(!T.drag)T.yaw+=0.004;
   T.cam.position.set(Math.cos(T.yaw)*Math.cos(T.pitch)*T.dist,Math.sin(T.pitch)*T.dist,Math.sin(T.yaw)*Math.cos(T.pitch)*T.dist);
   T.cam.lookAt(0,4,0);
@@ -262,14 +262,13 @@ function render(){
  var h="<div class='rvbar'><button id='rvBack'>&larr; "+X("Build","Jenga")+"</button><div class='seg'><button data-bd='uno' class='"+(board==="uno"?"p":"")+"'>Arduino Uno</button><button data-bd='esp' class='"+(board==="esp"?"p":"")+"'>ESP32</button></div><div class='seg'><button data-lg='en' class='"+(lang==="en"?"p":"")+"'>EN</button><button data-lg='sw' class='"+(lang==="sw"?"p":"")+"'>Kiswahili</button></div></div>";
  h+="<div class='rvstrip'>"+S.map(function(x,i){return "<button data-st='"+(i+1)+"' class='"+(i+1===step?"on":"")+"'><b>"+(i+1<10?"0":"")+(i+1)+"</b><span>"+esc(short(i))+"</span></button>";}).join("")+"</div>";
  h+="<div id='rv3d' class='rv3d'></div>";
- h+="<div class='card rvcard'><div class='rvk'>"+X("BUILD","JENGA")+" &middot; "+X("STEP","HATUA")+" "+step+" "+X("OF","KATI YA")+" 10</div><h2>"+esc(s.t)+"</h2><p class='rvwhy'>"+esc(s.why)+"</p>";
+ h+="<div class='card rvcard'><div class='rvk'>"+X("BUILD","JENGA")+" &middot; "+X("STEP","HATUA")+" "+step+" "+X("OF","KATI YA")+" 10</div><h2>"+esc(s.t)+"</h2>"+(s.sim?simHTML():"")+"<p class='rvwhy'>"+esc(s.why)+"</p>";
  if(s.need.length){h+="<div class='rvk'>"+X("YOU WILL NEED","UTAHITAJI")+"</div><ul class='rvneed'>"+s.need.map(function(n){return "<li><b>"+n[0]+"&times;</b> "+esc(n[1])+"</li>";}).join("")+"</ul>";}
  if(s.k==="parts"){h+=partsTable();}
  var done=0;s.todo.forEach(function(_,j){if(checks[stepKey(step,j)])done++;});
  h+="<div class='rvk'>"+X("DO THIS","FANYA HIVI")+" &middot; "+done+" / "+s.todo.length+"</div><div class='rvdo'>"+s.todo.map(function(t,j){return "<label><input type='checkbox' data-ck='"+stepKey(step,j)+"'"+(checks[stepKey(step,j)]?" checked":"")+"><span>"+esc(t)+"</span></label>";}).join("")+"</div>";
  if(s.pins){h+="<div class='rvk'>"+X("PIN MAP","RAMANI YA PINI")+" &middot; "+(ESP()?"ESP32":"Arduino Uno")+"</div><table class='rvtbl'>"+pinRows().map(function(r){return "<tr><td>"+esc(r[0])+"</td><td><b>"+esc(r[1])+"</b></td></tr>";}).join("")+"</table>";}
  if(s.code){h+="<div class='seg' style='margin-top:10px'><button data-sk='test' class='"+(skSel==="test"?"p":"")+"'>1 &middot; "+X("Wiring test","Jaribio la nyaya")+"</button><button data-sk='avoid' class='"+(skSel==="avoid"?"p":"")+"'>2 &middot; "+X("Obstacle avoider","Kiepusha vikwazo")+"</button></div><pre class='rvcode' id='rvCode'></pre><div class='row2'><button id='rvCopy'>"+X("Copy code","Nakili msimbo")+"</button><button id='rvDl'>"+X("Download .ino","Pakua .ino")+"</button></div><div class='rvk' style='margin-top:12px'>"+X("IF SOMETHING IS WRONG","IKIWA KUNA TATIZO")+"</div>"+fixes().map(function(f){return "<details class='rvfix'><summary>"+esc(f[0])+"</summary><p>"+esc(f[1])+"</p></details>";}).join("");}
- if(s.sim){h+=simHTML();}
  h+="<div class='rvk' style='margin-top:12px'>"+X("NOTE","KUMBUKA")+"</div><p class='rvnote'>"+esc(s.note)+"</p>";
  h+="<div class='rvnav'><button id='rvPrev'"+(step===1?" disabled":"")+">&larr; "+X("Back","Rudi")+"</button><button class='p' id='rvNext'>"+(step===10?X("Start over","Anza upya"):X("Next","Endelea")+" &rarr;")+"</button></div></div>";
  h+="<div class='sub' style='text-align:center;margin:6px 0'>"+X("Build progress","Maendeleo ya ujenzi")+": "+pct()+"%</div>";
