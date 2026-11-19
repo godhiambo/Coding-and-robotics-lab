@@ -366,6 +366,60 @@ register({id:"autodoor",name:"48 Automatic Door",floor:"workshop",station:true,d
  info:function(S){return [["Door",Math.round(S.gate)+"%"],["People through",S.passed+" / 4"],["Open, nobody near",Math.round(S.wasted)+" s"]];}});
 function ad8(S){if(S.passed<4)return {win:false,msg:S.passed+" of 4 people got through. The door must open for everyone."};return {win:true,msg:"★ All 4 people walked through safely! Door opened "+S.opens+" time"+(S.opens===1?"":"s")+", wasted only "+Math.round(S.wasted)+" s open."};}
 
+// ============================ 49: parking assistant ============================
+register({id:"parking",name:"49 Parking Assistant",floor:"workshop",station:true,dur:12,start:{x:150,y:100,a:0},
+ mission:"A car is <b>reversing</b> towards a wall. Build the <b>parking assistant</b>: <b>beep</b> when the wall is closer than <b>80 cm</b>, and turn the LED <b>RED</b> when it is closer than <b>30 cm</b> (green before that). Never beep when the wall is far away.",
+ hint:"Hint: Forever → If distance &lt; 30 then Red LED, else Green LED. Then If distance &lt; 80 then Beep.",
+ kit:["uno","bank","us","buzzer","led"],
+ actions:[{id:"beep",label:"Beep",need:"buzzer"},{id:"led_red",label:"LED RED",need:"led"},{id:"led_green",label:"LED GREEN",need:"led"}],
+ sensors:[{id:"wall_dist",label:"Wall distance less than",unit:"cm",type:"num",need:["us","irobs","sharp"]}],
+ init:function(S){S.t=0;S.d=210;S.led="off";S.zone=0;S.far=0;S.close=0;S.redT=0;S.bad=null;},
+ step:function(S,dt){S.t+=dt;if(S.d>16)S.d=Math.max(16,S.d-(S.d>60?30:18)*dt);if(S.d<30){S.close+=dt;if(S.led==="red")S.redT+=dt;}},
+ act:function*(S,id){if(id==="beep"){if(S.d>110)S.far++;else if(S.d<80)S.zone++;yield* api.wait(0.3);return;}if(id==="led_red"){S.led="red";}else if(id==="led_green"){S.led="green";}yield* api.wait(0.1);},
+ sense:function(S,id){return Math.round(S.d+noise(1.5));},
+ check:function(S){if(S.far>=2)return {win:false,msg:"The assistant beeped while the wall was still far away. Beep only under 80 cm."};if(S.t>=this.dur)return pk9(S);return null;},end:function(S){return S.t>=this.dur-1?pk9(S):{win:false,msg:"Program ended early. Use Forever so it watches the whole reverse."};},
+ info:function(S){return [["Wall",Math.round(S.d)+" cm"],["LED",S.led.toUpperCase()],["Warning beeps",S.zone]];}});
+function pk9(S){if(S.zone<3)return {win:false,msg:"Only "+S.zone+" warning beep"+(S.zone===1?"":"s")+" in the danger zone. Beep repeatedly while closer than 80 cm."};
+ if(S.close<=0||S.redT/S.close<0.7)return {win:false,msg:"The LED must be RED when the wall is closer than 30 cm."};return {win:true,msg:"★ Safe parking! "+S.zone+" warnings and a red light at the end."};}
+
+// ============================ 50: pedestrian crossing ============================
+register({id:"pedcross",name:"50 Pedestrian Crossing",floor:"workshop",station:true,dur:75,start:{x:150,y:100,a:0},
+ mission:"Make a <b>smart pedestrian crossing</b>. When the <b>button</b> is pressed: stop the cars (<b>red</b>), turn on the <b>WALK</b> signal for about 6 s, then turn it off and let cars <b>go</b> again. Never show WALK while cars can move, and no pedestrian may wait more than <b>25 s</b>.",
+ hint:"Hint: Forever → If button pressed then Cars red, Walk on, Wait 6, Walk off, Cars green.",
+ kit:["uno","bank","led","buzzer"],
+ actions:[{id:"cars_red",label:"Cars: RED",need:"led"},{id:"cars_green",label:"Cars: GREEN",need:"led"},{id:"walk_on",label:"Walk signal ON",need:"led"},{id:"walk_off",label:"Walk signal OFF",need:"led"},{id:"beep",label:"Crossing beep",need:"buzzer"}],
+ sensors:[{id:"button",label:"Crossing button pressed",type:"bool"}],
+ init:function(S){S.t=0;S.car="green";S.walk=false;S.bad=null;S.cars=0;S.pd=[];var t=R(5,9);for(var i=0;i<3;i++){S.pd.push({s:t,st:"idle",w:0,pr:0});t+=R(16,20);}S.done=0;},
+ step:function(S,dt){S.t+=dt;if(S.car==="green")S.cars+=dt*0.2;var cross=false;
+  S.pd.forEach(function(p,i){if(p.st==="idle"&&S.t>=p.s)p.st="wait";
+   if(p.st==="wait"){p.w+=dt;if(p.w>25&&!S.bad)S.bad="Pedestrian "+(i+1)+" waited more than 25 s. Respond to the button.";if(S.walk&&S.car==="red"){p.st="go";}}
+   if(p.st==="go"){cross=true;p.pr+=dt/5;if(S.car==="green"&&!S.bad)S.bad="Cars were released while pedestrian "+(i+1)+" was still crossing!";if(p.pr>=1){p.st="done";S.done++;}}});
+  S.cross=cross;},
+ act:function*(S,id){if(id==="cars_red"){if(S.car!=="red"){yield* api.wait(1.5);S.car="red";}return;}if(id==="cars_green"){S.car="green";yield* api.wait(0.1);return;}
+  if(id==="walk_on"){if(S.car!=="red"&&!S.bad)S.bad="WALK was shown while cars could still move. Turn the cars red first.";S.walk=true;yield* api.wait(0.1);return;}if(id==="walk_off"){S.walk=false;yield* api.wait(0.1);return;}yield* api.wait(0.2);},
+ sense:function(S,id){return S.pd.some(function(p){return p.st==="wait";});},
+ check:function(S){if(S.bad)return {win:false,msg:S.bad};if(S.done>=3&&S.car==="green"&&!S.walk)return pc0(S);if(S.t>=this.dur)return pc0(S);return null;},end:function(S){return S.bad?{win:false,msg:S.bad}:(S.done>=3?pc0(S):{win:false,msg:"Program ended early. Use Forever so the crossing keeps watching the button."});},
+ info:function(S){return [["Cars",S.car.toUpperCase()],["WALK",S.walk?"ON":"off"],["Crossed",S.done+" / 3"]];}});
+function pc0(S){if(S.done<3)return {win:false,msg:S.done+" of 3 pedestrians crossed safely."};if(S.cars<2)return {win:false,msg:"Cars were blocked too long. Give them green again after each crossing."};return {win:true,msg:"★ Everyone crossed safely and traffic kept moving!"};}
+
+// ============================ 51: automatic dustbin ============================
+register({id:"dustbin",name:"51 Automatic Dustbin",floor:"workshop",station:true,dur:60,start:{x:150,y:100,a:0},
+ mission:"Build a <b>touch-free dustbin</b>. <b>Open the lid</b> when a hand is closer than <b>30 cm</b>, keep it open while the hand is over the bin, then <b>close it</b>. 4 people will throw rubbish. Do not close on a hand, and do not leave the lid open for more than <b>10 s</b> with nobody near.",
+ hint:"Hint: Forever → If hand closer than 30 then Open lid, Wait 3, else Close lid.",
+ kit:["uno","bank","us","servo"],
+ actions:[{id:"open_lid",label:"Open the lid",need:"servo"},{id:"close_lid",label:"Close the lid",need:"servo"}],
+ sensors:[{id:"hand_dist",label:"Hand closer than",unit:"cm",type:"num",need:["us","irobs","sharp"]}],
+ init:function(S){S.t=0;S.lid=0;S.target=0;S.bad=null;S.wasted=0;S.h=[];var t=R(3,6);for(var i=0;i<4;i++){S.h.push({s:t,d:250,ok:0,done:false,blk:0});t+=R(10,13);}S.thrown=0;},
+ step:function(S,dt){S.t+=dt;var sp=140*dt;S.lid+=Math.max(-sp,Math.min(sp,S.target-S.lid));var near=false;
+  S.h.forEach(function(h,i){var u=S.t-h.s;if(u<0||u>5.2){h.d=250;return;}h.d=u<1.5?80-u/1.5*70:(u<3.7?10:10+(u-3.7)/1.5*90);if(h.d<60)near=true;
+   if(h.d<=12){if(S.lid>=70){h.ok+=dt;if(h.ok>=1.2&&!h.done){h.done=true;S.thrown++;}}else{h.blk+=dt;if(h.blk>1.4&&!S.bad)S.bad="Person "+(i+1)+" waited at a closed lid. Open it sooner.";if(S.target<S.lid&&!S.bad&&h.blk>0.15)S.bad="The lid closed on person "+(i+1)+"'s hand!";}}});
+  if(S.lid>30&&!near)S.wasted+=dt;else if(near||S.lid<=30)S.wasted=Math.max(0,S.wasted-dt*2);},
+ act:function*(S,id){if(id==="open_lid"){S.target=100;yield* api.wait(0.15);return;}if(id==="close_lid"){S.target=0;yield* api.wait(0.15);return;}yield* api.wait(0.2);},
+ sense:function(S,id){var b=250;S.h.forEach(function(h){b=Math.min(b,h.d);});return Math.round(b+(b<250?noise(1):0));},
+ check:function(S){if(S.bad)return {win:false,msg:S.bad};if(S.wasted>10)return {win:false,msg:"The lid stayed open for over 10 s with nobody near. Close it to keep flies out."};if(S.t>=this.dur)return db1(S);return null;},end:function(S){return S.bad?{win:false,msg:S.bad}:(S.t>=this.dur-1?db1(S):{win:false,msg:"Program ended early. Use Forever so the bin keeps watching."});},
+ info:function(S){return [["Lid",Math.round(S.lid)+"%"],["Rubbish thrown",S.thrown+" / 4"]];}});
+function db1(S){return S.thrown<4?{win:false,msg:S.thrown+" of 4 people could throw rubbish. The lid must be open while a hand is over the bin."}:{win:true,msg:"★ Clean and touch-free! All 4 people used the bin."};}
+
 
 return {def:def,levels:levels,bind:bind};
 })();

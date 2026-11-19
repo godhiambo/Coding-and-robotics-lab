@@ -872,6 +872,60 @@ register({id:"autodoor",name:"48 Automatic Door",floor:"workshop",station:true,d
  info:function(S){return [["Door",Math.round(S.gate)+"%"],["People through",S.passed+" / 4"],["Open, nobody near",Math.round(S.wasted)+" s"]];}});
 function ad8(S){if(S.passed<4)return {win:false,msg:S.passed+" of 4 people got through. The door must open for everyone."};return {win:true,msg:"★ All 4 people walked through safely! Door opened "+S.opens+" time"+(S.opens===1?"":"s")+", wasted only "+Math.round(S.wasted)+" s open."};}
 
+// ============================ 49: parking assistant ============================
+register({id:"parking",name:"49 Parking Assistant",floor:"workshop",station:true,dur:12,start:{x:150,y:100,a:0},
+ mission:"A car is <b>reversing</b> towards a wall. Build the <b>parking assistant</b>: <b>beep</b> when the wall is closer than <b>80 cm</b>, and turn the LED <b>RED</b> when it is closer than <b>30 cm</b> (green before that). Never beep when the wall is far away.",
+ hint:"Hint: Forever → If distance &lt; 30 then Red LED, else Green LED. Then If distance &lt; 80 then Beep.",
+ kit:["uno","bank","us","buzzer","led"],
+ actions:[{id:"beep",label:"Beep",need:"buzzer"},{id:"led_red",label:"LED RED",need:"led"},{id:"led_green",label:"LED GREEN",need:"led"}],
+ sensors:[{id:"wall_dist",label:"Wall distance less than",unit:"cm",type:"num",need:["us","irobs","sharp"]}],
+ init:function(S){S.t=0;S.d=210;S.led="off";S.zone=0;S.far=0;S.close=0;S.redT=0;S.bad=null;},
+ step:function(S,dt){S.t+=dt;if(S.d>16)S.d=Math.max(16,S.d-(S.d>60?30:18)*dt);if(S.d<30){S.close+=dt;if(S.led==="red")S.redT+=dt;}},
+ act:function*(S,id){if(id==="beep"){if(S.d>110)S.far++;else if(S.d<80)S.zone++;yield* api.wait(0.3);return;}if(id==="led_red"){S.led="red";}else if(id==="led_green"){S.led="green";}yield* api.wait(0.1);},
+ sense:function(S,id){return Math.round(S.d+noise(1.5));},
+ check:function(S){if(S.far>=2)return {win:false,msg:"The assistant beeped while the wall was still far away. Beep only under 80 cm."};if(S.t>=this.dur)return pk9(S);return null;},end:function(S){return S.t>=this.dur-1?pk9(S):{win:false,msg:"Program ended early. Use Forever so it watches the whole reverse."};},
+ info:function(S){return [["Wall",Math.round(S.d)+" cm"],["LED",S.led.toUpperCase()],["Warning beeps",S.zone]];}});
+function pk9(S){if(S.zone<3)return {win:false,msg:"Only "+S.zone+" warning beep"+(S.zone===1?"":"s")+" in the danger zone. Beep repeatedly while closer than 80 cm."};
+ if(S.close<=0||S.redT/S.close<0.7)return {win:false,msg:"The LED must be RED when the wall is closer than 30 cm."};return {win:true,msg:"★ Safe parking! "+S.zone+" warnings and a red light at the end."};}
+
+// ============================ 50: pedestrian crossing ============================
+register({id:"pedcross",name:"50 Pedestrian Crossing",floor:"workshop",station:true,dur:75,start:{x:150,y:100,a:0},
+ mission:"Make a <b>smart pedestrian crossing</b>. When the <b>button</b> is pressed: stop the cars (<b>red</b>), turn on the <b>WALK</b> signal for about 6 s, then turn it off and let cars <b>go</b> again. Never show WALK while cars can move, and no pedestrian may wait more than <b>25 s</b>.",
+ hint:"Hint: Forever → If button pressed then Cars red, Walk on, Wait 6, Walk off, Cars green.",
+ kit:["uno","bank","led","buzzer"],
+ actions:[{id:"cars_red",label:"Cars: RED",need:"led"},{id:"cars_green",label:"Cars: GREEN",need:"led"},{id:"walk_on",label:"Walk signal ON",need:"led"},{id:"walk_off",label:"Walk signal OFF",need:"led"},{id:"beep",label:"Crossing beep",need:"buzzer"}],
+ sensors:[{id:"button",label:"Crossing button pressed",type:"bool"}],
+ init:function(S){S.t=0;S.car="green";S.walk=false;S.bad=null;S.cars=0;S.pd=[];var t=R(5,9);for(var i=0;i<3;i++){S.pd.push({s:t,st:"idle",w:0,pr:0});t+=R(16,20);}S.done=0;},
+ step:function(S,dt){S.t+=dt;if(S.car==="green")S.cars+=dt*0.2;var cross=false;
+  S.pd.forEach(function(p,i){if(p.st==="idle"&&S.t>=p.s)p.st="wait";
+   if(p.st==="wait"){p.w+=dt;if(p.w>25&&!S.bad)S.bad="Pedestrian "+(i+1)+" waited more than 25 s. Respond to the button.";if(S.walk&&S.car==="red"){p.st="go";}}
+   if(p.st==="go"){cross=true;p.pr+=dt/5;if(S.car==="green"&&!S.bad)S.bad="Cars were released while pedestrian "+(i+1)+" was still crossing!";if(p.pr>=1){p.st="done";S.done++;}}});
+  S.cross=cross;},
+ act:function*(S,id){if(id==="cars_red"){if(S.car!=="red"){yield* api.wait(1.5);S.car="red";}return;}if(id==="cars_green"){S.car="green";yield* api.wait(0.1);return;}
+  if(id==="walk_on"){if(S.car!=="red"&&!S.bad)S.bad="WALK was shown while cars could still move. Turn the cars red first.";S.walk=true;yield* api.wait(0.1);return;}if(id==="walk_off"){S.walk=false;yield* api.wait(0.1);return;}yield* api.wait(0.2);},
+ sense:function(S,id){return S.pd.some(function(p){return p.st==="wait";});},
+ check:function(S){if(S.bad)return {win:false,msg:S.bad};if(S.done>=3&&S.car==="green"&&!S.walk)return pc0(S);if(S.t>=this.dur)return pc0(S);return null;},end:function(S){return S.bad?{win:false,msg:S.bad}:(S.done>=3?pc0(S):{win:false,msg:"Program ended early. Use Forever so the crossing keeps watching the button."});},
+ info:function(S){return [["Cars",S.car.toUpperCase()],["WALK",S.walk?"ON":"off"],["Crossed",S.done+" / 3"]];}});
+function pc0(S){if(S.done<3)return {win:false,msg:S.done+" of 3 pedestrians crossed safely."};if(S.cars<2)return {win:false,msg:"Cars were blocked too long. Give them green again after each crossing."};return {win:true,msg:"★ Everyone crossed safely and traffic kept moving!"};}
+
+// ============================ 51: automatic dustbin ============================
+register({id:"dustbin",name:"51 Automatic Dustbin",floor:"workshop",station:true,dur:60,start:{x:150,y:100,a:0},
+ mission:"Build a <b>touch-free dustbin</b>. <b>Open the lid</b> when a hand is closer than <b>30 cm</b>, keep it open while the hand is over the bin, then <b>close it</b>. 4 people will throw rubbish. Do not close on a hand, and do not leave the lid open for more than <b>10 s</b> with nobody near.",
+ hint:"Hint: Forever → If hand closer than 30 then Open lid, Wait 3, else Close lid.",
+ kit:["uno","bank","us","servo"],
+ actions:[{id:"open_lid",label:"Open the lid",need:"servo"},{id:"close_lid",label:"Close the lid",need:"servo"}],
+ sensors:[{id:"hand_dist",label:"Hand closer than",unit:"cm",type:"num",need:["us","irobs","sharp"]}],
+ init:function(S){S.t=0;S.lid=0;S.target=0;S.bad=null;S.wasted=0;S.h=[];var t=R(3,6);for(var i=0;i<4;i++){S.h.push({s:t,d:250,ok:0,done:false,blk:0});t+=R(10,13);}S.thrown=0;},
+ step:function(S,dt){S.t+=dt;var sp=140*dt;S.lid+=Math.max(-sp,Math.min(sp,S.target-S.lid));var near=false;
+  S.h.forEach(function(h,i){var u=S.t-h.s;if(u<0||u>5.2){h.d=250;return;}h.d=u<1.5?80-u/1.5*70:(u<3.7?10:10+(u-3.7)/1.5*90);if(h.d<60)near=true;
+   if(h.d<=12){if(S.lid>=70){h.ok+=dt;if(h.ok>=1.2&&!h.done){h.done=true;S.thrown++;}}else{h.blk+=dt;if(h.blk>1.4&&!S.bad)S.bad="Person "+(i+1)+" waited at a closed lid. Open it sooner.";if(S.target<S.lid&&!S.bad&&h.blk>0.15)S.bad="The lid closed on person "+(i+1)+"'s hand!";}}});
+  if(S.lid>30&&!near)S.wasted+=dt;else if(near||S.lid<=30)S.wasted=Math.max(0,S.wasted-dt*2);},
+ act:function*(S,id){if(id==="open_lid"){S.target=100;yield* api.wait(0.15);return;}if(id==="close_lid"){S.target=0;yield* api.wait(0.15);return;}yield* api.wait(0.2);},
+ sense:function(S,id){var b=250;S.h.forEach(function(h){b=Math.min(b,h.d);});return Math.round(b+(b<250?noise(1):0));},
+ check:function(S){if(S.bad)return {win:false,msg:S.bad};if(S.wasted>10)return {win:false,msg:"The lid stayed open for over 10 s with nobody near. Close it to keep flies out."};if(S.t>=this.dur)return db1(S);return null;},end:function(S){return S.bad?{win:false,msg:S.bad}:(S.t>=this.dur-1?db1(S):{win:false,msg:"Program ended early. Use Forever so the bin keeps watching."});},
+ info:function(S){return [["Lid",Math.round(S.lid)+"%"],["Rubbish thrown",S.thrown+" / 4"]];}});
+function db1(S){return S.thrown<4?{win:false,msg:S.thrown+" of 4 people could throw rubbish. The lid must be open while a hand is over the bin."}:{win:true,msg:"★ Clean and touch-free! All 4 people used the bin."};}
+
 
 return {def:def,levels:levels,bind:bind};
 })();
@@ -1009,7 +1063,7 @@ if(typeof SCN!=="undefined"){var sbx=LEVELS.map(function(l){return l.id;}).index
  ];
  var sb=LEVELS.map(function(l){return l.id;}).indexOf("sandbox");NEW.forEach(function(l,k){LEVELS.splice(sb+k,0,l);});
  var T={Beginner:["trafficled","drive","detour","sensor","line","farm","hop","twowalls","stopnear"],
-  Intermediate:["trafficsmart","autodoor","maze","cargo","greenhouse","solar","boda","homeeyes","beacon","compass","dronefirst","armpick","wetdry","handwash","cloth","irrigate","avoider","sharpline","schoolrun","farshelf"],
+  Intermediate:["trafficsmart","autodoor","parking","dustbin","pedcross","maze","cargo","greenhouse","solar","boda","homeeyes","beacon","compass","dronefirst","armpick","wetdry","handwash","cloth","irrigate","avoider","sharpline","schoolrun","farshelf"],
   Advanced:["armstack","armsort","dronegate","dronewall","escarp","armbelt","wastetype","lake","dam","pothole","tomato","mastermaze","slalom","tallwall","armfar"],
   Expert:["armbelt2","dronenight","fire","cropmon"]};
  LEVELS.forEach(function(l){l.tier="Open";for(var t in T)if(T[t].indexOf(l.id)>=0)l.tier=t;});
@@ -1665,6 +1719,9 @@ var TIPS={
  boda:[["Draw the route first: which way must the robot turn to pass each stall, and how far does it go between turns?","Forward, turn, pass the stall, turn back. Turns use degrees, so 90 is a quarter turn."],["Try: Forward 80, Turn right 90, Forward 90, Turn left 90, Forward 100, Turn right 90, Forward 80, Turn left 90, Forward 60. Adjust until it fits.","Run it and watch where the robot ends. Change one number at a time."]],
  trafficsmart:[["Which road needs green more, the one with more cars or fewer?","The one with the longer queue. Compare the two vehicle counters in an If block."],["Forever → If queue NS > queue EW then Green NS, else Green EW, then Wait 4.","Switching costs 2 s of amber, so do not flip every second."]],
  trafficled:[["What order do real traffic lights follow?","Red, then Green, then Amber, then back to Red."],["Forever → Light RED, Wait 5, Light GREEN, Wait 5, Light AMBER, Wait 3.","Every colour must stay on between 3 and 6 seconds."]],
+ parking:[["Which distances matter: when to start beeping and when to turn red?","Beep under 80 cm, red under 30 cm, green otherwise."],["Forever → If distance < 30 then Red LED else Green LED. If distance < 80 then Beep, Wait 0.4.","The beep must repeat while the car gets closer, so keep it inside Forever."]],
+ pedcross:[["What must happen before the WALK signal turns on?","The cars must be stopped (red) first, otherwise pedestrians are in danger."],["Forever → If button pressed then Cars red, Walk on, Wait 6, Walk off, Cars green.","Always release the cars again after the crossing."]],
+ dustbin:[["Which sensor tells the bin a hand is near, and how close?","The ultrasonic sensor. Open when the distance is under 30 cm."],["Forever → If hand closer than 30 then Open lid, Wait 3, else Close lid.","The hand stays over the bin for a few seconds, so wait before closing."]],
  autodoor:[["When should the door open, and when should it close?","Open when a person is close, stay open while they are in the doorway, close once nobody is near."],["Forever → If person closer than 100 then Open door, else Close door.","The sensor keeps seeing the person while they are in the doorway, so the door will not close on them."]],
  solar:[["Which sensor tells the robot a row is too hot?","The temperature sensor. Read it in an If block before you switch the fan on."],["Forward 70, If temperature > 30 then Fan on, Forward 95, then check again for the second row.","The fan should stay off in the cool row to save power."]],
  escarp:[["The cliff is 140 cm tall. How high must the drone be to clear it?","More than 145 cm. Take off gives 60 cm, so you need to fly up about 100 cm."],["Take off, Fly up 100, Forward 100, Forward 100, Fly down 100, Land.","Higher flight uses more battery, so do not wait in the air."]],
@@ -2484,6 +2541,27 @@ function autodoor(G,l,S){var t=T();
  var colors=[0x1e88e5,0xe53935,0x43a047,0xf9a825],skins=[0xf1c27d,0x8d5524,0xc68642,0xe0ac69],people=[];colors.forEach(function(c,i){var p=new t.Group();cyl(p,5,26,MM(c,0.8),0,13+8,0);sph(p,4.6,MM(skins[i],0.7),0,40,0);p.visible=false;G.add(p);people.push(p);});
  return function(tm){var g=S.gate/100*15;dl.position.x=142.5-g;dr.position.x=157.5+g;S.ppl.forEach(function(p,i){var pr=people[i];pr.visible=p.state==="walk";if(pr.visible){pr.position.set(150,0,70+p.x*0.6);pr.rotation.y=Math.PI;pr.position.y=Math.abs(Math.sin(tm*9+i))*0.8;}});};}
 B.autodoor=autodoor;
+function parking(G,l,S){var t=T();box(G,300,1,200,MM(0x555a60,0.9),150,0.5,100);box(G,12,50,200,MM(0xb0b0b0,0.8),280,25,100);for(var i=0;i<5;i++)box(G,12,6,14,MM(i%2?0xffd400:0x222222,0.7),273,40,30+i*35);
+ var car=new t.Group();box(car,56,14,28,MM(0x1e88e5,0.5),0,12,0);box(car,28,12,24,MM(0x9fd6f2,0.3),-4,24,0);[[-18,-14],[18,-14],[-18,14],[18,14]].forEach(function(p){cyl(car,6,4,MM(0x111),p[0],6,p[1]).rotation.x=Math.PI/2;});var tl=box(car,3,5,8,MM(0x330000,0.4),28,13,-8);var tl2=box(car,3,5,8,MM(0x330000,0.4),28,13,8);G.add(car);
+ var led=new t.Mesh(new t.SphereGeometry(6,16,12),new t.MeshStandardMaterial({color:0x222222,emissive:0x00ff00,emissiveIntensity:0}));led.position.set(150,60,40);G.add(led);var sl=lab("PARKING ASSISTANT",54,8,"#0d2b2b","#37d6c6");sl.position.set(150,80,40);G.add(sl);
+ return function(tm){car.position.set(274-S.d-28,0,100);var r=S.led==="red",g2=S.led==="green";led.material.emissive.setHex(r?0xff2020:0x22dd55);led.material.emissiveIntensity=(r||g2)?2.2:0;};}
+B.parking=parking;
+function pedcross(G,l,S){var t=T();box(G,300,1,200,MM(0x3c3f44,0.9),150,0.5,100);for(var i=0;i<7;i++)box(G,8,0.6,26,MM(0xffffff,0.6),128+i*7,1.2,100);box(G,300,1,24,MM(0x9a9a9a,0.9),150,0.9,10);box(G,300,1,24,MM(0x9a9a9a,0.9),150,0.9,190);
+ var cm=new t.MeshStandardMaterial({color:0x2a2a2a,emissive:0x00ff00,emissiveIntensity:2}),wm=new t.MeshStandardMaterial({color:0x2a2a2a,emissive:0xffffff,emissiveIntensity:0});
+ cyl(G,2,60,MM(0x444),100,30,28);var cl=new t.Mesh(new t.SphereGeometry(7,16,12),cm);cl.position.set(100,66,28);G.add(cl);var wl=new t.Mesh(new t.SphereGeometry(6,16,12),wm);wl.position.set(100,52,28);G.add(wl);var lb=lab("WALK",24,7,null,"#fff");lb.position.set(100,78,28);G.add(lb);
+ var cars=[];[0xe53935,0xf9a825,0x43a047].forEach(function(c){var m=carMesh(c);m.scale.setScalar(2);G.add(m);cars.push(m);});
+ var ped=[];[0x1e88e5,0xe53935,0x8e24aa].forEach(function(c){var p=new t.Group();cyl(p,4,22,MM(c,0.8),0,13,0);sph(p,4,MM(0xe0ac69,0.7),0,31,0);p.visible=false;G.add(p);ped.push(p);});
+ return function(tm){var r=S.car==="red";cm.emissive.setHex(r?0xff2020:0x22dd55);wl.material.emissiveIntensity=S.walk?2.4:0;
+  cars.forEach(function(c,i){c.position.set(r?-30-i*60:((tm*45+i*110)%360)-40,0,128);c.visible=true;});
+  S.pd.forEach(function(p,i){var o=ped[i];o.visible=p.st==="wait"||p.st==="go"||p.st==="done";if(!o.visible)return;var z=p.st==="wait"?18:p.st==="go"?18+p.pr*164:182;o.position.set(p.st==="wait"?112+i*4:150+i*6,0,z);o.position.y=p.st==="go"?Math.abs(Math.sin(tm*9))*0.8:0;});};}
+B.pedcross=pedcross;
+function dustbin(G,l,S){var t=T();box(G,300,1,200,MM(0xcdbfa5,0.9),150,0.5,100);
+ box(G,36,50,36,MM(0x2e7d32,0.7),150,25,100);var lid=new t.Group();lid.position.set(132,50,100);G.add(lid);box(lid,38,4,38,MM(0x1b5e20,0.6),19,0,0);
+ box(G,8,5,4,MM(0x111,0.4),150,46,81);var sl=lab("ULTRASONIC SENSOR",30,4,"#0d2b2b","#37d6c6");sl.position.set(150,58,81);G.add(sl);
+ var hand=[];for(var i=0;i<4;i++){var h=new t.Group();sph(h,5,MM([0xf1c27d,0x8d5524,0xc68642,0xe0ac69][i],0.7),0,0,0);box(h,5,5,26,MM([0x1e88e5,0xe53935,0x43a047,0xf9a825][i],0.8),0,0,-16);h.visible=false;G.add(h);hand.push(h);}
+ return function(tm){lid.rotation.z=S.lid/100*1.5;S.h.forEach(function(h,i){var o=hand[i];o.visible=h.d<240;if(o.visible){o.position.set(150+Math.min(h.d,100)*0.5,58+Math.min(h.d,100)*0.2,100);o.rotation.y=-Math.PI/2;}});};}
+B.dustbin=dustbin;
+
 
 // =============================== phone app overlay ===============================
 function phoneShow(on,html){if(!phone){var host=document.getElementById("stage")||document.getElementById("view3d")||E.box;phone=document.createElement("div");phone.style.cssText="position:absolute;right:8px;top:58px;width:150px;max-height:86%;overflow:auto;background:#0f172a;color:#e5e7eb;border:3px solid #334155;border-radius:16px;padding:7px 8px;font:11px/1.35 system-ui,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.45);z-index:6;pointer-events:none";(E.box).appendChild(phone);}
@@ -4144,7 +4222,7 @@ var C=Core,$=function(id){return document.getElementById(id);};
 var LSS="mm_scores",LSP="mm_player",LSF="mm_club";
 function jget(k,d){try{var v=JSON.parse(localStorage.getItem(k)||"null");return v===null?d:v;}catch(e){return d;}}
 function jset(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
-var PAR={drive:1,detour:5,sensor:4,line:7,maze:7,farm:5,cargo:4,greenhouse:5,beacon:8,compass:8,homeeyes:7,armpick:12,armstack:20,armsort:25,armbelt:14,armbelt2:22,dronefirst:4,dronegate:4,dronewall:6,dronenight:9,boda:11,solar:5,escarp:6,hop:1,trafficsmart:6,trafficled:8,autodoor:6,twowalls:7,stopnear:4,avoider:9,sharpline:7,schoolrun:12,farshelf:6,mastermaze:12,slalom:4,tallwall:6,armfar:12};
+var PAR={drive:1,detour:5,sensor:4,line:7,maze:7,farm:5,cargo:4,greenhouse:5,beacon:8,compass:8,homeeyes:7,armpick:12,armstack:20,armsort:25,armbelt:14,armbelt2:22,dronefirst:4,dronegate:4,dronewall:6,dronenight:9,boda:11,solar:5,escarp:6,hop:1,trafficsmart:6,trafficled:8,autodoor:6,parking:7,pedcross:9,dustbin:6,twowalls:7,stopnear:4,avoider:9,sharpline:7,schoolrun:12,farshelf:6,mastermaze:12,slalom:4,tallwall:6,armfar:12};
 function countBlocks(p){var n=0;(p||[]).forEach(function(b){n++;if(b.c)n+=countBlocks(b.c);if(b.e)n+=countBlocks(b.e);});return n;}
 function starsFor(id,blocks){var par=PAR[id];if(!par)return 1;return blocks<=par?3:blocks<=Math.ceil(par*1.5)?2:1;}
 function starStr(n){return "★★★".slice(0,n)+"☆☆☆".slice(0,3-n);}

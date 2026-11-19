@@ -273,6 +273,27 @@ function autodoor(G,l,S){var t=T();
  var colors=[0x1e88e5,0xe53935,0x43a047,0xf9a825],skins=[0xf1c27d,0x8d5524,0xc68642,0xe0ac69],people=[];colors.forEach(function(c,i){var p=new t.Group();cyl(p,5,26,MM(c,0.8),0,13+8,0);sph(p,4.6,MM(skins[i],0.7),0,40,0);p.visible=false;G.add(p);people.push(p);});
  return function(tm){var g=S.gate/100*15;dl.position.x=142.5-g;dr.position.x=157.5+g;S.ppl.forEach(function(p,i){var pr=people[i];pr.visible=p.state==="walk";if(pr.visible){pr.position.set(150,0,70+p.x*0.6);pr.rotation.y=Math.PI;pr.position.y=Math.abs(Math.sin(tm*9+i))*0.8;}});};}
 B.autodoor=autodoor;
+function parking(G,l,S){var t=T();box(G,300,1,200,MM(0x555a60,0.9),150,0.5,100);box(G,12,50,200,MM(0xb0b0b0,0.8),280,25,100);for(var i=0;i<5;i++)box(G,12,6,14,MM(i%2?0xffd400:0x222222,0.7),273,40,30+i*35);
+ var car=new t.Group();box(car,56,14,28,MM(0x1e88e5,0.5),0,12,0);box(car,28,12,24,MM(0x9fd6f2,0.3),-4,24,0);[[-18,-14],[18,-14],[-18,14],[18,14]].forEach(function(p){cyl(car,6,4,MM(0x111),p[0],6,p[1]).rotation.x=Math.PI/2;});var tl=box(car,3,5,8,MM(0x330000,0.4),28,13,-8);var tl2=box(car,3,5,8,MM(0x330000,0.4),28,13,8);G.add(car);
+ var led=new t.Mesh(new t.SphereGeometry(6,16,12),new t.MeshStandardMaterial({color:0x222222,emissive:0x00ff00,emissiveIntensity:0}));led.position.set(150,60,40);G.add(led);var sl=lab("PARKING ASSISTANT",54,8,"#0d2b2b","#37d6c6");sl.position.set(150,80,40);G.add(sl);
+ return function(tm){car.position.set(274-S.d-28,0,100);var r=S.led==="red",g2=S.led==="green";led.material.emissive.setHex(r?0xff2020:0x22dd55);led.material.emissiveIntensity=(r||g2)?2.2:0;};}
+B.parking=parking;
+function pedcross(G,l,S){var t=T();box(G,300,1,200,MM(0x3c3f44,0.9),150,0.5,100);for(var i=0;i<7;i++)box(G,8,0.6,26,MM(0xffffff,0.6),128+i*7,1.2,100);box(G,300,1,24,MM(0x9a9a9a,0.9),150,0.9,10);box(G,300,1,24,MM(0x9a9a9a,0.9),150,0.9,190);
+ var cm=new t.MeshStandardMaterial({color:0x2a2a2a,emissive:0x00ff00,emissiveIntensity:2}),wm=new t.MeshStandardMaterial({color:0x2a2a2a,emissive:0xffffff,emissiveIntensity:0});
+ cyl(G,2,60,MM(0x444),100,30,28);var cl=new t.Mesh(new t.SphereGeometry(7,16,12),cm);cl.position.set(100,66,28);G.add(cl);var wl=new t.Mesh(new t.SphereGeometry(6,16,12),wm);wl.position.set(100,52,28);G.add(wl);var lb=lab("WALK",24,7,null,"#fff");lb.position.set(100,78,28);G.add(lb);
+ var cars=[];[0xe53935,0xf9a825,0x43a047].forEach(function(c){var m=carMesh(c);m.scale.setScalar(2);G.add(m);cars.push(m);});
+ var ped=[];[0x1e88e5,0xe53935,0x8e24aa].forEach(function(c){var p=new t.Group();cyl(p,4,22,MM(c,0.8),0,13,0);sph(p,4,MM(0xe0ac69,0.7),0,31,0);p.visible=false;G.add(p);ped.push(p);});
+ return function(tm){var r=S.car==="red";cm.emissive.setHex(r?0xff2020:0x22dd55);wl.material.emissiveIntensity=S.walk?2.4:0;
+  cars.forEach(function(c,i){c.position.set(r?-30-i*60:((tm*45+i*110)%360)-40,0,128);c.visible=true;});
+  S.pd.forEach(function(p,i){var o=ped[i];o.visible=p.st==="wait"||p.st==="go"||p.st==="done";if(!o.visible)return;var z=p.st==="wait"?18:p.st==="go"?18+p.pr*164:182;o.position.set(p.st==="wait"?112+i*4:150+i*6,0,z);o.position.y=p.st==="go"?Math.abs(Math.sin(tm*9))*0.8:0;});};}
+B.pedcross=pedcross;
+function dustbin(G,l,S){var t=T();box(G,300,1,200,MM(0xcdbfa5,0.9),150,0.5,100);
+ box(G,36,50,36,MM(0x2e7d32,0.7),150,25,100);var lid=new t.Group();lid.position.set(132,50,100);G.add(lid);box(lid,38,4,38,MM(0x1b5e20,0.6),19,0,0);
+ box(G,8,5,4,MM(0x111,0.4),150,46,81);var sl=lab("ULTRASONIC SENSOR",30,4,"#0d2b2b","#37d6c6");sl.position.set(150,58,81);G.add(sl);
+ var hand=[];for(var i=0;i<4;i++){var h=new t.Group();sph(h,5,MM([0xf1c27d,0x8d5524,0xc68642,0xe0ac69][i],0.7),0,0,0);box(h,5,5,26,MM([0x1e88e5,0xe53935,0x43a047,0xf9a825][i],0.8),0,0,-16);h.visible=false;G.add(h);hand.push(h);}
+ return function(tm){lid.rotation.z=S.lid/100*1.5;S.h.forEach(function(h,i){var o=hand[i];o.visible=h.d<240;if(o.visible){o.position.set(150+Math.min(h.d,100)*0.5,58+Math.min(h.d,100)*0.2,100);o.rotation.y=-Math.PI/2;}});};}
+B.dustbin=dustbin;
+
 
 // =============================== phone app overlay ===============================
 function phoneShow(on,html){if(!phone){var host=document.getElementById("stage")||document.getElementById("view3d")||E.box;phone=document.createElement("div");phone.style.cssText="position:absolute;right:8px;top:58px;width:150px;max-height:86%;overflow:auto;background:#0f172a;color:#e5e7eb;border:3px solid #334155;border-radius:16px;padding:7px 8px;font:11px/1.35 system-ui,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.45);z-index:6;pointer-events:none";(E.box).appendChild(phone);}

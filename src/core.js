@@ -128,7 +128,7 @@ if(typeof SCN!=="undefined"){var sbx=LEVELS.map(function(l){return l.id;}).index
  ];
  var sb=LEVELS.map(function(l){return l.id;}).indexOf("sandbox");NEW.forEach(function(l,k){LEVELS.splice(sb+k,0,l);});
  var T={Beginner:["trafficled","drive","detour","sensor","line","farm","hop","twowalls","stopnear"],
-  Intermediate:["trafficsmart","autodoor","maze","cargo","greenhouse","solar","boda","homeeyes","beacon","compass","dronefirst","armpick","wetdry","handwash","cloth","irrigate","avoider","sharpline","schoolrun","farshelf"],
+  Intermediate:["trafficsmart","autodoor","parking","dustbin","pedcross","maze","cargo","greenhouse","solar","boda","homeeyes","beacon","compass","dronefirst","armpick","wetdry","handwash","cloth","irrigate","avoider","sharpline","schoolrun","farshelf"],
   Advanced:["armstack","armsort","dronegate","dronewall","escarp","armbelt","wastetype","lake","dam","pothole","tomato","mastermaze","slalom","tallwall","armfar"],
   Expert:["armbelt2","dronenight","fire","cropmon"]};
  LEVELS.forEach(function(l){l.tier="Open";for(var t in T)if(T[t].indexOf(l.id)>=0)l.tier=t;});
