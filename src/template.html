@@ -206,6 +206,24 @@ button{min-height:44px}.iconbtn{min-height:34px}
 nav button.tourhi{outline:2px solid #3b82f6;outline-offset:-2px;border-radius:10px;animation:tourp 1.2s ease-in-out infinite}
 @keyframes tourp{50%{box-shadow:0 0 14px 2px #3b82f6}}
 #wTour{margin:0 0 8px;width:100%}
+.rvbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px}.rvbar .seg{margin:0}.rvbar button,.rvbar .seg button{padding:7px 10px;font-size:12px;min-height:0}
+.rvstrip{display:flex;gap:4px;overflow-x:auto;margin-bottom:8px;padding-bottom:4px}.rvstrip button{flex:0 0 auto;min-width:62px;padding:6px 4px;font-size:10px;display:flex;flex-direction:column;align-items:center;gap:1px;border-radius:10px}.rvstrip button.on{outline:2px solid #3b82f6;background:#10294a}.rvstrip b{font-size:13px}
+.rv3d{background:#0b1322;border:1px solid #1e3a5f;border-radius:14px;overflow:hidden;margin-bottom:8px;min-height:120px}
+.rvcard h2{margin:2px 0 6px;font-size:18px}.rvk{font-size:11px;letter-spacing:.08em;color:#7dd3fc;margin:10px 0 4px;font-weight:700}
+.rvwhy{font-size:13.5px;line-height:1.55;color:#cbd5e1;margin:0 0 6px}.rvnote{font-size:13px;line-height:1.5;color:#fde68a;margin:0}
+.rvneed{list-style:none;padding:0;margin:0}.rvneed li{padding:5px 8px;background:#0f1d33;border-radius:8px;margin:3px 0;font-size:13px}
+.rvdo label{display:flex;gap:8px;align-items:flex-start;padding:7px 8px;background:#0f1d33;border-radius:8px;margin:4px 0;font-size:13px;line-height:1.45}.rvdo input{margin-top:3px}
+.rvtbl{width:100%;border-collapse:collapse;font-size:12.5px}.rvtbl td,.rvtbl th{padding:5px 6px;border-bottom:1px solid #1e293b;text-align:left}.rvpr{width:70px;background:#0b1322;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:4px}
+.rvcode{background:#060b14;border:1px solid #1e293b;border-radius:10px;padding:8px;font-size:10.5px;line-height:1.4;overflow:auto;max-height:320px;white-space:pre;margin:8px 0}
+.rvfix{background:#0f1d33;border-radius:8px;margin:4px 0;padding:6px 8px}.rvfix summary{font-size:13px;cursor:pointer}.rvfix p{margin:6px 0 2px;font-size:12.5px;color:#cbd5e1}
+.rvnav{display:flex;gap:8px;margin-top:14px}.rvnav button{flex:1}
+.rvsim{width:100%;max-width:420px;display:block;margin:6px auto;border-radius:10px;border:1px solid #1e3a5f}
+.rvhud{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:#94a3b8;justify-content:center}
+.rvctl{display:flex;gap:12px;align-items:center;margin-top:8px}.rvctl>div:last-child{flex:1}
+.rvpad{display:grid;grid-template-columns:repeat(3,46px);grid-template-areas:". f ." "l b r";gap:4px}.rvpad button{height:46px;font-size:20px;touch-action:none;padding:0}.rvpad [data-h=f]{grid-area:f}.rvpad [data-h=l]{grid-area:l}.rvpad [data-h=b]{grid-area:b}.rvpad [data-h=r]{grid-area:r}
+.rvser{background:#060b14;border:1px solid #1e293b;border-radius:10px;padding:8px;font-size:11px;height:130px;overflow:auto;white-space:pre-wrap;color:#86efac}
+@media print{body.rvprint>*:not(main):not(#rover){display:none!important}body.rvprint nav,body.rvprint header,body.rvprint .rvbar,body.rvprint .rvstrip,body.rvprint .rv3d,body.rvprint .rvcard>*:not(#rvParts){display:none!important}body.rvprint .view:not(#rover){display:none!important}body.rvprint,body.rvprint .card,body.rvprint #rvParts{background:#fff!important;color:#000!important}body.rvprint .rvtbl td,body.rvprint .rvtbl th{color:#000;border-color:#999}body.rvprint .rvpr{border:0;color:#000;background:#fff}}
+
 .tourbtn{display:block;width:100%;margin:0 0 8px;background:#0f2a4d;border:1px solid #2b5fa8;color:#bfdbfe;border-radius:12px;padding:9px;font-size:13px}
 
 #welcome .box{max-width:420px;width:100%;max-height:92vh;overflow:auto;background:#101c30;border:1px solid #27385a;border-radius:18px;padding:20px}
@@ -385,7 +403,9 @@ body.comp #picker,body.comp #nextM,body.comp nav [data-tab=club]{display:none!im
 </details>
 </section>
 
+<section id="rover" class="view"><div id="rvRoot"></div></section>
 <section id="build" class="view">
+<button id="rvOpen" class="tourbtn" style="background:#14532d;border-color:#22c55e;color:#bbf7d0">🚗 Guided Build: assemble a real rover step by step (3D, wiring, code, test drive)</button>
 <div class="card" id="lab">
   <h2>🔧 Parts Lab: build your robot</h2>
   <p class="sub">Pick a kit, or turn on Hands-on build to assemble it yourself. Parts follow real rules: mounting, pins, voltage and power.</p>
@@ -591,6 +611,8 @@ __RESCUE__
 __MMCR__
 __PROJ__
 __TOUR__
+__ROVSIM__
+__ROVER__
 __REW__
 __BRIDGE__
 __GEAR__
