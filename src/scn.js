@@ -453,6 +453,23 @@ register({id:"weatherstn",name:"53 Weather Station",floor:"farm",station:true,du
  info:function(S){return [["Temp",S.temp.toFixed(1)+" °C"],["Rain",S.rain?"YES":"no"],["Heat LED",S.heat?"ON":"off"],["Rain LED",S.ra?"ON":"off"]];}});
 function ws3(S){return {win:true,msg:"★ Accurate weather alerts all day! Heat and rain warnings followed the real conditions."};}
 
+// ============================ 54: sorting conveyor ============================
+register({id:"sorter",name:"54 Sorting Conveyor",floor:"workshop",station:true,dur:90,start:{x:150,y:100,a:0},
+ mission:"Run a <b>sorting conveyor</b>. Switch the belt on, read each item's <b>colour</b>, and set the diverter before it reaches the end: <b>red → LEFT bin</b>, <b>blue → RIGHT bin</b>. 8 items will arrive. Stop the belt if you need more time.",
+ hint:"Hint: Forever → Belt on. If colour = red then Diverter left. If colour = blue then Diverter right.",
+ kit:["uno","bank","color","servo","gear"],
+ actions:[{id:"belt_on",label:"Belt ON",need:"gear"},{id:"belt_off",label:"Belt OFF",need:"gear"},{id:"div_left",label:"Diverter LEFT",need:"servo"},{id:"div_right",label:"Diverter RIGHT",need:"servo"}],
+ sensors:[{id:"item_colour",label:"Item under sensor is",type:"enum",opts:["none","red","blue"],need:"color"}],
+ init:function(S){S.t=0;S.belt=false;S.div="left";S.bad=null;S.it=[];S.spawned=0;S.ok=0;S.bin=[0,0];S.cols=[];for(var i=0;i<8;i++)S.cols.push(R(0,1)<0.5?"red":"blue");},
+ step:function(S,dt){S.t+=dt;if(S.belt){var last=S.it[S.it.length-1];if(S.spawned<8&&(!last||last.x>=70)){S.it.push({x:0,c:S.cols[S.spawned++],done:false});}
+   S.it.forEach(function(o){if(o.done)return;o.x+=22*dt;if(o.x>=75&&!o.sorted){o.sorted=true;o.side=S.div;var want=o.c==="red"?"left":"right";if(o.side===want){S.ok++;}else if(!S.bad)S.bad="A "+o.c+" item went into the "+o.side.toUpperCase()+" bin. "+(o.c==="red"?"Red":"Blue")+" belongs "+want.toUpperCase()+".";}
+    if(o.x>=100)o.done=true;});}},
+ act:function*(S,id){if(id==="belt_on")S.belt=true;else if(id==="belt_off")S.belt=false;else if(id==="div_left"){yield* api.wait(0.3);S.div="left";return;}else if(id==="div_right"){yield* api.wait(0.3);S.div="right";return;}yield* api.wait(0.1);},
+ sense:function(S,id){var c="none";S.it.forEach(function(o){if(!o.done&&o.x>=20&&o.x<=48)c=o.c;});return c;},
+ check:function(S){if(S.bad)return {win:false,msg:S.bad};if(S.ok>=8)return so8(S);if(S.t>=this.dur)return so8(S);return null;},end:function(S){return S.bad?{win:false,msg:S.bad}:(S.ok>=8?so8(S):{win:false,msg:"Program ended early. Use Forever so the conveyor keeps sorting."});},
+ info:function(S){return [["Belt",S.belt?"RUNNING":"stopped"],["Diverter",S.div.toUpperCase()],["Sorted correctly",S.ok+" / 8"]];}});
+function so8(S){return S.ok>=8?{win:true,msg:"★ All 8 items sorted correctly! A factory-style sorting line."}:{win:false,msg:S.ok+" of 8 items sorted. Switch the belt on and keep running."};}
+
 
 return {def:def,levels:levels,bind:bind};
 })();

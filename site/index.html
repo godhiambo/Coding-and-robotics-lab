@@ -960,6 +960,23 @@ register({id:"weatherstn",name:"53 Weather Station",floor:"farm",station:true,du
  info:function(S){return [["Temp",S.temp.toFixed(1)+" °C"],["Rain",S.rain?"YES":"no"],["Heat LED",S.heat?"ON":"off"],["Rain LED",S.ra?"ON":"off"]];}});
 function ws3(S){return {win:true,msg:"★ Accurate weather alerts all day! Heat and rain warnings followed the real conditions."};}
 
+// ============================ 54: sorting conveyor ============================
+register({id:"sorter",name:"54 Sorting Conveyor",floor:"workshop",station:true,dur:90,start:{x:150,y:100,a:0},
+ mission:"Run a <b>sorting conveyor</b>. Switch the belt on, read each item's <b>colour</b>, and set the diverter before it reaches the end: <b>red → LEFT bin</b>, <b>blue → RIGHT bin</b>. 8 items will arrive. Stop the belt if you need more time.",
+ hint:"Hint: Forever → Belt on. If colour = red then Diverter left. If colour = blue then Diverter right.",
+ kit:["uno","bank","color","servo","gear"],
+ actions:[{id:"belt_on",label:"Belt ON",need:"gear"},{id:"belt_off",label:"Belt OFF",need:"gear"},{id:"div_left",label:"Diverter LEFT",need:"servo"},{id:"div_right",label:"Diverter RIGHT",need:"servo"}],
+ sensors:[{id:"item_colour",label:"Item under sensor is",type:"enum",opts:["none","red","blue"],need:"color"}],
+ init:function(S){S.t=0;S.belt=false;S.div="left";S.bad=null;S.it=[];S.spawned=0;S.ok=0;S.bin=[0,0];S.cols=[];for(var i=0;i<8;i++)S.cols.push(R(0,1)<0.5?"red":"blue");},
+ step:function(S,dt){S.t+=dt;if(S.belt){var last=S.it[S.it.length-1];if(S.spawned<8&&(!last||last.x>=70)){S.it.push({x:0,c:S.cols[S.spawned++],done:false});}
+   S.it.forEach(function(o){if(o.done)return;o.x+=22*dt;if(o.x>=75&&!o.sorted){o.sorted=true;o.side=S.div;var want=o.c==="red"?"left":"right";if(o.side===want){S.ok++;}else if(!S.bad)S.bad="A "+o.c+" item went into the "+o.side.toUpperCase()+" bin. "+(o.c==="red"?"Red":"Blue")+" belongs "+want.toUpperCase()+".";}
+    if(o.x>=100)o.done=true;});}},
+ act:function*(S,id){if(id==="belt_on")S.belt=true;else if(id==="belt_off")S.belt=false;else if(id==="div_left"){yield* api.wait(0.3);S.div="left";return;}else if(id==="div_right"){yield* api.wait(0.3);S.div="right";return;}yield* api.wait(0.1);},
+ sense:function(S,id){var c="none";S.it.forEach(function(o){if(!o.done&&o.x>=20&&o.x<=48)c=o.c;});return c;},
+ check:function(S){if(S.bad)return {win:false,msg:S.bad};if(S.ok>=8)return so8(S);if(S.t>=this.dur)return so8(S);return null;},end:function(S){return S.bad?{win:false,msg:S.bad}:(S.ok>=8?so8(S):{win:false,msg:"Program ended early. Use Forever so the conveyor keeps sorting."});},
+ info:function(S){return [["Belt",S.belt?"RUNNING":"stopped"],["Diverter",S.div.toUpperCase()],["Sorted correctly",S.ok+" / 8"]];}});
+function so8(S){return S.ok>=8?{win:true,msg:"★ All 8 items sorted correctly! A factory-style sorting line."}:{win:false,msg:S.ok+" of 8 items sorted. Switch the belt on and keep running."};}
+
 
 return {def:def,levels:levels,bind:bind};
 })();
@@ -1097,7 +1114,7 @@ if(typeof SCN!=="undefined"){var sbx=LEVELS.map(function(l){return l.id;}).index
  ];
  var sb=LEVELS.map(function(l){return l.id;}).indexOf("sandbox");NEW.forEach(function(l,k){LEVELS.splice(sb+k,0,l);});
  var T={Beginner:["trafficled","drive","detour","sensor","line","farm","hop","twowalls","stopnear"],
-  Intermediate:["trafficsmart","autodoor","parking","dustbin","pedcross","wifilight","weatherstn","maze","cargo","greenhouse","solar","boda","homeeyes","beacon","compass","dronefirst","armpick","wetdry","handwash","cloth","irrigate","avoider","sharpline","schoolrun","farshelf"],
+  Intermediate:["trafficsmart","autodoor","parking","dustbin","pedcross","wifilight","weatherstn","sorter","maze","cargo","greenhouse","solar","boda","homeeyes","beacon","compass","dronefirst","armpick","wetdry","handwash","cloth","irrigate","avoider","sharpline","schoolrun","farshelf"],
   Advanced:["armstack","armsort","dronegate","dronewall","escarp","armbelt","wastetype","lake","dam","pothole","tomato","mastermaze","slalom","tallwall","armfar"],
   Expert:["armbelt2","dronenight","fire","cropmon"]};
  LEVELS.forEach(function(l){l.tier="Open";for(var t in T)if(T[t].indexOf(l.id)>=0)l.tier=t;});
@@ -1758,6 +1775,7 @@ var TIPS={
  dustbin:[["Which sensor tells the bin a hand is near, and how close?","The ultrasonic sensor. Open when the distance is under 30 cm."],["Forever → If hand closer than 30 then Open lid, Wait 3, else Close lid.","The hand stays over the bin for a few seconds, so wait before closing."]],
  wifilight:[["What does the ESP32 receive from the phone, and what must the light do for each word?","on → light on, off → light off, blink → switch on and off repeatedly."],["Forever → If command = on then Light on. If command = off then Light off. If command = blink then Light on, Wait 0.5, Light off, Wait 0.5.","Blink needs at least 4 switches before the next command arrives."]],
  weatherstn:[["Which two readings does the station need, and when is each alert on?","Temperature above 32 gives the heat alert. Rain sensor true gives the rain alert."],["Forever → If temperature > 32 then Heat on else Heat off. If rain then Rain on else Rain off.","Turn each alert OFF in the else part, or it stays on after the danger has passed."]],
+ sorter:[["Which two things decide where an item goes?","The colour the sensor reads, and where you set the diverter before the item reaches it."],["Forever → Belt on. If colour = red then Diverter left. If colour = blue then Diverter right.","Set the diverter as soon as the colour is read, before the item reaches the end of the belt."]],
  autodoor:[["When should the door open, and when should it close?","Open when a person is close, stay open while they are in the doorway, close once nobody is near."],["Forever → If person closer than 100 then Open door, else Close door.","The sensor keeps seeing the person while they are in the doorway, so the door will not close on them."]],
  solar:[["Which sensor tells the robot a row is too hot?","The temperature sensor. Read it in an If block before you switch the fan on."],["Forward 70, If temperature > 30 then Fan on, Forward 95, then check again for the second row.","The fan should stay off in the cool row to save power."]],
  escarp:[["The cliff is 140 cm tall. How high must the drone be to clear it?","More than 145 cm. Take off gives 60 cm, so you need to fly up about 100 cm."],["Take off, Fly up 100, Forward 100, Forward 100, Fly down 100, Land.","Higher flight uses more battery, so do not wait in the air."]],
@@ -2613,6 +2631,14 @@ function weatherstn(G,l,S){var t=T();box(G,300,1,200,MM(0x6fae4f,0.95),150,0.5,1
  return function(tm){hl.material.emissiveIntensity=S.heat?2.4:0;rl.material.emissiveIntensity=S.ra?2.4:0;cloud.visible=S.rain;sun.scale.setScalar(S.temp>32?1.4:0.9);sun.material.color.setHex(S.temp>32?0xff8a2a:0xffd24a);
   drops.forEach(function(d,i){d.visible=S.rain;if(S.rain)d.position.y=118-(((tm*60)+i*13)%112);});};}
 B.weatherstn=weatherstn;
+function sorter(G,l,S){var t=T();box(G,300,1,200,MM(0xcdbfa5,0.9),150,0.5,100);box(G,200,8,30,MM(0x37404a,0.8),150,10,100);for(var i=0;i<10;i++)box(G,4,1,28,MM(0x222,0.9),60+i*20,14.6,100);
+ var sn=box(G,10,16,10,MM(0x111,0.4),120,26,100);var sl=lab("COLOUR SENSOR",34,6,"#0d2b2b","#37d6c6");sl.position.set(120,40,100);G.add(sl);
+ box(G,30,16,30,MM(0xc62828,0.7),255,8,60);box(G,30,16,30,MM(0x1565c0,0.7),255,8,140);var bl=lab("LEFT: RED",26,6,null,"#fff");bl.position.set(255,24,60);G.add(bl);var br=lab("RIGHT: BLUE",26,6,null,"#fff");br.position.set(255,24,140);G.add(br);
+ var arm=new t.Group();arm.position.set(245,16,100);G.add(arm);box(arm,32,6,3,MM(0xf9a825,0.5),14,0,0);
+ var items=[];for(var i=0;i<8;i++){var m=box(G,10,10,10,MM(0x888,0.5),0,0,0);m.visible=false;items.push(m);}
+ return function(tm){arm.rotation.y=S.div==="left"?0.7:-0.7;S.it.forEach(function(o,i){var m=items[i];m.visible=!o.done||o.x<110;m.material.color.setHex(o.c==="red"?0xe53935:0x1e88e5);var x=60+o.x*1.2,z=100;if(o.sorted){var k=Math.min(1,(o.x-75)/25);z=100+(o.side==="left"?-1:1)*k*40;}m.position.set(x,19,z);if(o.done)m.visible=false;});};}
+B.sorter=sorter;
+
 
 
 
@@ -4275,7 +4301,7 @@ var C=Core,$=function(id){return document.getElementById(id);};
 var LSS="mm_scores",LSP="mm_player",LSF="mm_club";
 function jget(k,d){try{var v=JSON.parse(localStorage.getItem(k)||"null");return v===null?d:v;}catch(e){return d;}}
 function jset(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
-var PAR={drive:1,detour:5,sensor:4,line:7,maze:7,farm:5,cargo:4,greenhouse:5,beacon:8,compass:8,homeeyes:7,armpick:12,armstack:20,armsort:25,armbelt:14,armbelt2:22,dronefirst:4,dronegate:4,dronewall:6,dronenight:9,boda:11,solar:5,escarp:6,hop:1,trafficsmart:6,trafficled:8,autodoor:6,parking:7,wifilight:8,weatherstn:8,pedcross:9,dustbin:6,twowalls:7,stopnear:4,avoider:9,sharpline:7,schoolrun:12,farshelf:6,mastermaze:12,slalom:4,tallwall:6,armfar:12};
+var PAR={drive:1,detour:5,sensor:4,line:7,maze:7,farm:5,cargo:4,greenhouse:5,beacon:8,compass:8,homeeyes:7,armpick:12,armstack:20,armsort:25,armbelt:14,armbelt2:22,dronefirst:4,dronegate:4,dronewall:6,dronenight:9,boda:11,solar:5,escarp:6,hop:1,trafficsmart:6,trafficled:8,autodoor:6,parking:7,wifilight:8,sorter:9,weatherstn:8,pedcross:9,dustbin:6,twowalls:7,stopnear:4,avoider:9,sharpline:7,schoolrun:12,farshelf:6,mastermaze:12,slalom:4,tallwall:6,armfar:12};
 function countBlocks(p){var n=0;(p||[]).forEach(function(b){n++;if(b.c)n+=countBlocks(b.c);if(b.e)n+=countBlocks(b.e);});return n;}
 function starsFor(id,blocks){var par=PAR[id];if(!par)return 1;return blocks<=par?3:blocks<=Math.ceil(par*1.5)?2:1;}
 function starStr(n){return "★★★".slice(0,n)+"☆☆☆".slice(0,3-n);}
@@ -4343,6 +4369,7 @@ var HWT={parking:["Mount the HC-SR04 at the back of a toy car or box and point i
  dustbin:["Glue the lid to an SG90 servo horn. Mount the HC-SR04 on the front rim of the bin.","Power the servo from a battery pack or power bank, not from a board pin. Join all grounds.","Test with your hand at 10 cm and 40 cm to tune the 30 cm rule."],
  wifilight:["ESP32 joins your Wi-Fi and runs a tiny web page with three buttons: on, off, blink.","Use an LED with a 220 ohm resistor. Do NOT switch mains lights without a teacher and a proper relay box.","Keep your Wi-Fi name and password out of any code you share online."],
  weatherstn:["DHT11 data pin to a digital GPIO. Rain plate analog output to an analog GPIO.","Place the DHT11 in the shade and the rain plate slightly tilted so drops run off.","Two LEDs (red heat, blue rain) each with a 220 ohm resistor."],
+ sorter:["Use a TCS3200 colour sensor close to the belt, shielded from sunlight.","A small servo arm is the diverter. Power the servo from a battery, not from the board.","A cheap geared DC motor with a rubber band belt works as the conveyor."],
  trafficled:["Use three LEDs (red, amber, green) with 220 ohm resistors or one RGB LED.","Use delay() or millis() for the 3 to 6 second timings."],
  autodoor:["Servo and ultrasonic sensor on a cardboard door frame. Power the servo separately."],
  trafficsmart:["Two sets of three LEDs, and two ultrasonic or IR sensors counting cars (toy cars work well)."]};

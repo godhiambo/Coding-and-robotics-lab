@@ -309,6 +309,14 @@ function weatherstn(G,l,S){var t=T();box(G,300,1,200,MM(0x6fae4f,0.95),150,0.5,1
  return function(tm){hl.material.emissiveIntensity=S.heat?2.4:0;rl.material.emissiveIntensity=S.ra?2.4:0;cloud.visible=S.rain;sun.scale.setScalar(S.temp>32?1.4:0.9);sun.material.color.setHex(S.temp>32?0xff8a2a:0xffd24a);
   drops.forEach(function(d,i){d.visible=S.rain;if(S.rain)d.position.y=118-(((tm*60)+i*13)%112);});};}
 B.weatherstn=weatherstn;
+function sorter(G,l,S){var t=T();box(G,300,1,200,MM(0xcdbfa5,0.9),150,0.5,100);box(G,200,8,30,MM(0x37404a,0.8),150,10,100);for(var i=0;i<10;i++)box(G,4,1,28,MM(0x222,0.9),60+i*20,14.6,100);
+ var sn=box(G,10,16,10,MM(0x111,0.4),120,26,100);var sl=lab("COLOUR SENSOR",34,6,"#0d2b2b","#37d6c6");sl.position.set(120,40,100);G.add(sl);
+ box(G,30,16,30,MM(0xc62828,0.7),255,8,60);box(G,30,16,30,MM(0x1565c0,0.7),255,8,140);var bl=lab("LEFT: RED",26,6,null,"#fff");bl.position.set(255,24,60);G.add(bl);var br=lab("RIGHT: BLUE",26,6,null,"#fff");br.position.set(255,24,140);G.add(br);
+ var arm=new t.Group();arm.position.set(245,16,100);G.add(arm);box(arm,32,6,3,MM(0xf9a825,0.5),14,0,0);
+ var items=[];for(var i=0;i<8;i++){var m=box(G,10,10,10,MM(0x888,0.5),0,0,0);m.visible=false;items.push(m);}
+ return function(tm){arm.rotation.y=S.div==="left"?0.7:-0.7;S.it.forEach(function(o,i){var m=items[i];m.visible=!o.done||o.x<110;m.material.color.setHex(o.c==="red"?0xe53935:0x1e88e5);var x=60+o.x*1.2,z=100;if(o.sorted){var k=Math.min(1,(o.x-75)/25);z=100+(o.side==="left"?-1:1)*k*40;}m.position.set(x,19,z);if(o.done)m.visible=false;});};}
+B.sorter=sorter;
+
 
 
 

@@ -4,7 +4,7 @@ var C=Core,$=function(id){return document.getElementById(id);};
 var LSS="mm_scores",LSP="mm_player",LSF="mm_club";
 function jget(k,d){try{var v=JSON.parse(localStorage.getItem(k)||"null");return v===null?d:v;}catch(e){return d;}}
 function jset(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
-var PAR={drive:1,detour:5,sensor:4,line:7,maze:7,farm:5,cargo:4,greenhouse:5,beacon:8,compass:8,homeeyes:7,armpick:12,armstack:20,armsort:25,armbelt:14,armbelt2:22,dronefirst:4,dronegate:4,dronewall:6,dronenight:9,boda:11,solar:5,escarp:6,hop:1,trafficsmart:6,trafficled:8,autodoor:6,parking:7,wifilight:8,weatherstn:8,pedcross:9,dustbin:6,twowalls:7,stopnear:4,avoider:9,sharpline:7,schoolrun:12,farshelf:6,mastermaze:12,slalom:4,tallwall:6,armfar:12};
+var PAR={drive:1,detour:5,sensor:4,line:7,maze:7,farm:5,cargo:4,greenhouse:5,beacon:8,compass:8,homeeyes:7,armpick:12,armstack:20,armsort:25,armbelt:14,armbelt2:22,dronefirst:4,dronegate:4,dronewall:6,dronenight:9,boda:11,solar:5,escarp:6,hop:1,trafficsmart:6,trafficled:8,autodoor:6,parking:7,wifilight:8,sorter:9,weatherstn:8,pedcross:9,dustbin:6,twowalls:7,stopnear:4,avoider:9,sharpline:7,schoolrun:12,farshelf:6,mastermaze:12,slalom:4,tallwall:6,armfar:12};
 function countBlocks(p){var n=0;(p||[]).forEach(function(b){n++;if(b.c)n+=countBlocks(b.c);if(b.e)n+=countBlocks(b.e);});return n;}
 function starsFor(id,blocks){var par=PAR[id];if(!par)return 1;return blocks<=par?3:blocks<=Math.ceil(par*1.5)?2:1;}
 function starStr(n){return "★★★".slice(0,n)+"☆☆☆".slice(0,3-n);}
@@ -72,6 +72,7 @@ var HWT={parking:["Mount the HC-SR04 at the back of a toy car or box and point i
  dustbin:["Glue the lid to an SG90 servo horn. Mount the HC-SR04 on the front rim of the bin.","Power the servo from a battery pack or power bank, not from a board pin. Join all grounds.","Test with your hand at 10 cm and 40 cm to tune the 30 cm rule."],
  wifilight:["ESP32 joins your Wi-Fi and runs a tiny web page with three buttons: on, off, blink.","Use an LED with a 220 ohm resistor. Do NOT switch mains lights without a teacher and a proper relay box.","Keep your Wi-Fi name and password out of any code you share online."],
  weatherstn:["DHT11 data pin to a digital GPIO. Rain plate analog output to an analog GPIO.","Place the DHT11 in the shade and the rain plate slightly tilted so drops run off.","Two LEDs (red heat, blue rain) each with a 220 ohm resistor."],
+ sorter:["Use a TCS3200 colour sensor close to the belt, shielded from sunlight.","A small servo arm is the diverter. Power the servo from a battery, not from the board.","A cheap geared DC motor with a rubber band belt works as the conveyor."],
  trafficled:["Use three LEDs (red, amber, green) with 220 ohm resistors or one RGB LED.","Use delay() or millis() for the 3 to 6 second timings."],
  autodoor:["Servo and ultrasonic sensor on a cardboard door frame. Power the servo separately."],
  trafficsmart:["Two sets of three LEDs, and two ultrasonic or IR sensors counting cars (toy cars work well)."]};
